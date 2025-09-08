@@ -1,0 +1,64 @@
+/* Custom black button for About Us */
+.btn-black {
+  background: #111;
+  color: #fff !important;
+  border: 2px solid #000;
+  transition: background 0.2s, color 0.2s, border 0.2s;
+  font-weight: bold;
+}
+.btn-black:hover, .btn-black:focus {
+  background: #222;
+  color: #fff !important;
+  border: 2px solid #000;
+}
+@import url('https://fonts.googleapis.com/css?family=Poppins:400,500,700,900&display=swap');
+
+body, .modern-navbar, .modern-navbar .navbar-brand, .modern-navbar .nav-link, .modern-navbar .nav-item, .modern-navbar .badge {
+  font-family: 'Poppins', Arial, sans-serif !important;
+}
+.modern-navbar {
+  background: #fff;
+  border-radius: 1.5rem;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+  padding: 1.2rem 2.5rem;
+  margin: 1rem 0;
+}
+.modern-navbar .navbar-brand {
+  font-size: 2.2rem;
+  font-weight: 900; /* Make header title font thick */
+  letter-spacing: 1px;
+  padding-left: 1rem;
+}
+.modern-navbar .nav-link {
+  font-size: 1.15rem;
+  padding: 1rem 2.2rem !important;
+  border-radius: 1.2rem;
+  transition: background 0.2s, color 0.2s;
+  margin-right: 0.5rem;
+}
+.modern-navbar .nav-link.active {
+  background: linear-gradient(90deg, #007bff 60%, #0056b3 100%);
+  color: #fff !important;
+  font-weight: 700;
+  box-shadow: none;
+  border: none;
+}
+.modern-navbar .nav-link:hover:not(.active) {
+  background: #f0f4ff;
+  color: #007bff;
+}
+.modern-navbar .nav-item {
+  position: relative;
+}
+.modern-navbar .badge {
+  top: 12px !important;
+  left: 80% !important;
+}
+@media (max-width: 991px) {
+  .modern-navbar {
+    padding: 1rem 1rem;
+  }
+  .modern-navbar .nav-link {
+    padding: 0.8rem 1.2rem !important;
+  }
+}

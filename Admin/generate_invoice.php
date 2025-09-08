@@ -1,0 +1,831 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+require '../database/database.php';
+session_start();
+
+$db = new Database();
+
+// --- Restrict access: Only allow logged in admin ---
+if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+    header("Location: login.php");
+    exit();
+}
+
+// --- Chat functionality ---
+if (isset($_POST['send_message']) && isset($_POST['invoice_id'])) {
+    $invoice_id = intval($_POST['invoice_id']);
+    $admin_id = $_SESSION['admin_id'] ?? 0;
+    $message_text = trim($_POST['message_text'] ?? '');
+    $image_path = null;
+
+    if (!empty($_FILES['image_file']['name'])) {
+        $upload_dir = '../uploads/invoice_chat/';
+        if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+        $file_name = time() . '_' . basename($_FILES['image_file']['name']);
+        $target_path = $upload_dir . $file_name;
+        if (move_uploaded_file($_FILES['image_file']['tmp_name'], $target_path)) {
+            $image_path = 'uploads/invoice_chat/' . $file_name;
+        }
+    }
+
+    $db->sendInvoiceChat($invoice_id, 'admin', $admin_id, $message_text, $image_path);
+    header("Location: generate_invoice.php?chat_invoice_id=" . $invoice_id . "&status=" . ($_GET['status'] ?? 'new'));
+    exit();
+}
+
+// --- Mark as Paid (send paid message in old invoice chat, create new invoice with chat continuity) ---
+if (isset($_GET['toggle_status']) && isset($_GET['invoice_id'])) {
+    $invoice_id = intval($_GET['invoice_id']);
+
+    // Fetch the invoice to check status
+    $invoice = $db->getSingleInvoiceForDisplay($invoice_id);
+    if (!$invoice) {
+        exit("Invoice not found.");
+    }
+
+    if (strtolower($invoice['Status']) === 'paid' || strtolower($invoice['Flow_Status']) === 'done') {
+        // Already paid!
+        header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new'));
+        exit();
+    }
+
+    // 1. Mark invoice as paid in the database (updates Status and Flow_Status)
+    $db->markInvoiceAsPaid($invoice_id);
+
+    // 1b. Also mark latest rentalrequest as done for this invoice's client/unit
+    $db->markRentalRequestDone($invoice['Client_ID'], $invoice['Space_ID']);
+
+    // 2. Post PAID message in old chat (serves as a receipt)
+    $paid_msg = "This rent has been PAID on " . date('Y-m-d') . ".";
+    $db->sendInvoiceChat($invoice_id, 'system', null, $paid_msg, null);
+
+    // 3. Create next invoice with correct period (next month after the most recent invoice's EndDate)
+    $new_invoice_id = $db->createNextRecurringInvoiceWithChat($invoice_id);
+
+    // 4. Optionally, add a system message in the NEW invoice chat
+    // $db->sendInvoiceChat($new_invoice_id, 'system', null, "Previous rent was PAID on " . date('Y-m-d') . ".", null);
+
+    // --- FIX: Only redirect if new invoice was actually created ---
+    if ($new_invoice_id) {
+        header("Location: generate_invoice.php?chat_invoice_id=$new_invoice_id&status=" . ($_GET['status'] ?? 'new'));
+    } else {
+        // fallback: stay in old invoice chat and show error (or just fallback)
+        header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new') . "&error=recurring_invoice_failed");
+    }
+    exit();
+}
+
+// --- Display Logic ---
+$invoices = [];
+$show_chat = false;
+$chat_invoice_id = null;
+$chat_messages = [];
+$invoice = null;
+
+// --- Invoice filter logic ---
+$allowed_statuses = ['new', 'done', 'all'];
+$status_filter = $_GET['status'] ?? 'new';
+if (!in_array($status_filter, $allowed_statuses)) $status_filter = 'new';
+
+if (!$show_chat) {
+    if ($status_filter === 'all') {
+        $invoices = array_merge(
+            $db->getInvoicesByFlowStatus('new'),
+            $db->getInvoicesByFlowStatus('done')
+        );
+    } else {
+        $invoices = $db->getInvoicesByFlowStatus($status_filter);
+    }
+}
+
+if (isset($_GET['chat_invoice_id'])) {
+    $show_chat = true;
+    $chat_invoice_id = intval($_GET['chat_invoice_id']);
+}
+if ($show_chat && $chat_invoice_id) {
+    $invoice = $db->getSingleInvoiceForDisplay($chat_invoice_id);
+    $chat_messages = $db->getInvoiceChatMessagesForClient($chat_invoice_id);
+}
+
+// Helper for countdown (output JS or static string)
+function renderCountdown($due_date) {
+    $due = strtotime($due_date);
+    $now = time();
+    $diff = $due - $now;
+    if ($diff <= 0) {
+        return '<span class="badge bg-danger">OVERDUE</span>';
+    }
+    $id = 'countdown_' . uniqid();
+    return '<span id="'.$id.'" class="badge bg-warning text-dark" data-duedate="'.$due_date.'"></span>
+<script>
+(function(){
+    function updateCountdown_'.$id.'() {
+        var due = new Date("'.$due_date.'T23:59:59").getTime();
+        var now = new Date().getTime();
+        var diff = due - now;
+        var el = document.getElementById("'.$id.'");
+        if (!el) return;
+        if (diff <= 0) {
+            el.textContent = "OVERDUE";
+            el.className = "badge bg-danger";
+            return;
+        }
+        var d = Math.floor(diff / (1000*60*60*24));
+        var h = Math.floor((diff%(1000*60*60*24))/(1000*60*60));
+        var m = Math.floor((diff%(1000*60*60))/(1000*60));
+        var s = Math.floor((diff%(1000*60))/1000);
+        el.textContent = "Due in " + (d>0?d + "d ":"") + (h>0?h + "h ":"") + (m>0?m + "m ":"") + s + "s";
+        setTimeout(updateCountdown_'.$id.', 1000);
+    }
+    updateCountdown_'.$id.'();
+})();
+</script>';
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Management | ASRT Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --dark: #1f2937;
+            --darker: #111827;
+            --light: #f3f4f6;
+            --sidebar-width: 280px;
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #f8fafc, #f1f5f9);
+            color: #374151;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Styling */
+        .sidebar {
+            position: fixed;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, var(--dark), var(--darker));
+            color: white;
+            padding: 1.5rem 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: var(--transition);
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 0 1.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.35rem;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .sidebar-brand i {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+        
+        .nav-item {
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: rgba(255, 255, 255, 0.85);
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .nav-link i {
+            width: 24px;
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+        }
+        
+        .badge-notification {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+        
+        /* Header */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .page-title h1 {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: var(--dark);
+            margin-bottom: 0;
+        }
+        
+        .title-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-size: 1.25rem;
+        }
+        
+        /* Dashboard Card */
+        .dashboard-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .card-header i {
+            color: var(--primary);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Table Styling */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+        }
+        
+        .custom-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .custom-table th {
+            background-color: #f9fafb;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            text-align: left;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .custom-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+        
+        .custom-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .custom-table tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        /* Chat Interface */
+        .chat-container {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chat-meta {
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .chat-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #fafafa;
+            border-radius: var(--border-radius);
+        }
+        
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius);
+            max-width: 80%;
+        }
+        
+        .chat-message.admin {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--primary);
+            margin-left: auto;
+        }
+        
+        .chat-message.client {
+            background: rgba(107, 114, 128, 0.1);
+            border-left: 4px solid #6b7280;
+        }
+        
+        .chat-message.system {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--warning);
+            text-align: center;
+            margin: 0 auto;
+            font-style: italic;
+        }
+        
+        .message-sender {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        
+        .chat-image {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+        }
+        
+        .chat-form {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+        }
+        
+        /* Filter Buttons */
+        .filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+        
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        /* Action Buttons */
+        .btn-action {
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-chat {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        
+        .btn-chat:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-paid {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--secondary);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-paid:hover {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        /* Status Badges */
+        .badge {
+            padding: 0.35rem 0.65rem;
+            font-weight: 600;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .filter-buttons {
+                flex-wrap: wrap;
+            }
+            
+            .custom-table {
+                font-size: 0.875rem;
+            }
+            
+            .chat-message {
+                max-width: 90%;
+            }
+        }
+        
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="sidebar-brand">
+                <i class="fas fa-crown"></i>
+                <span>ASRT Admin</span>
+            </a>
+        </div>
+        
+        <div class="sidebar-nav">
+            <div class="nav-item">
+                <a href="dashboard.php" class="nav-link">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="manage_user.php" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    <span>Manage Users</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="view_rental_requests.php" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Rental Requests</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="manage_maintenance.php" class="nav-link">
+                    <i class="fas fa-tools"></i>
+                    <span>Maintenance</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="generate_invoice.php" class="nav-link active">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Invoices</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="add_unit.php" class="nav-link">
+                    <i class="fas fa-plus-square"></i>
+                    <span>Add Unit</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="admin_add_handyman.php" class="nav-link">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Add Handyman</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="admin_kick_unpaid.php" class="nav-link">
+                    <i class="fas fa-user-slash"></i>
+                    <span>Overdue Accounts</span>
+                </a>
+            </div>
+            
+            <div class="nav-item mt-4">
+                <a href="logout.php" class="nav-link">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="page-title">
+                <div class="title-icon">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div>
+                    <h1>Invoice Management</h1>
+                    <p class="text-muted mb-0">Manage invoices and communicate with clients</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                
+            </div>
+        </div>
+        
+        <!-- Info Alert -->
+        <div class="alert alert-info animate-fade-in">
+            <i class="fas fa-info-circle me-2"></i>
+            Mark an invoice as paid to confirm payment. The system will send a chat message as a receipt and create a new invoice for the next rental period.
+        </div>
+        
+        <?php if ($show_chat && $invoice): ?>
+            <!-- Chat Interface -->
+            <div class="chat-container animate-fade-in">
+                <div class="chat-meta">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="fw-bold">Client: <?= htmlspecialchars($invoice['Client_fn'] ?? '') . ' ' . htmlspecialchars($invoice['Client_ln'] ?? '') ?></div>
+                            <div class="text-muted small">Unit: <?= htmlspecialchars($invoice['UnitName'] ?? '') ?></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-end">
+                                <div class="fw-bold">Issued: <?= htmlspecialchars($invoice['InvoiceDate'] ?? '') ?></div>
+                                <div class="fw-bold">Due: <?= htmlspecialchars($invoice['EndDate'] ?? $invoice['InvoiceDate'] ?? '') ?></div>
+                                <?= isset($invoice['EndDate']) ? renderCountdown($invoice['EndDate']) : '' ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-messages">
+                    <?php foreach ($chat_messages as $msg):
+                        $is_admin = $msg['Sender_Type'] === 'admin';
+                        $is_system = $msg['Sender_Type'] === 'system';
+                        $is_client = $msg['Sender_Type'] === 'client';
+                    ?>
+                        <div class="chat-message <?= $is_admin ? 'admin' : ($is_system ? 'system' : ($is_client ? 'client' : '')) ?>">
+                            <div class="message-sender">
+                                <?= htmlspecialchars($msg['SenderName'] ?? ($is_system ? 'System' : ($is_admin ? 'Admin' : 'Client'))) ?>
+                            </div>
+                            <div class="message-text">
+                                <?= nl2br(htmlspecialchars($msg['Message'])) ?>
+                                <?php if (!empty($msg['Image_Path'])): ?>
+                                    <img src="../<?= htmlspecialchars($msg['Image_Path']) ?>" class="chat-image mt-2" alt="chat photo">
+                                <?php endif; ?>
+                            </div>
+                            <div class="message-time">
+                                <?= htmlspecialchars($msg['Created_At'] ?? '') ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                
+                <form method="post" enctype="multipart/form-data" class="chat-form">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-8">
+                            <textarea name="message_text" class="form-control" rows="2" placeholder="Type your message..."></textarea>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="file" name="image_file" accept="image/*" class="form-control">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="hidden" name="invoice_id" value="<?= $chat_invoice_id ?>">
+                            <button type="submit" name="send_message" class="btn btn-primary w-100">
+                                <i class="fas fa-paper-plane me-1"></i> Send
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <button class="btn-action btn-paid" onclick="confirmPaid(this)"
+                        data-href="generate_invoice.php?toggle_status=paid&invoice_id=<?= $invoice['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>">
+                        <i class="fas fa-check-circle"></i> Mark as Paid
+                    </button>
+                    <a href="generate_invoice.php?status=<?= htmlspecialchars($status_filter) ?>" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Invoices
+                    </a>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!$show_chat): ?>
+            <!-- Invoice List -->
+            <div class="dashboard-card animate-fade-in">
+                <div class="card-header">
+                    <i class="fas fa-list"></i>
+                    <span>Invoices</span>
+                    <span class="badge bg-primary ms-2"><?= count($invoices) ?></span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="filter-buttons p-3 border-bottom">
+                        <a href="?status=new" class="filter-btn <?= $status_filter === 'new' ? 'active' : 'bg-light' ?>">
+                            New Invoices
+                        </a>
+                        <a href="?status=done" class="filter-btn <?= $status_filter === 'done' ? 'active' : 'bg-light' ?>">
+                            Completed
+                        </a>
+                        <a href="?status=all" class="filter-btn <?= $status_filter === 'all' ? 'active' : 'bg-light' ?>">
+                            All Invoices
+                        </a>
+                    </div>
+                    
+                    <?php if (!empty($invoices)): ?>
+                        <div class="table-container">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Client</th>
+                                        <th>Unit</th>
+                                        <th>Due Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php $ctr = 1; foreach ($invoices as $row): ?>
+                                    <tr>
+                                        <td>
+                                            <span class="fw-medium">#<?= $ctr++ ?></span>
+                                        </td>
+                                        <td>
+                                            <div class="fw-medium"><?= htmlspecialchars(($row['Client_fn'] ?? '') . ' ' . ($row['Client_ln'] ?? '')) ?></div>
+                                        </td>
+                                        <td><?= htmlspecialchars($row['UnitName'] ?? '') ?></td>
+                                        <td>
+                                            <?= isset($row['EndDate']) ? htmlspecialchars($row['EndDate']) : '<span class="text-muted">N/A</span>' ?>
+                                        </td>
+                                        <td>
+                                            <?= isset($row['EndDate']) ? renderCountdown($row['EndDate']) : '<span class="text-muted">N/A</span>' ?>
+                                        </td>
+                                        <td>
+                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat">
+                                                <i class="fas fa-comments"></i> Chat
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <i class="fas fa-file-invoice"></i>
+                            <h4>No invoices found</h4>
+                            <p>There are no invoices matching the selected filter</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function confirmPaid(button) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "Mark this invoice as PAID? The system will send a chat message as a receipt and create the next invoice for the next rental period with chat continuity.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#10b981',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, mark it as paid!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = button.getAttribute('data-href');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
