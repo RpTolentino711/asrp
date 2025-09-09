@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
 
     // Gmail credentials (replace with env vars in production)
-    $mail->Username = 'ahmadpaguta2005@gmail.com';
+    $mail->Username = 'romeopaolotolentino@gmail.com';
     $mail->Password = 'unwr kdad ejcd rysq';
 
     $mail->setFrom($mail->Username, 'ASRP Registration');
