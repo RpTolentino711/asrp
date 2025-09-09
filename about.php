@@ -492,7 +492,7 @@ $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
         <div class="swiper-wrapper">
           <div class="swiper-slide">
             <div class="team-member">
-              <img src="IMG/SHOW/BRYAN.jpg" alt="Bryan Gabriel Tesoro" class="team-image">
+              <img src="IMG/show/BRYAN.jpg" alt="Bryan Gabriel Tesoro" class="team-image">
               <h4 class="team-name">Bryan Gabriel Tesoro</h4>
               <p class="team-role">Full-Stack Developer</p>
             </div>
@@ -500,7 +500,7 @@ $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
           
           <div class="swiper-slide">
             <div class="team-member">
-              <img src="IMG/SHOW/LUKE.jpg" alt="Luke Aron Magpantay" class="team-image">
+              <img src="IMG/show/LUKE.jpg" alt="Luke Aron Magpantay" class="team-image">
               <h4 class="team-name">Luke Aron Magpantay</h4>
               <p class="team-role">Frontend Developer</p>
             </div>
@@ -508,7 +508,7 @@ $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
           
           <div class="swiper-slide">
             <div class="team-member">
-              <img src="IMG/SHOW/jin.jpg" alt="Jin Carlo Maullon" class="team-image">
+              <img src="IMG/show/jin.jpg" alt="Jin Carlo Maullon" class="team-image">
               <h4 class="team-name">Jin Carlo Maullon</h4>
               <p class="team-role">Backend Developer</p>
             </div>
@@ -516,7 +516,7 @@ $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
           
           <div class="swiper-slide">
             <div class="team-member">
-              <img src="IMG/SHOW/kibrys.jpg" alt="John Kibry Buño" class="team-image">
+              <img src="IMG/show/kibrys.jpg" alt="John Kibry Buño" class="team-image">
               <h4 class="team-name">John Kibry Buño</h4>
               <p class="team-role">UI/UX Designer</p>
             </div>
@@ -524,7 +524,7 @@ $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
           
           <div class="swiper-slide">
             <div class="team-member">
-              <img src="IMG/SHOW/romeo.jpg" alt="Romeo Paolo Tolentino" class="team-image">
+              <img src="IMG/show/romeo.jpg" alt="Romeo Paolo Tolentino" class="team-image">
               <h4 class="team-name">Romeo Paolo Tolentino</h4>
               <p class="team-role">System Architect</p>
             </div>
