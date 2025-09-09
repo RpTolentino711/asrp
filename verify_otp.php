@@ -13,8 +13,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => false, 'message' => 'Invalid OTP format.']);
         exit;
     }
+    // Check OTP expiry
+    if (isset($_SESSION['otp_expires']) && time() > $_SESSION['otp_expires']) {
+        echo json_encode(['success' => false, 'message' => 'OTP expired. Please resend the code.']);
+        exit;
+    }
     if ($entered_otp === $_SESSION['otp']) {
-        require_once 'database/database.php';
+        require_once __DIR__ . '/database/database.php';
         $db = new Database();
         $data = $_SESSION['pending_registration'];
         $success = $db->registerClient(
@@ -25,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data['username'],
             $data['password']
         );
+        // Clean up session
         unset($_SESSION['otp']);
         unset($_SESSION['pending_registration']);
         unset($_SESSION['otp_email']);
@@ -40,6 +46,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     exit;
 }
-
 echo json_encode(['success' => false, 'message' => 'Invalid request.']);
 exit;
