@@ -6,6 +6,6 @@
   <title>Document</title>
 </head>
 <body>
-  <h1>webhook try</h1>
+  <h1>webhook works</h1>
 </body>
 </html>
