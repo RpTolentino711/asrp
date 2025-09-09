@@ -42,32 +42,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = "Password must contain at least one uppercase letter and one special character.";
     }
     if ($db->checkClientCredentialExists('C_username', $username)) {
-    $errors[] = "Username already exists.";
-    $_SESSION['register_duplicate'] = 'username';
+        $errors[] = "Username already exists.";
+        $_SESSION['register_duplicate'] = 'username';
     }
     if ($db->checkClientCredentialExists('Client_Email', $email)) {
-    $errors[] = "Email address is already registered.";
-    $_SESSION['register_duplicate'] = 'email';
+        $errors[] = "Email address is already registered.";
+        $_SESSION['register_duplicate'] = 'email';
     }
 
     if (!empty($errors)) {
-    $_SESSION['register_error'] = implode(' ', $errors);
-    header('Location: index.php'); // Or a dedicated register page
-    exit();
+        $_SESSION['register_error'] = implode(' ', $errors);
+        header('Location: index.php'); // Or a dedicated register page
+        exit();
     } else {
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        
-        if ($db->registerClient($fname, $lname, $email, $phone, $username, $hashed_password)) {
-            $_SESSION['register_success'] = "Registration successful! You can now log in.";
-            unset($_SESSION['register_backup']);
-            unset($_SESSION['register_duplicate']);
-            header('Location: index.php');
-            exit();
-        } else {
-            $_SESSION['register_error'] = "An unexpected error occurred. Please try again later.";
-            header('Location: index.php');
-            exit();
-        }
+        // Generate OTP
+        $otp = rand(100000, 999999);
+        $_SESSION['otp'] = $otp;
+        $_SESSION['otp_email'] = $email;
+        $_SESSION['otp_user_data'] = [
+            'fname' => $fname,
+            'lname' => $lname,
+            'email' => $email,
+            'phone' => $phone,
+            'username' => $username,
+            'password' => password_hash($password, PASSWORD_DEFAULT)
+        ];
+
+    // Send OTP email using PHPMailer
+    require_once __DIR__ . '/send_otp_mail.php';
+    send_otp_mail($email, $otp);
+
+        // Redirect to OTP verification page
+        header('Location: verify_otp.php');
+        exit();
     }
 } else {
     header('Location: index.php');
