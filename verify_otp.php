@@ -10,6 +10,7 @@ if (!isset($_SESSION['otp']) || !isset($_SESSION['otp_user_data'])) {
 $otp_error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $entered_otp = trim($_POST['otp']);
+
     // Validate OTP format (6 digits)
     if (!preg_match('/^\d{6}$/', $entered_otp)) {
         $otp_error = 'OTP must be a 6-digit number.';
@@ -28,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Clear session data
         unset($_SESSION['otp']);
         unset($_SESSION['otp_user_data']);
-        unset($_SESSION['otp_email']);
+        if (isset($_SESSION['otp_email'])) unset($_SESSION['otp_email']);
         if ($success) {
             $_SESSION['register_success'] = 'Registration successful! You can now log in.';
         } else {
