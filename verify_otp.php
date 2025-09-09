@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-// If OTP or user data not set, redirect to registration
+// Redirect if OTP or user data not set
 if (!isset($_SESSION['otp']) || !isset($_SESSION['otp_user_data'])) {
     header('Location: index.php');
     exit();
@@ -10,9 +10,11 @@ if (!isset($_SESSION['otp']) || !isset($_SESSION['otp_user_data'])) {
 $otp_error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $entered_otp = trim($_POST['otp']);
-    if ($entered_otp == $_SESSION['otp']) {
-        // OTP correct, register user
-        require 'database/database.php';
+    // Validate OTP format (6 digits)
+    if (!preg_match('/^\d{6}$/', $entered_otp)) {
+        $otp_error = 'OTP must be a 6-digit number.';
+    } elseif ($entered_otp === $_SESSION['otp']) {
+        require_once 'database/database.php';
         $db = new Database();
         $data = $_SESSION['otp_user_data'];
         $success = $db->registerClient(
@@ -23,18 +25,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data['username'],
             $data['password']
         );
+        // Clear session data
         unset($_SESSION['otp']);
         unset($_SESSION['otp_user_data']);
         unset($_SESSION['otp_email']);
         if ($success) {
             $_SESSION['register_success'] = 'Registration successful! You can now log in.';
-            header('Location: index.php');
-            exit();
         } else {
             $_SESSION['register_error'] = 'An unexpected error occurred. Please try again later.';
-            header('Location: index.php');
-            exit();
         }
+        header('Location: index.php');
+        exit();
     } else {
         $otp_error = 'Invalid OTP. Please try again.';
     }
@@ -55,14 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="card shadow-lg">
                     <div class="card-body">
                         <h3 class="card-title mb-4 text-center">Email Verification</h3>
-                        <p class="mb-3">We have sent a 6-digit OTP to your email: <b><?php echo htmlspecialchars($_SESSION['otp_email']); ?></b></p>
-                        <form method="post">
+                        <p class="mb-3">
+                            We have sent a 6-digit OTP to your email:
+                            <b><?php echo isset($_SESSION['otp_email']) ? htmlspecialchars($_SESSION['otp_email']) : ''; ?></b>
+                        </p>
+                        <form method="post" autocomplete="off">
                             <div class="mb-3">
                                 <label for="otp" class="form-label">Enter OTP</label>
-                                <input type="text" class="form-control" id="otp" name="otp" maxlength="6" required autofocus>
+                                <input type="text" class="form-control" id="otp" name="otp" maxlength="6" pattern="\d{6}" required autofocus>
                             </div>
                             <?php if ($otp_error): ?>
-                                <div class="alert alert-danger py-2"><?php echo $otp_error; ?></div>
+                                <div class="alert alert-danger py-2"><?php echo htmlspecialchars($otp_error); ?></div>
                             <?php endif; ?>
                             <div class="d-grid">
                                 <button type="submit" class="btn btn-primary">Verify & Register</button>
