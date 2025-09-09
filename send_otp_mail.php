@@ -8,8 +8,8 @@ function send_otp_mail($to, $otp, $subject = 'ASRT Registration OTP') {
     $mail->isSMTP();
     $mail->Host = 'smtp.example.com'; // TODO: Change to your SMTP server
     $mail->SMTPAuth = true;
-    $mail->Username = 'romeopaolotolentino@gmail.com'; // TODO: Change to your SMTP username
-    $mail->Password = 'Pogilameg@10'; // TODO: Change to your SMTP password
+    $mail->Username = 'romeotolentino804@gmailcom'; // TODO: Change to your SMTP username
+    $mail->Password = 'unwr kdad ejcd rysq'; // TODO: Change to your SMTP password
     $mail->SMTPSecure = 'tls'; // Or 'ssl' if required
     $mail->Port = 587; // Or 465 for SSL
 
