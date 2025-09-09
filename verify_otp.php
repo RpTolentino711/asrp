@@ -2,6 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 
+// Use the same keys as register.php!
 if (!isset($_SESSION['otp']) || !isset($_SESSION['pending_registration'])) {
     echo json_encode(['success' => false, 'message' => 'Session expired or invalid. Please register again.']);
     exit;
@@ -13,11 +14,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo json_encode(['success' => false, 'message' => 'Invalid OTP format.']);
         exit;
     }
+
     // Check OTP expiry
     if (isset($_SESSION['otp_expires']) && time() > $_SESSION['otp_expires']) {
         echo json_encode(['success' => false, 'message' => 'OTP expired. Please resend the code.']);
         exit;
     }
+
     if ($entered_otp === $_SESSION['otp']) {
         require_once __DIR__ . '/database/database.php';
         $db = new Database();
@@ -36,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         unset($_SESSION['otp_email']);
         unset($_SESSION['otp_expires']);
         unset($_SESSION['otp_attempts']);
+
         if ($success) {
             echo json_encode(['success' => true, 'message' => 'Registration successful! You can now log in.']);
         } else {
@@ -46,5 +50,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     exit;
 }
+
 echo json_encode(['success' => false, 'message' => 'Invalid request.']);
 exit;
