@@ -2,7 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 
-// Check if session contains required data
+// Check if session contains required data (pending registration and email)
 if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration'])) {
     echo json_encode(['success' => false, 'message' => 'Session expired or invalid. Please register again.']);
     exit;
@@ -11,7 +11,7 @@ if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration']))
 $email = $_SESSION['otp_email'];
 $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT); // Always 6 digits
 $_SESSION['otp'] = $otp;
-$_SESSION['otp_expires'] = time() + 5 * 60; // 5 minutes
+$_SESSION['otp_expires'] = time() + 5 * 60; // 5 minutes from now
 $_SESSION['otp_attempts'] = 0;
 unset($_SESSION['otp_locked_until']);
 
