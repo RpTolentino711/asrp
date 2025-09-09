@@ -2,10 +2,10 @@
 
 class Database {
 
-    private $host = "localhost";
-    private $dbname = "asrp"; // UPDATED DATABASE NAME
-    private $user = "root";
-    private $pass = "";
+    private $host = "mysql.hostinger.com";
+    private $dbname = "u321173822_asrp"; // UPDATED DATABASE NAME
+    private $user = "u321173822_alicia";
+    private $pass = "Pogilameg@10";
     private $pdo;
 
     public function __construct() {
