@@ -1,5 +1,5 @@
 <?php
-require '../database/database.php';
+require '../AJAX/database.php';
 header('Content-Type: application/json');
 
 // Create an instance of the Database class
@@ -18,7 +18,7 @@ try {
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $response = ['exists' => false, 'message' => 'Invalid email format', 'valid' => false];
         } else {
-            // Check if email exists in database using PDO
+            // Check if email exists in database
             if ($db->checkClientCredentialExists('Client_Email', $email)) {
                 $response = ['exists' => true, 'message' => 'Email already in use', 'valid' => false];
             } else {
@@ -39,7 +39,7 @@ try {
         } elseif (!preg_match('/^[a-zA-Z0-9_]+$/', $username)) {
             $response = ['exists' => false, 'message' => 'Username can only contain letters, numbers, and underscores', 'valid' => false];
         } else {
-            // Check if username exists in database using PDO
+            // Check if username exists in database
             if ($db->checkClientCredentialExists('C_username', $username)) {
                 $response = ['exists' => true, 'message' => 'Username already in use', 'valid' => false];
             } else {
