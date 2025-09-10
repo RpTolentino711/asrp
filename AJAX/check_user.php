@@ -1,5 +1,5 @@
 <?php
-require '../AJAX/database.php';
+require '../database/database.php';
 header('Content-Type: application/json');
 
 // Create an instance of the Database class
@@ -9,46 +9,43 @@ $db = new Database();
 $response = ['exists' => false, 'message' => '', 'valid' => true];
 
 try {
-    // --- Email Validation ---
+    // Check for email validation request
     if (isset($_POST['email'])) {
         $email = trim($_POST['email']);
-
+        
         if (empty($email)) {
-            // Allow empty as user types
-            $response = ['exists' => false, 'message' => '', 'valid' => true];
+            $response = ['exists' => false, 'message' => '', 'valid' => true]; // Empty is OK while typing
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $response = ['exists' => false, 'message' => 'Invalid email format', 'valid' => false];
         } else {
-            // Check if email exists in database
+            // Check if email exists in database using PDO
             if ($db->checkClientCredentialExists('Client_Email', $email)) {
                 $response = ['exists' => true, 'message' => 'Email already in use', 'valid' => false];
             } else {
                 $response = ['exists' => false, 'message' => 'Email available', 'valid' => true];
             }
         }
-
-    // --- Username Validation ---
-    } elseif (isset($_POST['username'])) {
+    } 
+    // Check for username validation request
+    elseif (isset($_POST['username'])) {
         $username = trim($_POST['username']);
-
+        
         if (empty($username)) {
-            // Allow empty as user types
-            $response = ['exists' => false, 'message' => '', 'valid' => true];
-        } elseif (strlen($username) < 3) {
+            $response = ['exists' => false, 'message' => '', 'valid' => true]; // Empty is OK while typing
+        } elseif (strlen($username) < 3 && strlen($username) > 0) {
             $response = ['exists' => false, 'message' => 'Username must be at least 3 characters', 'valid' => false];
         } elseif (strlen($username) > 20) {
             $response = ['exists' => false, 'message' => 'Username must be 20 characters or less', 'valid' => false];
         } elseif (!preg_match('/^[a-zA-Z0-9_]+$/', $username)) {
             $response = ['exists' => false, 'message' => 'Username can only contain letters, numbers, and underscores', 'valid' => false];
         } else {
-            // Check if username exists in database
+            // Check if username exists in database using PDO
             if ($db->checkClientCredentialExists('C_username', $username)) {
                 $response = ['exists' => true, 'message' => 'Username already in use', 'valid' => false];
             } else {
                 $response = ['exists' => false, 'message' => 'Username available', 'valid' => true];
             }
         }
-
     } else {
         $response = ['exists' => false, 'message' => 'No validation parameter provided', 'valid' => false];
     }
@@ -59,3 +56,4 @@ try {
 }
 
 echo json_encode($response);
+?>
