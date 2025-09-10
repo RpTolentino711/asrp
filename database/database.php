@@ -1333,17 +1333,21 @@ public function updateSpacePhotoField($space_id, $photo_field, $photo_filename) 
         return $this->executeStatement($sql, [$request_id]);
     }
 
-    public function checkClientCredentialExists($field, $value) {
-        if (!in_array($field, ['Client_Email', 'C_username'])) {
-            return false;
-        }
-        $sql = "SELECT 1 FROM client WHERE {$field} = ? LIMIT 1";
-        $result = $this->runQuery($sql, [$value]);
-        return (bool)$result;
+  public function checkClientCredentialExists($field, $value) {
+    if (!in_array($field, ['Client_Email', 'C_username'])) {
+        return false;
     }
 
+    $sql = "SELECT 1 FROM client WHERE {$field} = ? LIMIT 1";
+    $stmt = $this->runQuery($sql, [$value]);
 
-    
+    // If runQuery returns a PDOStatement
+    if ($stmt instanceof PDOStatement) {
+        return (bool)$stmt->fetchColumn();
+    }
+
+    return false;
+}
 
     
 public function getAllUnitsWithRenterStatus() {

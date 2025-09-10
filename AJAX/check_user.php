@@ -1,5 +1,5 @@
 <?php
-// Fix the require path - go up one level to reach database folder
+// Fix the require path - should point to database folder, not AJAX folder
 require '../database/database.php';
 header('Content-Type: application/json');
 
@@ -55,3 +55,4 @@ try {
 
 // Send the JSON response back to the browser
 echo json_encode($response);
+?>
