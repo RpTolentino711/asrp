@@ -1333,20 +1333,20 @@ public function updateSpacePhotoField($space_id, $photo_field, $photo_filename) 
         return $this->executeStatement($sql, [$request_id]);
     }
 
-  public function checkClientCredentialExists($field, $value) {
+
+
+
+    public function checkClientCredentialExists($field, $value) {
     if (!in_array($field, ['Client_Email', 'C_username'])) {
         return false;
     }
 
     $sql = "SELECT 1 FROM client WHERE {$field} = ? LIMIT 1";
-    $stmt = $this->runQuery($sql, [$value]);
-
-    // If runQuery returns a PDOStatement
-    if ($stmt instanceof PDOStatement) {
-        return (bool)$stmt->fetchColumn();
-    }
-
-    return false;
+    $result = $this->runQuery($sql, [$value]);
+    
+    // runQuery returns the fetched result directly, not a PDOStatement
+    // If a record exists, $result will be an array; if not, it will be false
+    return $result !== false;
 }
 
     

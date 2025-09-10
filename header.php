@@ -798,7 +798,7 @@ function validateEmail(email, fieldId, feedbackId) {
 
     showValidationLoading(fieldId, feedbackId, 'Checking email...');
 
-    fetch('AJAX/check_username.php', {
+    fetch('AJAX/check_user.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -827,7 +827,7 @@ function validateUsername(username, fieldId, feedbackId) {
 
     showValidationLoading(fieldId, feedbackId, 'Checking username...');
 
-    fetch('AJAX/check_username.php', {
+    fetch('AJAX/check_user.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
