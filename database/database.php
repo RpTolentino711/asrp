@@ -1435,5 +1435,67 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 }
 
+
+// Add these methods to your existing Database class in database/database.php
+
+/**
+ * Get live available units for real-time updates
+ * Uses the same logic as getHomepageAvailableUnits but optimized for AJAX calls
+ */
+public function getLiveAvailableUnits($limit = null) {
+    try {
+        // Using the same logic as your existing getHomepageAvailableUnits method
+        $sql = "SELECT s.*, st.SpaceTypeName
+                FROM space s
+                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+                LEFT JOIN (
+                    SELECT Space_ID FROM spaceavailability
+                    WHERE LOWER(Status) = 'occupied' AND EndDate >= CURDATE()
+                ) sa ON s.Space_ID = sa.Space_ID
+                WHERE sa.Space_ID IS NULL
+                  AND s.Flow_Status = 'new'
+                ORDER BY s.Space_ID DESC";
+        
+        if ($limit) {
+            $sql .= " LIMIT :limit";
+        }
+        
+        $stmt = $this->pdo->prepare($sql);
+        
+        if ($limit) {
+            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        }
+        
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database error in getLiveAvailableUnits: " . $e->getMessage());
+        return [];
+    }
+}
+
+/**
+ * Get total count of available units (optional - for pagination/info display)
+ */
+public function getAvailableUnitsCount() {
+    try {
+        $sql = "SELECT COUNT(*) as total 
+                FROM space s
+                LEFT JOIN (
+                    SELECT Space_ID FROM spaceavailability
+                    WHERE LOWER(Status) = 'occupied' AND EndDate >= CURDATE()
+                ) sa ON s.Space_ID = sa.Space_ID
+                WHERE sa.Space_ID IS NULL
+                  AND s.Flow_Status = 'new'";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return (int)$result['total'];
+    } catch (PDOException $e) {
+        error_log("Database error in getAvailableUnitsCount: " . $e->getMessage());
+        return 0;
+    }
+}
+
 ?>
 
