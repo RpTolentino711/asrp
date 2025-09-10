@@ -33,7 +33,14 @@ unset($_SESSION['otp_locked_until']);
 
 // --- Send OTP email ---
 require_once __DIR__ . '/send_otp_mail.php';
-$sent = send_otp_mail($email, $otp, 'ASRP Registration OTP (Resent)');
+
+// Pass subject with "(Resent)" so user knows
+$sent = send_otp_mail(
+    $email,
+    $otp,
+    'ASRP Registration OTP (Resent)',
+    $_SESSION['pending_registration']['fname'] ?? ''
+);
 
 if ($sent) {
     echo json_encode([
