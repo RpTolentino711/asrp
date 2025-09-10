@@ -1,11 +1,9 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/database/database.php';
-require_once __DIR__ . '/send_otp_mail.php';
+require_once __DIR__ . '/send_otp_mail.php'; // uses PHPMailer with config.php
 
 $db = new Database();
 $pdo = $db->pdo ?? null;
@@ -47,23 +45,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Check for duplicates ---
     if ($pdo) {
-        $stmt = $pdo->prepare("SELECT Client_ID, C_username, Client_Email FROM client WHERE C_username = ? OR Client_Email = ?");
-        $stmt->execute([$username, $email]);
-        $row = $stmt->fetch();
-        if ($row) {
-            if ($row['C_username'] === $username) {
-                echo json_encode(['success' => false, 'message' => 'Username already exists.']);
-            } elseif ($row['Client_Email'] === $email) {
-                echo json_encode(['success' => false, 'message' => 'Email already registered.']);
-            }
+        $stmt = $pdo->prepare("SELECT Client_ID FROM client WHERE C_username = ?");
+        $stmt->execute([$username]);
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['success' => false, 'message' => 'Username already exists.']);
+            exit;
+        }
+        $stmt = $pdo->prepare("SELECT Client_ID FROM client WHERE Client_Email = ?");
+        $stmt->execute([$email]);
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['success' => false, 'message' => 'Email address already registered.']);
             exit;
         }
     }
 
-    // --- Secure session before writing OTP ---
-    session_regenerate_id(true);
-
-    // --- Store pending registration ---
+    // --- Store pending registration in session ---
     $_SESSION['pending_registration'] = [
         'fname'    => $fname,
         'lname'    => $lname,
@@ -74,26 +70,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     ];
     $_SESSION['otp_email'] = $email;
 
-    // --- Generate OTP (valid 5 minutes) ---
+    // --- Generate OTP ---
     $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-    $_SESSION['otp'] = $otp;
-    $_SESSION['otp_expires'] = time() + 300;
+    $_SESSION['otp']         = $otp;
+    $_SESSION['otp_expires'] = time() + (5 * 60);
     $_SESSION['otp_attempts'] = 0;
     unset($_SESSION['otp_locked_until']);
 
-    // --- Send OTP ---
+    // --- Send OTP email ---
     $sent = send_otp_mail($email, $otp, 'ASRP Registration OTP');
 
     if ($sent) {
         echo json_encode([
-            'success'    => true,
-            'message'    => 'Registration started. OTP sent to your email.',
-            'email'      => $email,
-            'expires_at' => $_SESSION['otp_expires']
+            'success'              => true,
+            'message'              => 'Registration started. OTP sent to your email.',
+            'pending_verification' => true,
+            'email'                => $email,
+            'expires_at'           => $_SESSION['otp_expires']
         ]);
     } else {
-        error_log("Failed to send OTP to {$email}");
-        echo json_encode(['success' => false, 'message' => 'Failed to send OTP email. Try again later.']);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to send OTP email. Please try again later.'
+        ]);
     }
 
 } else {

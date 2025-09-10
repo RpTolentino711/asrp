@@ -1,41 +1,27 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+// send_otp_mail.php
 
-require_once __DIR__ . '/vendor/autoload.php'; // if using Composer
-require_once __DIR__ . '/config.php'; // your SMTP_USER / SMTP_PASS
+require_once __DIR__ . '/class.phpmailer.php';
 
-function send_otp_mail($to, $otp, $subject = 'ASRP Registration OTP') {
-    $mail = new PHPMailer(true);
+function send_otp_mail($to, $otp, $subject = 'ASRT Registration OTP') {
+    $mail = new PHPMailer();
+    $mail->isSMTP();
+    $mail->Host = 'smtp.example.com'; // TODO: Change to your SMTP server
+    $mail->SMTPAuth = true;
+    $mail->Username = 'romeotolentino804com'; // TODO: Change to your SMTP username
+    $mail->Password = 'unwr kdad ejcd rysq'; // TODO: Change to your SMTP password
+    $mail->SMTPSecure = 'tls'; // Or 'ssl' if required
+    $mail->Port = 587; // Or 465 for SSL
 
-    try {
-        // Server settings
-        $mail->isSMTP();
-        $mail->Host       = 'smtp.gmail.com';
-        $mail->SMTPAuth   = true;
-        $mail->Username   = SMTP_USER;
-        $mail->Password   = SMTP_PASS; 
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port       = 587;
+    $mail->setFrom('no-reply@asrt.com', 'ASRT Commercial Spaces');
+    $mail->addAddress($to);
 
-        // Sender & Recipient
-        $mail->setFrom($mail->Username, 'ASRP Registration');
-        $mail->addAddress($to);
+    $mail->isHTML(true);
+    $mail->Subject = $subject;
+    $mail->Body = "Your OTP code for ASRT registration is: <b>" . htmlspecialchars($otp) . "</b><br>This code will expire in 10 minutes.";
 
-        // Content
-        $mail->isHTML(true);
-        $mail->Subject = $subject;
-        $mail->Body    = "Your OTP code for ASRP registration is: <b>" . htmlspecialchars($otp) . "</b><br>This code will expire in 10 minutes.";
-        $mail->AltBody = "Your OTP code for ASRP registration is: $otp. This code will expire in 10 minutes.";
+    // Optional: Add a plain text version for non-HTML clients
+    $mail->AltBody = "Your OTP code for ASRT registration is: $otp\nThis code will expire in 10 minutes.";
 
-        // Optional headers
-        $mail->addCustomHeader('X-Mailer', 'PHPMailer ASRP System');
-
-        $mail->send();
-        return true;
-
-    } catch (Exception $e) {
-        error_log('OTP email failed: ' . $mail->ErrorInfo);
-        return false;
-    }
+    return $mail->send();
 }

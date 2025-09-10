@@ -4,30 +4,39 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 header('Content-Type: application/json');
 
-require_once __DIR__ . '/send_otp_mail.php';
+error_log('RESEND_OTP SESSION: ' . json_encode($_SESSION));
 
+// --- Check session data ---
 if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration'])) {
-    echo json_encode(['success' => false, 'message' => 'Session expired. Please register again.']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Session expired or invalid. Please register again.'
+    ]);
     exit;
 }
 
 $email = $_SESSION['otp_email'];
 
-// --- Cooldown: 60 seconds ---
+// --- Prevent OTP spamming (60s cooldown) ---
 if (isset($_SESSION['last_otp_sent']) && (time() - $_SESSION['last_otp_sent']) < 60) {
     $wait = 60 - (time() - $_SESSION['last_otp_sent']);
-    echo json_encode(['success' => false, 'message' => "Wait {$wait} seconds before requesting again."]);
+    echo json_encode([
+        'success' => false,
+        'message' => "Please wait {$wait} seconds before requesting a new OTP."
+    ]);
     exit;
 }
 $_SESSION['last_otp_sent'] = time();
 
-// --- Generate new OTP ---
-$otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+// --- Generate fresh OTP ---
+$otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 $_SESSION['otp'] = $otp;
-$_SESSION['otp_expires'] = time() + 300;
+$_SESSION['otp_expires'] = time() + 300; // 5 minutes
 $_SESSION['otp_attempts'] = 0;
 unset($_SESSION['otp_locked_until']);
 
+// --- Send OTP email ---
+require_once __DIR__ . '/send_otp_mail.php';
 $sent = send_otp_mail($email, $otp, 'ASRP Registration OTP (Resent)');
 
 if ($sent) {
@@ -38,5 +47,9 @@ if ($sent) {
     ]);
 } else {
     error_log("Failed to resend OTP to {$email}");
-    echo json_encode(['success' => false, 'message' => 'Failed to resend OTP. Try again later.']);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Failed to resend OTP. Please try again later.'
+    ]);
 }
+exit;
