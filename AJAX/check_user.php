@@ -9,12 +9,13 @@ $db = new Database();
 $response = ['exists' => false, 'message' => '', 'valid' => true];
 
 try {
-    // Check for email validation request
+    // --- Email Validation ---
     if (isset($_POST['email'])) {
         $email = trim($_POST['email']);
-        
+
         if (empty($email)) {
-            $response = ['exists' => false, 'message' => '', 'valid' => true]; // Empty is OK while typing
+            // Allow empty as user types
+            $response = ['exists' => false, 'message' => '', 'valid' => true];
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $response = ['exists' => false, 'message' => 'Invalid email format', 'valid' => false];
         } else {
@@ -25,14 +26,15 @@ try {
                 $response = ['exists' => false, 'message' => 'Email available', 'valid' => true];
             }
         }
-    } 
-    // Check for username validation request
-    elseif (isset($_POST['username'])) {
+
+    // --- Username Validation ---
+    } elseif (isset($_POST['username'])) {
         $username = trim($_POST['username']);
-        
+
         if (empty($username)) {
-            $response = ['exists' => false, 'message' => '', 'valid' => true]; // Empty is OK while typing
-        } elseif (strlen($username) < 3 && strlen($username) > 0) {
+            // Allow empty as user types
+            $response = ['exists' => false, 'message' => '', 'valid' => true];
+        } elseif (strlen($username) < 3) {
             $response = ['exists' => false, 'message' => 'Username must be at least 3 characters', 'valid' => false];
         } elseif (strlen($username) > 20) {
             $response = ['exists' => false, 'message' => 'Username must be 20 characters or less', 'valid' => false];
@@ -46,6 +48,7 @@ try {
                 $response = ['exists' => false, 'message' => 'Username available', 'valid' => true];
             }
         }
+
     } else {
         $response = ['exists' => false, 'message' => 'No validation parameter provided', 'valid' => false];
     }
@@ -56,4 +59,3 @@ try {
 }
 
 echo json_encode($response);
-?>

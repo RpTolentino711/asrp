@@ -428,15 +428,16 @@ $is_logged_in = isset($_SESSION['client_id']);
 
 
 }
+/* ADD THIS TO YOUR EXISTING STYLE SECTION */
 
-/* Live Validation Styles for Register Modal */
+/* Live Validation Styles */
 .validation-loading {
-    background: linear-gradient(90deg, transparent, rgba(0,123,255,0.1), transparent);
+    background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
     background-size: 200px 100%;
-    animation: loading-shimmer 1.5s infinite;
+    animation: validation-shimmer 1.5s infinite;
 }
 
-@keyframes loading-shimmer {
+@keyframes validation-shimmer {
     0% { background-position: -200px 0; }
     100% { background-position: 200px 0; }
 }
@@ -446,63 +447,64 @@ $is_logged_in = isset($_SESSION['client_id']);
     font-size: 0.875em;
     margin-top: 0.25rem;
     font-weight: 500;
+    transition: var(--navbar-transition);
 }
 
 .form-text.text-success {
-    color: #28a745 !important;
+    color: var(--navbar-success) !important;
 }
 
 .form-text.text-danger {
-    color: #dc3545 !important;
+    color: var(--navbar-accent) !important;
 }
 
 .form-text.text-muted {
-    color: #6c757d !important;
+    color: var(--navbar-gray) !important;
 }
 
 /* Custom styling for validation states */
 .form-control.is-valid {
-    border-color: #28a745;
-    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    border-color: var(--navbar-success) !important;
+    box-shadow: 0 0 0 0.2rem rgba(5, 150, 105, 0.25) !important;
 }
 
 .form-control.is-invalid {
-    border-color: #dc3545;
-    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+    border-color: var(--navbar-accent) !important;
+    box-shadow: 0 0 0 0.2rem rgba(239, 68, 68, 0.25) !important;
 }
 
 /* Loading state for input fields */
 .form-control.validation-loading {
-    border-color: #007bff;
+    border-color: var(--navbar-primary) !important;
     background-repeat: no-repeat;
 }
 
-/* Icon animations */
+/* Icon animations for validation */
 .bi-check-circle {
-    animation: checkmark 0.3s ease-in;
+    animation: validation-success 0.3s ease-in;
 }
 
 .bi-x-circle {
-    animation: error-shake 0.3s ease-in;
+    animation: validation-error 0.3s ease-in;
 }
 
 .bi-hourglass-split {
-    animation: spin 1s linear infinite;
+    animation: validation-loading 1s linear infinite;
 }
 
-@keyframes checkmark {
+@keyframes validation-success {
     0% { transform: scale(0); }
     50% { transform: scale(1.2); }
     100% { transform: scale(1); }
 }
 
-@keyframes error-shake {
+@keyframes validation-error {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-2px); }
     75% { transform: translateX(2px); }
 }
 
-@keyframes spin {
+@keyframes validation-loading {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
@@ -1020,23 +1022,7 @@ document.querySelectorAll('form').forEach(form => {
   });
 });
 
-// Live validation system for your register modal
-let validationTimeouts = {};
-
-// Debounce function to prevent too many requests
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
-
-// Validate email function
+// Validate email function - UPDATED URL
 function validateEmail(email, fieldId, feedbackId) {
     if (!email.trim()) {
         clearValidationFeedback(fieldId, feedbackId);
@@ -1046,7 +1032,8 @@ function validateEmail(email, fieldId, feedbackId) {
     // Show loading state
     showValidationLoading(fieldId, feedbackId, 'Checking email...');
 
-    fetch('validate_credentials.php', {
+    // CORRECTED URL - pointing to AJAX/check_user.php
+    fetch('AJAX/check_user.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -1063,7 +1050,7 @@ function validateEmail(email, fieldId, feedbackId) {
     });
 }
 
-// Validate username function
+// Validate username function - UPDATED URL
 function validateUsername(username, fieldId, feedbackId) {
     if (!username.trim()) {
         clearValidationFeedback(fieldId, feedbackId);
@@ -1073,7 +1060,8 @@ function validateUsername(username, fieldId, feedbackId) {
     // Show loading state
     showValidationLoading(fieldId, feedbackId, 'Checking username...');
 
-    fetch('validate_credentials.php', {
+    // CORRECTED URL - pointing to AJAX/check_user.php
+    fetch('AJAX/check_user.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -1090,173 +1078,5 @@ function validateUsername(username, fieldId, feedbackId) {
     });
 }
 
-// Update UI based on validation response
-function updateValidationUI(fieldId, feedbackId, data) {
-    const field = document.getElementById(fieldId);
-    const feedback = document.getElementById(feedbackId);
 
-    if (!field || !feedback) return;
-
-    // Remove loading state
-    field.classList.remove('validation-loading');
-
-    if (data.valid && !data.exists) {
-        // Valid and available
-        field.classList.remove('is-invalid');
-        field.classList.add('is-valid');
-        feedback.className = 'form-text text-success';
-        feedback.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + data.message;
-    } else if (!data.valid || data.exists) {
-        // Invalid or already exists
-        field.classList.remove('is-valid');
-        field.classList.add('is-invalid');
-        feedback.className = 'form-text text-danger';
-        feedback.innerHTML = '<i class="bi bi-x-circle me-1"></i>' + data.message;
-    }
-
-    feedback.style.display = 'block';
-}
-
-// Show loading state
-function showValidationLoading(fieldId, feedbackId, message) {
-    const field = document.getElementById(fieldId);
-    const feedback = document.getElementById(feedbackId);
-
-    if (field) {
-        field.classList.add('validation-loading');
-        field.classList.remove('is-valid', 'is-invalid');
-    }
-    
-    if (feedback) {
-        feedback.className = 'form-text text-muted';
-        feedback.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>' + message;
-        feedback.style.display = 'block';
-    }
-}
-
-// Clear validation feedback
-function clearValidationFeedback(fieldId, feedbackId) {
-    const field = document.getElementById(fieldId);
-    const feedback = document.getElementById(feedbackId);
-
-    if (field) {
-        field.classList.remove('is-valid', 'is-invalid', 'validation-loading');
-    }
-    
-    if (feedback) {
-        feedback.innerHTML = '';
-        feedback.style.display = 'none';
-        feedback.className = 'form-text text-danger'; // Reset to default
-    }
-}
-
-// Show validation error
-function showValidationError(fieldId, feedbackId, message) {
-    const field = document.getElementById(fieldId);
-    const feedback = document.getElementById(feedbackId);
-
-    if (field) {
-        field.classList.remove('is-valid', 'validation-loading');
-        field.classList.add('is-invalid');
-    }
-    
-    if (feedback) {
-        feedback.className = 'form-text text-danger';
-        feedback.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + message;
-        feedback.style.display = 'block';
-    }
-}
-
-// Create debounced validation functions
-const debouncedEmailValidation = debounce(validateEmail, 800); // 800ms delay
-const debouncedUsernameValidation = debounce(validateUsername, 800);
-
-// Add this to your existing DOMContentLoaded event listener
-// If you don't have one, create it like this:
-document.addEventListener('DOMContentLoaded', function() {
-    
-    // Email field validation
-    const emailField = document.getElementById('reg_email');
-    if (emailField) {
-        emailField.addEventListener('input', function() {
-            const email = this.value.trim();
-            debouncedEmailValidation(email, 'reg_email', 'email_msg');
-        });
-
-        // Clear validation on focus if empty
-        emailField.addEventListener('focus', function() {
-            if (!this.value.trim()) {
-                clearValidationFeedback('reg_email', 'email_msg');
-            }
-        });
-    }
-
-    // Username field validation
-    const usernameField = document.getElementById('reg_username');
-    if (usernameField) {
-        usernameField.addEventListener('input', function() {
-            const username = this.value.trim();
-            debouncedUsernameValidation(username, 'reg_username', 'username_msg');
-        });
-
-        // Clear validation on focus if empty
-        usernameField.addEventListener('focus', function() {
-            if (!this.value.trim()) {
-                clearValidationFeedback('reg_username', 'username_msg');
-            }
-        });
-    }
-
-    // Enhanced form submission to check validation before submitting
-    const registerForm = document.getElementById('registerForm');
-    if (registerForm) {
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            // Check if there are any validation errors
-            const emailField = document.getElementById('reg_email');
-            const usernameField = document.getElementById('reg_username');
-            const hasEmailError = emailField && emailField.classList.contains('is-invalid');
-            const hasUsernameError = usernameField && usernameField.classList.contains('is-invalid');
-            
-            if (hasEmailError || hasUsernameError) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Validation Error',
-                    text: 'Please fix the errors before submitting.',
-                    timer: 3000
-                });
-                return false;
-            }
-            
-            // If validation passes, proceed with your existing form submission logic
-            if (!checkRegisterForm()) return;
-
-            const submitBtn = document.getElementById('registerSubmitBtn');
-            submitBtn.disabled = true;
-            submitBtn.classList.add('loading');
-
-            const formData = new FormData(registerForm);
-            fetch('register.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('loading');
-                if (data.success && data.pending_verification) {
-                    showOtpModal(data.expires_at);
-                } else if (!data.success) {
-                    Swal.fire({ icon: 'error', title: 'Registration Failed', text: data.message });
-                }
-            })
-            .catch(() => {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('loading');
-                Swal.fire({ icon: 'error', title: 'Error', text: 'Could not process registration.' });
-            });
-        });
-    }
-});
 </script>
