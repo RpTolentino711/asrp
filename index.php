@@ -657,7 +657,7 @@ if (isset($_SESSION['login_error'])) {
             <div class="d-flex gap-3 flex-wrap">
               <a href="#units" class="btn btn-accent btn-lg">Explore Units</a>
               <form action="about.php" method="get" style="display: inline;">
-                <button type="submit" class="btn btn-black btn-lg">About Us</button>
+                <button type="submit" class="btn btn-white btn-lg">About Us</button>
               </form>
             </div>
           </div>
