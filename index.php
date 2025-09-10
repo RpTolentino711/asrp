@@ -657,7 +657,7 @@ if (isset($_SESSION['login_error'])) {
             <div class="d-flex gap-3 flex-wrap">
               <a href="#units" class="btn btn-accent btn-lg">Explore Units</a>
               <form action="about.php" method="get" style="display: inline;">
-                <button type="submit" class="btn btn-black btn-lg">About Us</button>
+                <button type="submit" class="btn btn-accent btn-lg">About Us</button>
               </form>
             </div>
           </div>
@@ -803,7 +803,7 @@ if (isset($_SESSION['login_error'])) {
                                         <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
                                         <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
                                         <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
-                                    </ul>
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
