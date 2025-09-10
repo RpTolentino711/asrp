@@ -52,8 +52,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO client (Client_fn, Client_ln, Client_Email, Client_Phone, C_username, C_password, Status)
-            VALUES (?, ?, ?, ?, ?, ?, 'Active')
+            INSERT INTO client (C_FName, C_LName, Client_Email, C_phone, C_username, C_password, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $user['fname'],
@@ -61,7 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user['email'],
             $user['phone'],
             $user['username'],
-            $user['password']
+            $user['password'],
+            $user['created_at']
         ]);
 
         // Clear OTP and session data
