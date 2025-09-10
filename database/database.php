@@ -1431,7 +1431,5 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 }
 
-
-
 ?>
 
