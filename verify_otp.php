@@ -1,6 +1,5 @@
 <?php
 session_start();
-header('Content-Type: application/json');
 require_once __DIR__ . '/database/database.php';
 
 $db = new Database();
@@ -9,45 +8,28 @@ if (!$pdo && method_exists($db, 'opencon')) {
     $pdo = $db->opencon();
 }
 
-// 1. Ensure we have a pending registration and OTP
 if (!isset($_SESSION['pending_registration'], $_SESSION['otp'], $_SESSION['otp_expires'])) {
-    echo json_encode(['success' => false, 'message' => 'No pending registration. Please register again.']);
-    exit;
+    $_SESSION['register_error'] = "Session expired. Please register again.";
+    header("Location: index.php");
+    exit();
 }
 
-// 2. Handle POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input_otp = isset($_POST['otp']) ? trim($_POST['otp']) : '';
+    $input_otp = trim($_POST['otp']);
 
-    // Lockout system
-    if (isset($_SESSION['otp_locked_until']) && time() < $_SESSION['otp_locked_until']) {
-        echo json_encode(['success' => false, 'message' => 'Too many failed attempts. Please wait before retrying.']);
-        exit;
-    }
-
-    // Expiry check
     if (time() > $_SESSION['otp_expires']) {
-        unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['pending_registration']);
-        echo json_encode(['success' => false, 'message' => 'OTP expired. Please register again.']);
-        exit;
+        $_SESSION['register_error'] = "OTP expired. Please register again.";
+        unset($_SESSION['pending_registration']);
+        header("Location: index.php");
+        exit();
     }
 
-    // Validate OTP
     if ($input_otp !== $_SESSION['otp']) {
-        $_SESSION['otp_attempts'] = ($_SESSION['otp_attempts'] ?? 0) + 1;
-
-        // Lock after 5 failed attempts for 2 minutes
-        if ($_SESSION['otp_attempts'] >= 5) {
-            $_SESSION['otp_locked_until'] = time() + 120;
-            echo json_encode(['success' => false, 'message' => 'Too many failed attempts. Locked for 2 minutes.']);
-            exit;
-        }
-
-        echo json_encode(['success' => false, 'message' => 'Invalid OTP. Please try again.']);
-        exit;
+        $_SESSION['register_error'] = "Invalid OTP.";
+        header("Location: verify_otp_page.php");
+        exit();
     }
 
-    // ✅ OTP valid
     $user = $_SESSION['pending_registration'];
 
     try {
@@ -64,13 +46,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user['password']
         ]);
 
-        // Clear OTP and session data
-        unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until'], $_SESSION['pending_registration'], $_SESSION['otp_email']);
-
-        echo json_encode(['success' => true, 'message' => 'Registration successful! You can now log in.']);
+        unset($_SESSION['pending_registration'], $_SESSION['otp'], $_SESSION['otp_expires']);
+        $_SESSION['register_success'] = "Registration successful! You can now log in.";
+        header("Location: index.php");
+        exit();
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to complete registration.', 'error' => $e->getMessage()]);
+        $_SESSION['register_error'] = "Database error: " . $e->getMessage();
+        header("Location: index.php");
+        exit();
     }
 } else {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
+    header("Location: index.php");
+    exit();
 }
