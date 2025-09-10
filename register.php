@@ -1,9 +1,11 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 header('Content-Type: application/json');
+
 require_once __DIR__ . '/database/database.php';
-require_once __DIR__ . '/class.phpmailer.php';
-require_once __DIR__ . '/class.smtp.php';
+require_once __DIR__ . '/send_otp_mail.php';
 
 $db = new Database();
 $pdo = $db->pdo ?? null;
@@ -11,16 +13,18 @@ if (!$pdo && method_exists($db, 'opencon')) {
     $pdo = $db->opencon();
 }
 
+// --- Handle registration request ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fname = isset($_POST['fname']) ? trim($_POST['fname']) : '';
-    $lname = isset($_POST['lname']) ? trim($_POST['lname']) : '';
-    $email = isset($_POST['email']) ? trim($_POST['email']) : '';
-    $phone = isset($_POST['phone']) ? trim($_POST['phone']) : '';
-    $username = isset($_POST['username']) ? trim($_POST['username']) : '';
-    $password = isset($_POST['password']) ? $_POST['password'] : '';
-    $confirm_password = isset($_POST['confirm_password']) ? $_POST['confirm_password'] : '';
+    $fname            = trim($_POST['fname'] ?? '');
+    $lname            = trim($_POST['lname'] ?? '');
+    $email            = trim($_POST['email'] ?? '');
+    $phone            = trim($_POST['phone'] ?? '');
+    $username         = trim($_POST['username'] ?? '');
+    $password         = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
 
-    if (empty($fname) || empty($lname) || empty($email) || empty($phone) || empty($username) || empty($password) || empty($confirm_password)) {
+    // --- Basic validations ---
+    if (!$fname || !$lname || !$email || !$phone || !$username || !$password || !$confirm_password) {
         echo json_encode(['success' => false, 'message' => 'All fields are required.']);
         exit;
     }
@@ -33,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     if (!preg_match('/^\d{11}$/', $phone)) {
-        echo json_encode(['success' => false, 'message' => 'Phone number must be exactly 11 digits and numbers only.']);
+        echo json_encode(['success' => false, 'message' => 'Phone number must be exactly 11 digits.']);
         exit;
     }
     if (!preg_match('/[A-Z]/', $password) || !preg_match('/[\W_]/', $password)) {
@@ -41,100 +45,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Check for duplicate username/email
+    // --- Check for duplicates ---
     if ($pdo) {
-        $stmt = $pdo->prepare("SELECT C_id FROM client WHERE C_username = ?");
-        $stmt->execute([$username]);
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(['success' => false, 'message' => 'Username already exists.']);
-            exit;
-        }
-        $stmt = $pdo->prepare("SELECT C_id FROM client WHERE Client_Email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(['success' => false, 'message' => 'Email address is already registered.']);
+        $stmt = $pdo->prepare("SELECT Client_ID, C_username, Client_Email FROM client WHERE C_username = ? OR Client_Email = ?");
+        $stmt->execute([$username, $email]);
+        $row = $stmt->fetch();
+        if ($row) {
+            if ($row['C_username'] === $username) {
+                echo json_encode(['success' => false, 'message' => 'Username already exists.']);
+            } elseif ($row['Client_Email'] === $email) {
+                echo json_encode(['success' => false, 'message' => 'Email already registered.']);
+            }
             exit;
         }
     }
 
-    // Store pending registration in session
-    $_SESSION['pending_registration'] = [
-        'fname' => $fname,
-        'lname' => $lname,
-        'email' => $email,
-        'phone' => $phone,
-        'username' => $username,
-        'password' => password_hash($password, PASSWORD_DEFAULT),
-        'created_at' => date('Y-m-d H:i:s')
-    ];
+    // --- Secure session before writing OTP ---
+    session_regenerate_id(true);
 
-    // Generate OTP + session state
-    $otp = random_int(100000, 999999);
-    $_SESSION['otp'] = (string)$otp;
+    // --- Store pending registration ---
+    $_SESSION['pending_registration'] = [
+        'fname'    => $fname,
+        'lname'    => $lname,
+        'email'    => $email,
+        'phone'    => $phone,
+        'username' => $username,
+        'password' => password_hash($password, PASSWORD_DEFAULT)
+    ];
     $_SESSION['otp_email'] = $email;
-    $_SESSION['otp_expires'] = time() + 5 * 60; // 5 minutes
+
+    // --- Generate OTP (valid 5 minutes) ---
+    $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    $_SESSION['otp'] = $otp;
+    $_SESSION['otp_expires'] = time() + 300;
     $_SESSION['otp_attempts'] = 0;
     unset($_SESSION['otp_locked_until']);
 
-    // Send email via PHPMailer
-    $mail = new PHPMailer;
-    $mail->CharSet    = 'UTF-8';
-    $mail->isSMTP();
-    $mail->Host       = 'smtp.gmail.com';
-    $mail->Port       = 587;
-    $mail->SMTPAuth   = true;
-    $mail->SMTPSecure = 'tls';
+    // --- Send OTP ---
+    $sent = send_otp_mail($email, $otp, 'ASRP Registration OTP');
 
-    // Log SMTP debug to Apache error.log
-    $mail->SMTPDebug = 2;
-    $mail->Debugoutput = function ($str, $level) {
-        error_log("PHPMailer [$level]: $str");
-    };
-    $mail->Timeout = 20;
-
-    // Force TLS 1.2
-    $mail->SMTPOptions = [
-        'ssl' => [
-            'verify_peer'       => false,
-            'verify_peer_name'  => false,
-            'allow_self_signed' => true,
-            'crypto_method'     => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
-        ],
-    ];
-
-    // Gmail credentials - CHANGED HERE
-    $mail->Username = 'ahmadpaguta2005@gmail.com';
-    $mail->Password = 'unwr kdad ejcd rysq';
-    $mail->setFrom($mail->Username, 'ASRP Registration');
-    $mail->addReplyTo('no-reply@asrp.local', 'ASRP Registration');
-    $mail->addAddress($email);
-
-    $mail->isHTML(true);
-    $mail->Subject = "Your verification code";
-    $safeName = htmlspecialchars($fname, ENT_QUOTES, 'UTF-8');
-    $mail->Body    = "<p>Hi {$safeName},</p>
-                      <p>Your OTP code is <b>{$otp}</b>.</p>
-                      <p>This code expires in 5 minutes.</p>
-                      <p>If you did not request this email, please ignore it.</p>
-                      <p>See you soon!</p>
-                      <p>Regards,<br>ASRP Registration</p>";
-    $mail->AltBody = "Your OTP code is {$otp}. It expires in 5 minutes.";
-
-    if (!$mail->send()) {
+    if ($sent) {
         echo json_encode([
-            'success' => false,
-            'message' => 'Failed to send verification email. Please try again later.',
-            'error'   => $mail->ErrorInfo,
+            'success'    => true,
+            'message'    => 'Registration started. OTP sent to your email.',
+            'email'      => $email,
+            'expires_at' => $_SESSION['otp_expires']
         ]);
     } else {
-        echo json_encode([
-            'success'               => true,
-            'message'               => 'Registration initiated, OTP sent to your email.',
-            'pending_verification'  => true,
-            'email'                 => $email,
-            'expires_at'            => $_SESSION['otp_expires']
-        ]);
+        error_log("Failed to send OTP to {$email}");
+        echo json_encode(['success' => false, 'message' => 'Failed to send OTP email. Try again later.']);
     }
+
 } else {
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
 }
