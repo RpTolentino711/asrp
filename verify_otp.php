@@ -60,9 +60,13 @@ if (hash_equals($_SESSION['otp'], $inputOtp)) {
     } catch (Exception $e) {
         $errorMsg = $e->getMessage();
     }
-
-    unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until'], $_SESSION['pending_registration']);
-
+    unset(
+        $_SESSION['otp'],
+        $_SESSION['otp_expires'],
+        $_SESSION['otp_attempts'],
+        $_SESSION['otp_locked_until'],
+        $_SESSION['pending_registration']
+    );
     if ($success) {
         echo json_encode(['success' => true, 'message' => 'OTP verified successfully. Registration complete.']);
     } else {
@@ -76,14 +80,12 @@ if (hash_equals($_SESSION['otp'], $inputOtp)) {
         $_SESSION['otp_attempts'] = 0;
     }
     $_SESSION['otp_attempts']++;
-
     // Lock after 5 failed attempts
     if ($_SESSION['otp_attempts'] >= 5) {
         $_SESSION['otp_locked_until'] = time() + 300; // 5 minutes
         echo json_encode(['success' => false, 'message' => 'Too many failed attempts. Please wait 5 minutes before retrying.']);
         exit;
     }
-
     echo json_encode(['success' => false, 'message' => 'Incorrect OTP. Please try again.']);
     exit;
 }
