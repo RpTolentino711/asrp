@@ -1,77 +1,71 @@
 <?php
 session_start();
 header('Content-Type: application/json');
-require_once __DIR__ . '/database/database.php';
 
-$db = new Database();
-$pdo = $db->pdo ?? null;
-if (!$pdo && method_exists($db, 'opencon')) {
-    $pdo = $db->opencon();
-}
-
-// 1. Ensure we have a pending registration and OTP
-if (!isset($_SESSION['pending_registration'], $_SESSION['otp'], $_SESSION['otp_expires'])) {
-    echo json_encode(['success' => false, 'message' => 'No pending registration. Please register again.']);
+// --- Check session data ---
+if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration'])) {
+    echo json_encode(['success' => false, 'message' => 'Session expired or invalid. Please register again.']);
     exit;
 }
 
-// 2. Handle POST
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $input_otp = isset($_POST['otp']) ? trim($_POST['otp']) : '';
+if (!isset($_POST['otp'])) {
+    echo json_encode(['success' => false, 'message' => 'No OTP provided.']);
+    exit;
+}
 
-    // Lockout system
-    if (isset($_SESSION['otp_locked_until']) && time() < $_SESSION['otp_locked_until']) {
-        echo json_encode(['success' => false, 'message' => 'Too many failed attempts. Please wait before retrying.']);
-        exit;
-    }
+$inputOtp = trim($_POST['otp']);
 
-    // Expiry check
-    if (time() > $_SESSION['otp_expires']) {
-        unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['pending_registration']);
-        echo json_encode(['success' => false, 'message' => 'OTP expired. Please register again.']);
-        exit;
-    }
+// --- Validate OTP format ---
+if (!preg_match('/^\d{6}$/', $inputOtp)) {
+    echo json_encode(['success' => false, 'message' => 'Invalid OTP format.']);
+    exit;
+}
 
-    // Validate OTP
-    if ($input_otp !== $_SESSION['otp']) {
-        $_SESSION['otp_attempts'] = ($_SESSION['otp_attempts'] ?? 0) + 1;
+// --- Check if account is locked due to too many attempts ---
+if (isset($_SESSION['otp_locked_until']) && time() < $_SESSION['otp_locked_until']) {
+    $wait = $_SESSION['otp_locked_until'] - time();
+    echo json_encode(['success' => false, 'message' => "Too many attempts. Try again in {$wait} seconds."]);
+    exit;
+}
 
-        // Lock after 5 failed attempts for 2 minutes
-        if ($_SESSION['otp_attempts'] >= 5) {
-            $_SESSION['otp_locked_until'] = time() + 120;
-            echo json_encode(['success' => false, 'message' => 'Too many failed attempts. Locked for 2 minutes.']);
-            exit;
-        }
+// --- Ensure OTP exists in session ---
+if (!isset($_SESSION['otp']) || !isset($_SESSION['otp_expires'])) {
+    echo json_encode(['success' => false, 'message' => 'No OTP found. Please request a new one.']);
+    exit;
+}
 
-        echo json_encode(['success' => false, 'message' => 'Invalid OTP. Please try again.']);
-        exit;
-    }
+// --- Check expiry ---
+if (time() > $_SESSION['otp_expires']) {
+    echo json_encode(['success' => false, 'message' => 'OTP expired. Please request a new one.']);
+    exit;
+}
 
-    // ✅ OTP valid
-    $user = $_SESSION['pending_registration'];
+// --- Verify OTP ---
+if (hash_equals($_SESSION['otp'], $inputOtp)) {
+    // ✅ OTP is correct
+    unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until']);
 
-    try {
-        $stmt = $pdo->prepare("
-            INSERT INTO client (C_FName, C_LName, Client_Email, C_phone, C_username, C_password, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $user['fname'],
-            $user['lname'],
-            $user['email'],
-            $user['phone'],
-            $user['username'],
-            $user['password'],
-            $user['created_at']
-        ]);
+    // Here you can finalize the registration (e.g., insert into DB)
+    // Example:
+    // $userData = $_SESSION['pending_registration'];
+    // save_user_to_db($userData);
 
-        // Clear OTP and session data
-        unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until'], $_SESSION['pending_registration'], $_SESSION['otp_email']);
-
-        echo json_encode(['success' => true, 'message' => 'Registration successful! You can now log in.']);
-    } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Failed to complete registration.', 'error' => $e->getMessage()]);
-    }
+    echo json_encode(['success' => true, 'message' => 'OTP verified successfully. Registration complete.']);
+    exit;
 } else {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
+    // ❌ Wrong OTP
+    if (!isset($_SESSION['otp_attempts'])) {
+        $_SESSION['otp_attempts'] = 0;
+    }
+    $_SESSION['otp_attempts']++;
+
+    // Lock after 5 failed attempts
+    if ($_SESSION['otp_attempts'] >= 5) {
+        $_SESSION['otp_locked_until'] = time() + 300; // 5 minutes
+        echo json_encode(['success' => false, 'message' => 'Too many failed attempts. Please wait 5 minutes before retrying.']);
+        exit;
+    }
+
+    echo json_encode(['success' => false, 'message' => 'Incorrect OTP. Please try again.']);
+    exit;
 }
