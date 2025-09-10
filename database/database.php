@@ -1431,5 +1431,48 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 }
 
+<?php
+// Add this method to your Database class in database/database.php
+
+public function getLiveAvailableUnits($limit = null) {
+    try {
+        $sql = "SELECT s.*, st.SpaceType_Name as SpaceTypeName 
+                FROM spaces s 
+                LEFT JOIN spacetypes st ON s.SpaceType_ID = st.SpaceType_ID 
+                WHERE s.Status = 'available' 
+                ORDER BY s.created_at DESC";
+        
+        if ($limit) {
+            $sql .= " LIMIT :limit";
+        }
+        
+        $stmt = $this->pdo->prepare($sql);
+        
+        if ($limit) {
+            $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
+        }
+        
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database error in getLiveAvailableUnits: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Optional: Add method to get units count for pagination
+public function getAvailableUnitsCount() {
+    try {
+        $sql = "SELECT COUNT(*) as total FROM spaces WHERE Status = 'available'";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['total'];
+    } catch (PDOException $e) {
+        error_log("Database error in getAvailableUnitsCount: " . $e->getMessage());
+        return 0;
+    }
+}
+
 ?>
 
