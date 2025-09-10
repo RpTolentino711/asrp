@@ -4,18 +4,22 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/database/database.php';
 
 // ==== CONFIGURATION ====
-$MAX_ATTEMPTS = 5;       // Max allowed OTP attempts before lockout
-$LOCKOUT_MIN = 15;       // Lockout time in minutes
+$MAX_ATTEMPTS = 5;    // Lock after 5 wrong attempts
+$LOCKOUT_MIN = 15;    // Lockout period (minutes)
 
-// ==== SESSION CHECKS ====
+// ==== GET OTP FROM POST ====
+$otp = isset($_POST['otp']) ? preg_replace('/\D+/', '', $_POST['otp']) : '';
+$now = time();
+
+// ==== DEBUGGING (optional) ====
+// error_log("OTP VERIFY POST: " . json_encode($_POST));
+// error_log("OTP VERIFY SESSION: " . json_encode($_SESSION));
+
+// ==== SESSION REQUIREMENTS ====
 if (!isset($_SESSION['pending_registration']) || !isset($_SESSION['otp'])) {
     echo json_encode(['success' => false, 'message' => 'No pending registration found.']);
     exit;
 }
-
-// ==== READ & VALIDATE REQUEST ====
-$otp = isset($_POST['otp']) ? preg_replace('/\D+/', '', $_POST['otp']) : '';
-$now = time();
 
 // ==== LOCKOUT CHECK ====
 if (!empty($_SESSION['otp_locked_until']) && $now < $_SESSION['otp_locked_until']) {
@@ -33,7 +37,7 @@ if ($otp === '' || strlen($otp) !== 6) {
     exit;
 }
 
-// ==== EXPIRY CHECK ====
+// ==== OTP EXPIRY CHECK ====
 if (empty($_SESSION['otp_expires'])) {
     echo json_encode(['success' => false, 'message' => 'No active code. Please request a new one.']);
     exit;
@@ -47,21 +51,23 @@ $_SESSION['otp_attempts'] = $_SESSION['otp_attempts'] ?? 0;
 
 // ==== OTP VERIFICATION ====
 if (hash_equals((string)$_SESSION['otp'], $otp)) {
-    // ---- OTP Correct: Register the user ----
+    // OTP is correct! Register the user
     try {
         $db = new Database();
         $pdo = $db->pdo ?? (method_exists($db, 'opencon') ? $db->opencon() : null);
+        $data = $_SESSION['pending_registration'];
         $stmt = $pdo->prepare("INSERT INTO client (Client_Fname, Client_Lname, Client_Email, Client_Contact, C_username, C_password, Created_At) VALUES (?, ?, ?, ?, ?, ?, ?)");
         $inserted = $stmt->execute([
-            $_SESSION['pending_registration']['fname'],
-            $_SESSION['pending_registration']['lname'],
-            $_SESSION['pending_registration']['email'],
-            $_SESSION['pending_registration']['phone'],
-            $_SESSION['pending_registration']['username'],
-            $_SESSION['pending_registration']['password'],
-            $_SESSION['pending_registration']['created_at'],
+            $data['fname'],
+            $data['lname'],
+            $data['email'],
+            $data['phone'],
+            $data['username'],
+            $data['password'], // Already hashed
+            $data['created_at']
         ]);
         if ($inserted) {
+            // Optionally: set logged-in session here!
             unset(
                 $_SESSION['otp'],
                 $_SESSION['otp_expires'],
@@ -78,7 +84,7 @@ if (hash_equals((string)$_SESSION['otp'], $otp)) {
         echo json_encode(['success' => false, 'message' => 'An error occurred during registration.']);
     }
 } else {
-    // ---- OTP Incorrect: Track attempts and possibly lock out ----
+    // OTP is wrong
     $_SESSION['otp_attempts']++;
     if ($_SESSION['otp_attempts'] >= $MAX_ATTEMPTS) {
         $_SESSION['otp_locked_until'] = $now + ($LOCKOUT_MIN * 60);
