@@ -656,7 +656,7 @@ if (isset($_SESSION['login_error'])) {
             <p class="hero-subtitle">Your partner in secure, reliable, and flexible commercial leasing. Our mission is to empower businesses with modern, well-equipped workspaces and outstanding service.</p>
             <div class="d-flex gap-3 flex-wrap">
               <a href="#units" class="btn btn-accent btn-lg me-3" style="background: #ff6f61; color: #fff; border: none;">Explore Units</a>
-              <a href="#about" class="btn btn-outline-dark btn-lg" style="color: #fff; border: 2px solid #000; background: transparent;">About Us</a>
+              <a href="about.php" class="btn btn-outline-dark btn-lg" style="color: #fff; border: 2px solid #000; background: transparent;">About Us</a>
             </div>
           </div>
         </div>
