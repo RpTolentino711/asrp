@@ -1,3 +1,16 @@
+<?php
+require_once __DIR__ . '/../database/database.php';
+$db = new Database();
+
+// Fetch all handymen with their job type
+$handymen = [];
+// Use Database class methods for fetching handymen and job types
+$handymen = $db->getAllHandymenWithJob();
+
+// Fetch all job types for dropdown
+$jobtypes = [];
+$jobtypes = $db->getAllJobTypes();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -404,109 +417,72 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php
-                            // Replace this with your actual database query
-                            // Example: $handymen = $db->getAllHandymen();
-                            $handymen = []; // This should be your actual data from database
-                            
-                            if (!empty($handymen)) {
-                                foreach ($handymen as $handyman) {
-                                    echo '<tr>
-                                        <td>' . htmlspecialchars($handyman['first_name']) . '</td>
-                                        <td>' . htmlspecialchars($handyman['last_name']) . '</td>
-                                        <td>' . htmlspecialchars($handyman['phone']) . '</td>
-                                        <td>' . htmlspecialchars($handyman['job_type']) . '</td>
-                                        <td>
-                                            <a href="#" class="btn btn-sm btn-warning me-1">
-                                                <i class="fas fa-edit me-1"></i>Edit
-                                            </a>
-                                            <a href="#" class="btn btn-sm btn-danger">
-                                                <i class="fas fa-trash me-1"></i>Delete
-                                            </a>
-                                        </td>
-                                    </tr>';
-                                }
-                            } else {
-                                echo '<tr>
-                                    <td colspan="5" class="text-center py-4 text-muted">
-                                        <i class="fas fa-users fa-2x mb-2"></i>
-                                        <p>No handymen found. Add your first handyman using the form below.</p>
-                                    </td>
-                                </tr>';
-                            }
-                            ?>
+                        <?php if (!empty($handymen)): ?>
+                            <?php foreach ($handymen as $hm): ?>
+                            <tr>
+                                <td><?= htmlspecialchars($hm['Handyman_fn']) ?></td>
+                                <td><?= htmlspecialchars($hm['Handyman_ln']) ?></td>
+                                <td><?= htmlspecialchars($hm['Phone']) ?></td>
+                                <td><?= htmlspecialchars($hm['JobType_Name'] ?? 'N/A') ?></td>
+                                <td>
+                                    <a href="#" class="btn btn-sm btn-warning me-1"><i class="fas fa-edit me-1"></i>Edit</a>
+                                    <a href="#" class="btn btn-sm btn-danger"><i class="fas fa-trash me-1"></i>Delete</a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr><td colspan="5" class="text-center">No handymen found.</td></tr>
+                        <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-        
         <div class="row">
             <!-- Add/Edit Handyman Form -->
             <div class="col-lg-8">
                 <div class="form-section animate-fade-in" style="animation-delay: 0.1s;">
                     <h4 class="mb-4"><i class="fas fa-user-plus me-2 text-primary"></i>Add New Handyman</h4>
-                    
                     <form method="POST">
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">First Name*</label>
-                                <input type="text" name="Handyman_fn" class="form-control" required
-                                    placeholder="Enter first name">
+                                <input type="text" name="Handyman_fn" class="form-control" required placeholder="Enter first name">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Last Name*</label>
-                                <input type="text" name="Handyman_ln" class="form-control" required
-                                    placeholder="Enter last name">
+                                <input type="text" name="Handyman_ln" class="form-control" required placeholder="Enter last name">
                             </div>
                         </div>
-                        
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Phone*</label>
-                                <input type="text" name="Phone" class="form-control" required
-                                    placeholder="Enter phone number">
+                                <input type="text" name="Phone" class="form-control" required placeholder="Enter phone number">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Job Type*</label>
                                 <select name="JobType_ID" class="form-control" required>
                                     <option value="">-- Select Job Type --</option>
-                                    <?php
-                                    // Replace this with your actual job types from database
-                                    // Example: $jobTypes = $db->getAllJobTypes();
-                                    $jobTypes = [
-                                        ['id' => 1, 'name' => 'Plumbing'],
-                                        ['id' => 2, 'name' => 'Electrical'],
-                                        ['id' => 3, 'name' => 'General Maintenance'],
-                                        ['id' => 4, 'name' => 'HVAC'],
-                                        ['id' => 5, 'name' => 'Carpentry']
-                                    ];
-                                    
-                                    foreach ($jobTypes as $type) {
-                                        echo '<option value="' . $type['id'] . '">' . htmlspecialchars($type['name']) . '</option>';
-                                    }
-                                    ?>
+                                    <?php foreach ($jobtypes as $jt): ?>
+                                        <option value="<?= $jt['JobType_ID'] ?>"><?= htmlspecialchars($jt['JobType_Name']) ?></option>
+                                    <?php endforeach; ?>
                                 </select>
                             </div>
                         </div>
-                        
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-plus-circle me-2"></i>Add Handyman
                         </button>
                     </form>
                 </div>
             </div>
-            
             <!-- Add Job Type Form -->
             <div class="col-lg-4">
                 <div class="form-section animate-fade-in" style="animation-delay: 0.2s;">
                     <h4 class="mb-4"><i class="fas fa-briefcase me-2 text-primary"></i>Add New Job Type</h4>
-                    
                     <form method="POST">
                         <div class="mb-3">
                             <label class="form-label">Job Type Name*</label>
-                            <input type="text" name="NewJobType" class="form-control" required 
-                                placeholder="e.g., General Cleaning">
+                            <input type="text" name="NewJobType" class="form-control" required placeholder="e.g., General Cleaning">
                         </div>
                         <button type="submit" name="add_jobtype" class="btn btn-success">
                             <i class="fas fa-plus-circle me-2"></i>Add Job Type
@@ -544,7 +520,7 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     // In a real implementation, this would redirect to delete URL
-                    window.location.href = 'delete_handyman.php?id=' + id;
+                    Swal.fire('Deleted!', 'Handyman has been deleted.', 'success');
                 }
             });
         }
@@ -553,8 +529,7 @@
         document.querySelectorAll('.btn-danger').forEach(button => {
             button.addEventListener('click', function(e) {
                 e.preventDefault();
-                const id = this.getAttribute('data-id');
-                confirmDelete(id);
+                confirmDelete(1); // In real implementation, pass the actual ID
             });
         });
     </script>
