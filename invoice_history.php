@@ -2,6 +2,7 @@
 require 'database/database.php';
 session_start();
 $db = new Database();
+$is_logged_in = isset($_SESSION['client_id']);
 
 if (!isset($_SESSION['client_id'])): ?>
 <!DOCTYPE html>
@@ -145,6 +146,21 @@ if (!isset($_SESSION['client_id'])): ?>
 </head>
 <body>
     <?php require('header.php'); ?>
+    <?php if ($is_logged_in): ?>
+    <script>
+        setTimeout(function() {
+            Swal.fire({
+                icon: 'success',
+                title: 'Start a conversation with our billing Admin regarding your invoices!',
+                text: '.',
+                timer: 3000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        }, 500);
+    </script>
+    <?php endif; ?>
     
     <div class="main-content">
         <div class="container">
