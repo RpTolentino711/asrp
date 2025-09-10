@@ -404,48 +404,37 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td>John</td>
-                                <td>Doe</td>
-                                <td>(555) 123-4567</td>
-                                <td>Plumbing</td>
-                                <td>
-                                    <a href="#" class="btn btn-sm btn-warning me-1">
-                                        <i class="fas fa-edit me-1"></i>Edit
-                                    </a>
-                                    <a href="#" class="btn btn-sm btn-danger">
-                                        <i class="fas fa-trash me-1"></i>Delete
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Jane</td>
-                                <td>Smith</td>
-                                <td>(555) 987-6543</td>
-                                <td>Electrical</td>
-                                <td>
-                                    <a href="#" class="btn btn-sm btn-warning me-1">
-                                        <i class="fas fa-edit me-1"></i>Edit
-                                    </a>
-                                    <a href="#" class="btn btn-sm btn-danger">
-                                        <i class="fas fa-trash me-1"></i>Delete
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Robert</td>
-                                <td>Johnson</td>
-                                <td>(555) 456-7890</td>
-                                <td>General Maintenance</td>
-                                <td>
-                                    <a href="#" class="btn btn-sm btn-warning me-1">
-                                        <i class="fas fa-edit me-1"></i>Edit
-                                    </a>
-                                    <a href="#" class="btn btn-sm btn-danger">
-                                        <i class="fas fa-trash me-1"></i>Delete
-                                    </a>
-                                </td>
-                            </tr>
+                            <?php
+                            // Replace this with your actual database query
+                            // Example: $handymen = $db->getAllHandymen();
+                            $handymen = []; // This should be your actual data from database
+                            
+                            if (!empty($handymen)) {
+                                foreach ($handymen as $handyman) {
+                                    echo '<tr>
+                                        <td>' . htmlspecialchars($handyman['first_name']) . '</td>
+                                        <td>' . htmlspecialchars($handyman['last_name']) . '</td>
+                                        <td>' . htmlspecialchars($handyman['phone']) . '</td>
+                                        <td>' . htmlspecialchars($handyman['job_type']) . '</td>
+                                        <td>
+                                            <a href="#" class="btn btn-sm btn-warning me-1">
+                                                <i class="fas fa-edit me-1"></i>Edit
+                                            </a>
+                                            <a href="#" class="btn btn-sm btn-danger">
+                                                <i class="fas fa-trash me-1"></i>Delete
+                                            </a>
+                                        </td>
+                                    </tr>';
+                                }
+                            } else {
+                                echo '<tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="fas fa-users fa-2x mb-2"></i>
+                                        <p>No handymen found. Add your first handyman using the form below.</p>
+                                    </td>
+                                </tr>';
+                            }
+                            ?>
                         </tbody>
                     </table>
                 </div>
@@ -482,11 +471,21 @@
                                 <label class="form-label">Job Type*</label>
                                 <select name="JobType_ID" class="form-control" required>
                                     <option value="">-- Select Job Type --</option>
-                                    <option value="1">Plumbing</option>
-                                    <option value="2">Electrical</option>
-                                    <option value="3">General Maintenance</option>
-                                    <option value="4">HVAC</option>
-                                    <option value="5">Carpentry</option>
+                                    <?php
+                                    // Replace this with your actual job types from database
+                                    // Example: $jobTypes = $db->getAllJobTypes();
+                                    $jobTypes = [
+                                        ['id' => 1, 'name' => 'Plumbing'],
+                                        ['id' => 2, 'name' => 'Electrical'],
+                                        ['id' => 3, 'name' => 'General Maintenance'],
+                                        ['id' => 4, 'name' => 'HVAC'],
+                                        ['id' => 5, 'name' => 'Carpentry']
+                                    ];
+                                    
+                                    foreach ($jobTypes as $type) {
+                                        echo '<option value="' . $type['id'] . '">' . htmlspecialchars($type['name']) . '</option>';
+                                    }
+                                    ?>
                                 </select>
                             </div>
                         </div>
@@ -545,7 +544,7 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     // In a real implementation, this would redirect to delete URL
-                    Swal.fire('Deleted!', 'Handyman has been deleted.', 'success');
+                    window.location.href = 'delete_handyman.php?id=' + id;
                 }
             });
         }
@@ -554,7 +553,8 @@
         document.querySelectorAll('.btn-danger').forEach(button => {
             button.addEventListener('click', function(e) {
                 e.preventDefault();
-                confirmDelete(1); // In real implementation, pass the actual ID
+                const id = this.getAttribute('data-id');
+                confirmDelete(id);
             });
         });
     </script>
