@@ -697,12 +697,6 @@ function showOtpModal(expiresAt) {
   document.getElementById('otpInput').value = '';
   document.getElementById('otpErrorMsg').textContent = '';
   updateOtpTimer();
-  // Hide the register modal if it's open
-  const regModalEl = document.getElementById('registerModal');
-  if (regModalEl) {
-    const regModal = bootstrap.Modal.getInstance(regModalEl) || new bootstrap.Modal(regModalEl);
-    regModal.hide();
-  }
   const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
   otpModal.show();
   if (otpTimerInterval) clearInterval(otpTimerInterval);
