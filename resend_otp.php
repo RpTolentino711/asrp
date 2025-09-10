@@ -1,10 +1,6 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
 header('Content-Type: application/json');
-
-error_log('RESEND_OTP SESSION: ' . json_encode($_SESSION));
 
 // --- Check session data ---
 if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration'])) {
@@ -31,7 +27,7 @@ $_SESSION['last_otp_sent'] = time();
 // --- Generate fresh OTP ---
 $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 $_SESSION['otp'] = $otp;
-$_SESSION['otp_expires'] = time() + 300; // 5 minutes
+$_SESSION['otp_expires'] = time() + (5 * 60); // valid for 5 minutes
 $_SESSION['otp_attempts'] = 0;
 unset($_SESSION['otp_locked_until']);
 
@@ -42,11 +38,11 @@ $sent = send_otp_mail($email, $otp, 'ASRP Registration OTP (Resent)');
 if ($sent) {
     echo json_encode([
         'success'    => true,
-        'message'    => "A new OTP has been sent to {$email}.",
+        'message'    => 'A new OTP has been sent to your email.',
         'expires_at' => $_SESSION['otp_expires']
     ]);
 } else {
-    error_log("Failed to resend OTP to {$email}");
+    error_log("Failed to send OTP to {$email}");
     echo json_encode([
         'success' => false,
         'message' => 'Failed to resend OTP. Please try again later.'

@@ -13,12 +13,12 @@ if (!$pdo && method_exists($db, 'opencon')) {
 
 // --- Handle registration request ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $fname            = trim($_POST['fname'] ?? '');
-    $lname            = trim($_POST['lname'] ?? '');
-    $email            = trim($_POST['email'] ?? '');
-    $phone            = trim($_POST['phone'] ?? '');
-    $username         = trim($_POST['username'] ?? '');
-    $password         = $_POST['password'] ?? '';
+    $fname = trim($_POST['fname'] ?? '');
+    $lname = trim($_POST['lname'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
     // --- Basic validations ---
@@ -61,32 +61,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- Store pending registration in session ---
     $_SESSION['pending_registration'] = [
-        'fname'    => $fname,
-        'lname'    => $lname,
-        'email'    => $email,
-        'phone'    => $phone,
+        'fname' => $fname,
+        'lname' => $lname,
+        'email' => $email,
+        'phone' => $phone,
         'username' => $username,
-        'password' => password_hash($password, PASSWORD_DEFAULT)
+        'password' => password_hash($password, PASSWORD_DEFAULT),
+        'created_at' => date('Y-m-d H:i:s')
     ];
     $_SESSION['otp_email'] = $email;
 
     // --- Generate OTP ---
     $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-    $_SESSION['otp']         = $otp;
+    $_SESSION['otp'] = $otp;
     $_SESSION['otp_expires'] = time() + (5 * 60);
     $_SESSION['otp_attempts'] = 0;
     unset($_SESSION['otp_locked_until']);
 
     // --- Send OTP email ---
     $sent = send_otp_mail($email, $otp, 'ASRP Registration OTP');
-
     if ($sent) {
         echo json_encode([
-            'success'              => true,
-            'message'              => 'Registration started. OTP sent to your email.',
+            'success' => true,
+            'message' => 'Registration started. OTP sent to your email.',
             'pending_verification' => true,
-            'email'                => $email,
-            'expires_at'           => $_SESSION['otp_expires']
+            'email' => $email,
+            'expires_at' => $_SESSION['otp_expires']
         ]);
     } else {
         echo json_encode([
@@ -94,7 +94,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'message' => 'Failed to send OTP email. Please try again later.'
         ]);
     }
-
 } else {
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
 }
