@@ -1263,7 +1263,7 @@ if (isset($_SESSION['login_error'])) {
         try {
           this.showLoading(true);
           
-          const response = await fetch("AJAX/live_units.php");
+          const response = await fetch("AJAX/live_unit.php");
           if (!response.ok) {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
