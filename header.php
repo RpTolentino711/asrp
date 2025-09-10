@@ -693,13 +693,17 @@ let otpExpiresAt = null;
 let otpTimerInterval = null;
 
 function showOtpModal(expiresAt) {
+  // ✅ Reset old timer before showing new modal
+  if (otpTimerInterval) clearInterval(otpTimerInterval);
+
   otpExpiresAt = expiresAt;
   document.getElementById('otpInput').value = '';
   document.getElementById('otpErrorMsg').textContent = '';
   updateOtpTimer();
+
   const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
   otpModal.show();
-  if (otpTimerInterval) clearInterval(otpTimerInterval);
+
   otpTimerInterval = setInterval(updateOtpTimer, 1000);
 }
 
@@ -708,6 +712,7 @@ function updateOtpTimer() {
   const now = Math.floor(Date.now() / 1000);
   const secondsLeft = otpExpiresAt - now;
   const timerSpan = document.getElementById('otpTimer');
+
   if (secondsLeft > 0) {
     const min = Math.floor(secondsLeft / 60);
     const sec = secondsLeft % 60;
@@ -717,19 +722,33 @@ function updateOtpTimer() {
     timerSpan.textContent = 'OTP expired. Please resend.';
     document.getElementById('resendOtpBtn').disabled = false;
     clearInterval(otpTimerInterval);
+    otpTimerInterval = null;
   }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Clean up timer when OTP modal is closed
+  const otpModalEl = document.getElementById('otpModal');
+  if (otpModalEl) {
+    otpModalEl.addEventListener('hidden.bs.modal', function() {
+      if (otpTimerInterval) {
+        clearInterval(otpTimerInterval);
+        otpTimerInterval = null;
+      }
+    });
+  }
+
   // Intercept registration form submit
   const regForm = document.getElementById('registerForm');
   if (regForm) {
     regForm.addEventListener('submit', function(e) {
       e.preventDefault();
       if (!checkRegisterForm()) return;
+
       const submitBtn = document.getElementById('registerSubmitBtn');
       submitBtn.disabled = true;
       submitBtn.classList.add('loading');
+
       const formData = new FormData(regForm);
       fetch('register.php', {
         method: 'POST',
@@ -753,6 +772,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  // OTP input field: restrict to numbers only, max 6
+  const otpInput = document.getElementById('otpInput');
+  if (otpInput) {
+    otpInput.addEventListener('input', function() {
+      this.value = this.value.replace(/\D/g, '').slice(0, 6);
+      // Auto-submit when 6 digits entered
+      if (this.value.length === 6) {
+        document.getElementById('otpForm').requestSubmit();
+      }
+    });
+  }
+
   // OTP form submit
   const otpForm = document.getElementById('otpForm');
   if (otpForm) {
@@ -763,7 +794,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('otpErrorMsg').textContent = 'Please enter a valid 6-digit code.';
         return;
       }
+
       document.getElementById('otpErrorMsg').textContent = '';
+      const submitOtpBtn = otpForm.querySelector('button[type="submit"]');
+      submitOtpBtn.disabled = true;
+
       fetch('verify_otp.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -775,7 +810,6 @@ document.addEventListener('DOMContentLoaded', function() {
           const otpModal = bootstrap.Modal.getInstance(document.getElementById('otpModal'));
           otpModal.hide();
           Swal.fire({ icon: 'success', title: 'Registration Complete', text: data.message || 'You can now log in.' });
-          // Optionally reload or redirect
           setTimeout(() => window.location.reload(), 1500);
         } else {
           document.getElementById('otpErrorMsg').textContent = data.message || 'Invalid OTP.';
@@ -783,6 +817,9 @@ document.addEventListener('DOMContentLoaded', function() {
       })
       .catch(() => {
         document.getElementById('otpErrorMsg').textContent = 'Could not verify OTP. Please try again.';
+      })
+      .finally(() => {
+        submitOtpBtn.disabled = false;
       });
     });
   }
@@ -812,6 +849,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
 // Navbar scroll effect
 window.addEventListener('scroll', function() {
   const navbar = document.querySelector('.modern-navbar');

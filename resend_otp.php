@@ -8,6 +8,13 @@ if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration']))
     exit;
 }
 
+// Prevent spamming: allow resend only once per 60 seconds
+if (isset($_SESSION['last_otp_sent']) && (time() - $_SESSION['last_otp_sent']) < 60) {
+    echo json_encode(['success' => false, 'message' => 'Please wait before requesting a new OTP.']);
+    exit;
+}
+$_SESSION['last_otp_sent'] = time();
+
 $email = $_SESSION['otp_email'];
 $otp = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT); // Always 6 digits
 $_SESSION['otp'] = $otp;
