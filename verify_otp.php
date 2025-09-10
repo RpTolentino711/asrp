@@ -7,13 +7,15 @@ require_once __DIR__ . '/database/database.php';
 $MAX_ATTEMPTS = 5;    // Lock after 5 wrong attempts
 $LOCKOUT_MIN = 15;    // Lockout period (minutes)
 
+
 // ==== GET OTP FROM POST ====
 $otp = isset($_POST['otp']) ? preg_replace('/\D+/', '', $_POST['otp']) : '';
+$otp = str_pad($otp, 6, '0', STR_PAD_LEFT); // Always 6 digits
 $now = time();
 
-// ==== DEBUGGING (optional) ====
-// error_log("OTP VERIFY POST: " . json_encode($_POST));
-// error_log("OTP VERIFY SESSION: " . json_encode($_SESSION));
+// ==== DEBUGGING (enabled) ====
+error_log("OTP VERIFY POST: " . json_encode($_POST));
+error_log("OTP VERIFY SESSION: " . json_encode($_SESSION));
 
 // ==== SESSION REQUIREMENTS ====
 if (!isset($_SESSION['pending_registration']) || !isset($_SESSION['otp'])) {
@@ -50,47 +52,53 @@ if (empty($_SESSION['otp_expires'])) {
 $_SESSION['otp_attempts'] = $_SESSION['otp_attempts'] ?? 0;
 
 // ==== OTP VERIFICATION ====
-if (hash_equals((string)$_SESSION['otp'], $otp)) {
-    // OTP is correct! Register the user
-    try {
-        $db = new Database();
-        $pdo = $db->pdo ?? (method_exists($db, 'opencon') ? $db->opencon() : null);
-        $data = $_SESSION['pending_registration'];
-        $stmt = $pdo->prepare("INSERT INTO client (Client_Fname, Client_Lname, Client_Email, Client_Contact, C_username, C_password, Created_At) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $inserted = $stmt->execute([
-            $data['fname'],
-            $data['lname'],
-            $data['email'],
-            $data['phone'],
-            $data['username'],
-            $data['password'], // Already hashed
-            $data['created_at']
-        ]);
-        if ($inserted) {
-            // Optionally: set logged-in session here!
-            unset(
-                $_SESSION['otp'],
-                $_SESSION['otp_expires'],
-                $_SESSION['otp_attempts'],
-                $_SESSION['otp_locked_until'],
-                $_SESSION['pending_registration']
-            );
-            echo json_encode(['success' => true, 'message' => 'Registration successful! You can now log in.']);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to create account. Please try again.']);
+if (isset($_SESSION['otp'])) {
+    $sessionOtp = str_pad((string)$_SESSION['otp'], 6, '0', STR_PAD_LEFT);
+    if (hash_equals($sessionOtp, $otp)) {
+        // OTP is correct! Register the user
+        try {
+            $db = new Database();
+            $pdo = $db->pdo ?? (method_exists($db, 'opencon') ? $db->opencon() : null);
+            $data = $_SESSION['pending_registration'];
+            $stmt = $pdo->prepare("INSERT INTO client (Client_Fname, Client_Lname, Client_Email, Client_Contact, C_username, C_password, Created_At) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $inserted = $stmt->execute([
+                $data['fname'],
+                $data['lname'],
+                $data['email'],
+                $data['phone'],
+                $data['username'],
+                $data['password'], // Already hashed
+                $data['created_at']
+            ]);
+            if ($inserted) {
+                unset(
+                    $_SESSION['otp'],
+                    $_SESSION['otp_expires'],
+                    $_SESSION['otp_attempts'],
+                    $_SESSION['otp_locked_until'],
+                    $_SESSION['pending_registration']
+                );
+                echo json_encode(['success' => true, 'message' => 'Registration successful! You can now log in.']);
+            } else {
+                error_log('DB insert failed: ' . json_encode($stmt->errorInfo()));
+                echo json_encode(['success' => false, 'message' => 'Failed to create account. Please try again.']);
+            }
+        } catch (Exception $e) {
+            error_log("Registration error: " . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'An error occurred during registration.']);
         }
-    } catch (Exception $e) {
-        error_log("Registration error: " . $e->getMessage());
-        echo json_encode(['success' => false, 'message' => 'An error occurred during registration.']);
+    } else {
+        // OTP is wrong
+        $_SESSION['otp_attempts']++;
+        if ($_SESSION['otp_attempts'] >= $MAX_ATTEMPTS) {
+            $_SESSION['otp_locked_until'] = $now + ($LOCKOUT_MIN * 60);
+            echo json_encode(['success' => false, 'message' => 'Too many incorrect attempts. Try again later.']);
+        } else {
+            $remaining = $MAX_ATTEMPTS - $_SESSION['otp_attempts'];
+            echo json_encode(['success' => false, 'message' => 'Incorrect code. Attempts left: ' . $remaining . '.']);
+        }
     }
 } else {
-    // OTP is wrong
-    $_SESSION['otp_attempts']++;
-    if ($_SESSION['otp_attempts'] >= $MAX_ATTEMPTS) {
-        $_SESSION['otp_locked_until'] = $now + ($LOCKOUT_MIN * 60);
-        echo json_encode(['success' => false, 'message' => 'Too many incorrect attempts. Try again later.']);
-    } else {
-        $remaining = $MAX_ATTEMPTS - $_SESSION['otp_attempts'];
-        echo json_encode(['success' => false, 'message' => 'Incorrect code. Attempts left: ' . $remaining . '.']);
-    }
+        error_log('OTP session missing at verification.');
+        echo json_encode(['success' => false, 'message' => 'Could not verify OTP. Please try again.']);
 }
