@@ -1432,8 +1432,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
 }
 
 
-<?php
-// Add this method to your Database class in database/database.php
 
 public function getLiveAvailableUnits($limit = null) {
     try {
@@ -1474,5 +1472,5 @@ public function getAvailableUnitsCount() {
         return 0;
     }
 }
-?>
+
 
