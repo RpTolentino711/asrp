@@ -43,14 +43,41 @@ if (time() > $_SESSION['otp_expires']) {
 // --- Verify OTP ---
 if (hash_equals($_SESSION['otp'], $inputOtp)) {
     // ✅ OTP is correct
-    unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until']);
+    require_once __DIR__ . '/database/database.php';
+    $db = new Database();
+    $pdo = $db->pdo ?? (method_exists($db, 'opencon') ? $db->opencon() : null);
+    $userData = $_SESSION['pending_registration'];
+    $success = false;
+    $errorMsg = '';
+    if ($pdo) {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO client (Client_fn, Client_ln, Client_Email, Client_Phone, C_username, C_password, Status) VALUES (?, ?, ?, ?, ?, ?, 'Active')");
+            $success = $stmt->execute([
+                $userData['fname'],
+                $userData['lname'],
+                $userData['email'],
+                $userData['phone'],
+                $userData['username'],
+                $userData['password']
+            ]);
+            if (!$success) {
+                $errorMsg = json_encode($stmt->errorInfo());
+            }
+        } catch (Exception $e) {
+            $errorMsg = $e->getMessage();
+        }
+    } else {
+        $errorMsg = 'Database connection failed.';
+    }
 
-    // Here you can finalize the registration (e.g., insert into DB)
-    // Example:
-    // $userData = $_SESSION['pending_registration'];
-    // save_user_to_db($userData);
+    unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until'], $_SESSION['pending_registration']);
 
-    echo json_encode(['success' => true, 'message' => 'OTP verified successfully. Registration complete.']);
+    if ($success) {
+        echo json_encode(['success' => true, 'message' => 'OTP verified successfully. Registration complete.']);
+    } else {
+        error_log('DB insert failed: ' . $errorMsg);
+        echo json_encode(['success' => false, 'message' => 'Registration failed. Please try again.']);
+    }
     exit;
 } else {
     // ❌ Wrong OTP
