@@ -2,6 +2,9 @@
 session_start();
 header('Content-Type: application/json');
 
+require_once __DIR__ . '/class.phpmailer.php';
+require_once __DIR__ . '/class.smtp.php';
+
 // --- Check session data ---
 if (!isset($_SESSION['otp_email']) || !isset($_SESSION['pending_registration'])) {
     echo json_encode([
@@ -24,35 +27,70 @@ if (isset($_SESSION['last_otp_sent']) && (time() - $_SESSION['last_otp_sent']) <
 }
 $_SESSION['last_otp_sent'] = time();
 
-// --- Generate fresh OTP ---
-$otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-$_SESSION['otp'] = $otp;
+// --- Generate fresh OTP (same method as registration) ---
+$otp = random_int(100000, 999999);
+$_SESSION['otp'] = (string)$otp;
 $_SESSION['otp_expires'] = time() + (5 * 60); // valid for 5 minutes
 $_SESSION['otp_attempts'] = 0;
 unset($_SESSION['otp_locked_until']);
 
-// --- Send OTP email ---
-require_once __DIR__ . '/send_otp_mail.php';
+// --- Send OTP email (same configuration as registration) ---
+$mail = new PHPMailer;
+$mail->CharSet    = 'UTF-8';
+$mail->isSMTP();
+$mail->Host       = 'smtp.gmail.com';
+$mail->Port       = 587;
+$mail->SMTPAuth   = true;
+$mail->SMTPSecure = 'tls';
 
-// Pass subject with "(Resent)" so user knows
-$sent = send_otp_mail(
-    $email,
-    $otp,
-    'ASRP Registration OTP (Resent)',
-    $_SESSION['pending_registration']['fname'] ?? ''
-);
+// Log SMTP debug to Apache error.log
+$mail->SMTPDebug = 2;
+$mail->Debugoutput = function ($str, $level) {
+    error_log("PHPMailer [$level]: $str");
+};
+$mail->Timeout = 20;
 
-if ($sent) {
+// Force TLS 1.2
+$mail->SMTPOptions = [
+    'ssl' => [
+        'verify_peer'       => false,
+        'verify_peer_name'  => false,
+        'allow_self_signed' => true,
+        'crypto_method'     => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
+    ],
+];
+
+// Gmail credentials (same as registration)
+$mail->Username = 'ahmadpaguta2005@gmail.com';
+$mail->Password = 'unwr kdad ejcd rysq';
+$mail->setFrom($mail->Username, 'ASRP Registration');
+$mail->addReplyTo('no-reply@asrp.local', 'ASRP Registration');
+$mail->addAddress($email);
+
+$mail->isHTML(true);
+$mail->Subject = "Your verification code (Resent)";
+$safeName = htmlspecialchars($_SESSION['pending_registration']['fname'] ?? '', ENT_QUOTES, 'UTF-8');
+$mail->Body    = "<p>Hi {$safeName},</p>
+                  <p>Your new OTP code is <b>{$otp}</b>.</p>
+                  <p>This code expires in 5 minutes.</p>
+                  <p>If you did not request this email, please ignore it.</p>
+                  <p>See you soon!</p>
+                  <p>Regards,<br>ASRP Registration</p>";
+$mail->AltBody = "Your new OTP code is {$otp}. It expires in 5 minutes.";
+
+if (!$mail->send()) {
+    error_log("Failed to resend OTP to {$email}. Error: " . $mail->ErrorInfo);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Failed to resend OTP. Please try again later.',
+        'error'   => $mail->ErrorInfo,
+    ]);
+} else {
+    error_log("OTP successfully resent to {$email}");
     echo json_encode([
         'success'    => true,
         'message'    => 'A new OTP has been sent to your email.',
         'expires_at' => $_SESSION['otp_expires']
-    ]);
-} else {
-    error_log("Failed to send OTP to {$email}");
-    echo json_encode([
-        'success' => false,
-        'message' => 'Failed to resend OTP. Please try again later.'
     ]);
 }
 exit;
