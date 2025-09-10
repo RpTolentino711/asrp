@@ -655,8 +655,10 @@ if (isset($_SESSION['login_error'])) {
             <h1 class="hero-title">Welcome to ASRT Commercial Spaces</h1>
             <p class="hero-subtitle">Your partner in secure, reliable, and flexible commercial leasing. Our mission is to empower businesses with modern, well-equipped workspaces and outstanding service.</p>
             <div class="d-flex gap-3 flex-wrap">
-              <a href="#units" class="btn btn-accent btn-lg me-3" style="background: #ff6f61; color: #fff; border: none;">Explore Units</a>
-              <a href="about.php" class="btn btn-outline-dark btn-lg" style="color: #fff; border: 2px solid #000; background: transparent;">About Us</a>
+              <a href="#units" class="btn btn-accent btn-lg">Explore Units</a>
+              <form action="about.php" method="get" style="display: inline;">
+                <button type="submit" class="btn btn-black btn-lg">About Us</button>
+              </form>
             </div>
           </div>
         </div>
@@ -801,7 +803,7 @@ if (isset($_SESSION['login_error'])) {
                                         <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
                                         <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
                                         <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
-                                    </div>
+                                    </ul>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
