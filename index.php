@@ -40,6 +40,8 @@ $available_units = $db->getHomepageAvailableUnits(10);
 $rented_units_display = $db->getHomepageRentedUnits(10);
 $job_types_display = $db->getAllJobTypes();
 $testimonials = $db->getHomepageTestimonials(6);
+$available_units = $db->getLiveAvailableUnits(10);
+
 ?>
 
 <!doctype html>
@@ -286,6 +288,20 @@ $testimonials = $db->getHomepageTestimonials(6);
       color: var(--gray);
       max-width: 600px;
       margin: 0 auto;
+    }
+
+    /* Loading indicator */
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .loading-text {
+      color: var(--gray);
+      font-size: 0.9rem;
     }
 
     /* Cards */
@@ -672,9 +688,20 @@ if (isset($_SESSION['login_error'])) {
       <div class="section-title animate-on-scroll">
         <h2>Available Units</h2>
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
+        
+        <!-- Loading indicator -->
+        <div id="unitsLoading" class="loading-container" style="display: none;">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="loading-text">Updating units...</span>
+        </div>
+        
+        <!-- Last updated timestamp -->
+        <small id="lastUpdated" class="text-muted d-block mt-2" style="display: none;"></small>
       </div>
 
-      <div class="row g-4">
+      <div class="row g-4" id="unitsContainer">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -697,7 +724,7 @@ if (isset($_SESSION['login_error'])) {
                     $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
                 }
         ?>
-        <div class="col-lg-4 col-md-6 animate-on-scroll">
+        <div class="col-lg-4 col-md-6 animate-on-scroll unit-card-container">
           <div class="card unit-card">
             <?php if (!empty($photo_urls)): ?>
               <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
@@ -817,7 +844,7 @@ if (isset($_SESSION['login_error'])) {
                 }
             }
         } else {
-            echo '<div class="col-12 text-center">
+            echo '<div class="col-12 text-center" id="noUnitsMessage">
                     <div class="alert alert-info">No units currently available.</div>
                   </div>';
         }
@@ -826,9 +853,15 @@ if (isset($_SESSION['login_error'])) {
 
       <div class="text-center mt-5">
         <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
+        <button id="refreshUnitsBtn" class="btn btn-primary btn-lg ms-2">
+          <i class="bi bi-arrow-clockwise me-2"></i>Refresh Now
+        </button>
       </div>
     </div>
   </section>
+
+  <!-- Dynamic Modals Container -->
+  <div id="dynamicModals"></div>
 
   <!-- All rental modals rendered here -->
   <?php if (!empty($modals)) echo $modals; ?>
@@ -1066,8 +1099,6 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </section>
 
-
-
   <!-- Floating Message Button (only for non-logged-in users) -->
   <?php if (!$is_logged_in): ?>
   <div class="floating-message" data-bs-toggle="modal" data-bs-target="#messageModal">
@@ -1132,12 +1163,343 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   
   <!-- Swiper JS -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   
-  <!-- Custom JavaScript -->
+  <!-- Live Units Loading JavaScript -->
   <script>
+    // Live units loading functionality
+    class LiveUnitsLoader {
+      constructor() {
+        this.container = document.getElementById('unitsContainer');
+        this.loadingIndicator = document.getElementById('unitsLoading');
+        this.lastUpdatedElement = document.getElementById('lastUpdated');
+        this.refreshBtn = document.getElementById('refreshUnitsBtn');
+        this.dynamicModalsContainer = document.getElementById('dynamicModals');
+        this.modalCounter = 0;
+        
+        this.init();
+      }
+
+      init() {
+        // Set up automatic refresh every 30 seconds
+        this.startAutoRefresh();
+        
+        // Manual refresh button
+        this.refreshBtn.addEventListener('click', () => {
+          this.loadUnits();
+        });
+        
+        // Initial load timestamp
+        this.updateLastUpdated();
+      }
+
+      async loadUnits() {
+        try {
+          this.showLoading(true);
+          
+          const response = await fetch("AJAX/live_units.php");
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            this.updateUnitsDisplay(result.data);
+            this.updateLastUpdated(result.timestamp);
+          } else {
+            throw new Error(result.error || 'Failed to load units');
+          }
+          
+        } catch (error) {
+          console.error("Failed to load units:", error);
+          this.showError("Failed to refresh units. Please try again later.");
+        } finally {
+          this.showLoading(false);
+        }
+      }
+
+      updateUnitsDisplay(units) {
+        // Clear existing content
+        this.container.innerHTML = "";
+        this.dynamicModalsContainer.innerHTML = "";
+        this.modalCounter = 0;
+
+        if (units.length === 0) {
+          this.container.innerHTML = `
+            <div class="col-12 text-center" id="noUnitsMessage">
+              <div class="alert alert-info">No units currently available.</div>
+            </div>
+          `;
+          return;
+        }
+
+        let modalsHtml = '';
+
+        units.forEach(unit => {
+          this.modalCounter++;
+          const modalId = `unitModal${this.modalCounter}`;
+          const photoModalId = `photoModal${this.modalCounter}`;
+          
+          // Create unit card
+          const unitCard = this.createUnitCard(unit, modalId, photoModalId);
+          this.container.appendChild(unitCard);
+          
+          // Create modals HTML
+          modalsHtml += this.createModalsHtml(unit, modalId, photoModalId);
+        });
+
+        // Add modals to DOM
+        this.dynamicModalsContainer.innerHTML = modalsHtml;
+        
+        // Reinitialize animations for new cards
+        this.initializeNewCards();
+      }
+
+      createUnitCard(unit, modalId, photoModalId) {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4 col-md-6 animate-on-scroll unit-card-container';
+        
+        const hasPhoto = unit.photo_urls && unit.photo_urls.length > 0;
+        const primaryPhoto = hasPhoto ? unit.photo_urls[0] : '';
+        
+        // Determine button based on login status
+        let buttonHtml = '';
+        if (unit.is_logged_in && !unit.client_is_inactive) {
+          buttonHtml = `
+            <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#${modalId}">
+              <i class="bi bi-key me-2"></i>Rent Now
+            </button>
+          `;
+        } else if (unit.is_logged_in && unit.client_is_inactive) {
+          buttonHtml = `
+            <button class="btn btn-secondary w-100" disabled>
+              Account Inactive
+            </button>
+          `;
+        } else {
+          buttonHtml = `
+            <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
+              <i class="bi bi-key me-2"></i>Login to Rent
+            </button>
+          `;
+        }
+
+        col.innerHTML = `
+          <div class="card unit-card">
+            ${hasPhoto ? 
+              `<img src="${primaryPhoto}" class="card-img-top" alt="${this.escapeHtml(unit.Name)}" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#${photoModalId}">` :
+              `<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+                 <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
+               </div>`
+            }
+            <div class="card-body">
+              <h5 class="card-title fw-bold">${this.escapeHtml(unit.Name)}</h5>
+              <p class="unit-price">₱${Number(unit.Price).toLocaleString()} / month</p>
+              <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="unit-type">${this.escapeHtml(unit.SpaceTypeName || 'Commercial Space')}</span>
+                <small class="unit-location">${this.escapeHtml(unit.City || '')}</small>
+              </div>
+              ${buttonHtml}
+            </div>
+          </div>
+        `;
+
+        return col;
+      }
+
+      createModalsHtml(unit, modalId, photoModalId) {
+        const hasPhoto = unit.photo_urls && unit.photo_urls.length > 0;
+        let modalsHtml = '';
+
+        // Photo Modal
+        if (hasPhoto) {
+          modalsHtml += `
+            <div class="modal fade" id="${photoModalId}" tabindex="-1" aria-labelledby="${photoModalId}Label" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered modal-xl">
+                <div class="modal-content bg-dark">
+                  <div class="modal-header border-0">
+                    <h5 class="modal-title text-white" id="${photoModalId}Label">
+                      Photo Gallery: ${this.escapeHtml(unit.Name)}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body text-center">
+                    ${unit.photo_urls.length === 1 ? 
+                      `<img src="${unit.photo_urls[0]}" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">` :
+                      this.createPhotoCarousel(unit.photo_urls, this.modalCounter)
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // Rental Modal (only if user is logged in and active)
+        if (unit.is_logged_in && !unit.client_is_inactive) {
+          modalsHtml += `
+            <div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true">
+              <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title" id="${modalId}Label">Contact Admin to Rent: ${this.escapeHtml(unit.Name)}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="alert alert-info">
+                      <i class="bi bi-info-circle me-2"></i>
+                      To rent this unit and receive an invoice, please contact our admin team for rental approval.
+                    </div>
+                    <div class="row">
+                      <div class="col-md-6">
+                        <h6 class="fw-bold">Admin Contact:</h6>
+                        <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:rom_telents@asrt.com">rom_telents@asrt.com</a></p>
+                        <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+639171234567">+63 917 123 4567</a></p>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="alert alert-warning">
+                          <strong>Invoice Required:</strong><br>
+                          Please request your invoice from the admin for the rental process.
+                        </div>
+                      </div>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                      <li class="list-group-item"><strong>Price:</strong> ₱${Number(unit.Price).toLocaleString()} per month</li>
+                      <li class="list-group-item"><strong>Unit Type:</strong> ${this.escapeHtml(unit.SpaceTypeName || 'Commercial Space')}</li>
+                      <li class="list-group-item"><strong>Location:</strong> ${this.escapeHtml(unit.Street || '')}, ${this.escapeHtml(unit.Brgy || '')}, ${this.escapeHtml(unit.City || '')}</li>
+                    </ul>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="rent_request.php?space_id=${encodeURIComponent(unit.Space_ID)}" class="btn btn-success">
+                      <i class="bi bi-receipt me-2"></i>Request Invoice
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        return modalsHtml;
+      }
+
+      createPhotoCarousel(photoUrls, counter) {
+        let carouselItems = '';
+        photoUrls.forEach((url, index) => {
+          carouselItems += `
+            <div class="carousel-item${index === 0 ? ' active' : ''}">
+              <img src="${url}" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo ${index + 1}" style="max-height:60vh;">
+            </div>
+          `;
+        });
+
+        return `
+          <div id="zoomCarousel${counter}" class="carousel slide" data-bs-ride="carousel">
+            <div class="carousel-inner">
+              ${carouselItems}
+            </div>
+            <button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel${counter}" data-bs-slide="prev">
+              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+              <span class="visually-hidden">Previous</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel${counter}" data-bs-slide="next">
+              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+              <span class="visually-hidden">Next</span>
+            </button>
+          </div>
+        `;
+      }
+
+      initializeNewCards() {
+        // Re-observe new elements for scroll animations
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('animate');
+            }
+          });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+        document.querySelectorAll('.unit-card-container.animate-on-scroll').forEach((el) => {
+          observer.observe(el);
+          // Trigger animation immediately if in viewport
+          el.classList.add('animate');
+        });
+
+        // Re-add hover effects
+        document.querySelectorAll('.unit-card-container .card').forEach(card => {
+          card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-8px)';
+          });
+          
+          card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+          });
+        });
+      }
+
+      showLoading(show) {
+        this.loadingIndicator.style.display = show ? 'block' : 'none';
+      }
+
+      showError(message) {
+        console.error(message);
+        // Show a subtle error notification
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-warning alert-dismissible fade show mt-3';
+        errorDiv.innerHTML = `
+          <i class="bi bi-exclamation-triangle me-2"></i>
+          ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        this.container.parentNode.insertBefore(errorDiv, this.container.nextSibling);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+          if (errorDiv.parentNode) {
+            errorDiv.remove();
+          }
+        }, 5000);
+      }
+
+      updateLastUpdated(timestamp = null) {
+        const now = timestamp ? new Date(timestamp) : new Date();
+        this.lastUpdatedElement.textContent = `Last updated: ${now.toLocaleString()}`;
+        this.lastUpdatedElement.style.display = 'block';
+      }
+
+      startAutoRefresh(intervalMs = 30000) {
+        // Load units every 30 seconds
+        this.refreshInterval = setInterval(() => {
+          this.loadUnits();
+        }, intervalMs);
+      }
+
+      stopAutoRefresh() {
+        if (this.refreshInterval) {
+          clearInterval(this.refreshInterval);
+        }
+      }
+
+      escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+      }
+    }
+
     // Initialize Swiper for testimonials
     const testimonialSwiper = new Swiper('.testimonials-swiper', {
       effect: 'coverflow',
@@ -1218,6 +1580,18 @@ if (isset($_SESSION['login_error'])) {
       card.addEventListener('mouseleave', function() {
         this.style.transform = 'translateY(0)';
       });
+    });
+
+    // Initialize the live units loader when DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+      window.liveUnitsLoader = new LiveUnitsLoader();
+    });
+
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+      if (window.liveUnitsLoader) {
+        window.liveUnitsLoader.stopAutoRefresh();
+      }
     });
   </script>
 </body>
