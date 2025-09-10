@@ -43,14 +43,32 @@ if (time() > $_SESSION['otp_expires']) {
 // --- Verify OTP ---
 if (hash_equals($_SESSION['otp'], $inputOtp)) {
     // ✅ OTP is correct
-    unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until']);
+    require_once __DIR__ . '/database/database.php';
+    $db = new Database();
+    $userData = $_SESSION['pending_registration'];
+    $success = false;
+    $errorMsg = '';
+    try {
+        $success = $db->registerClient(
+            $userData['fname'],
+            $userData['lname'],
+            $userData['email'],
+            $userData['phone'],
+            $userData['username'],
+            $userData['password']
+        );
+    } catch (Exception $e) {
+        $errorMsg = $e->getMessage();
+    }
 
-    // Here you can finalize the registration (e.g., insert into DB)
-    // Example:
-    // $userData = $_SESSION['pending_registration'];
-    // save_user_to_db($userData);
+    unset($_SESSION['otp'], $_SESSION['otp_expires'], $_SESSION['otp_attempts'], $_SESSION['otp_locked_until'], $_SESSION['pending_registration']);
 
-    echo json_encode(['success' => true, 'message' => 'OTP verified successfully. Registration complete.']);
+    if ($success) {
+        echo json_encode(['success' => true, 'message' => 'OTP verified successfully. Registration complete.']);
+    } else {
+        error_log('DB insert failed: ' . $errorMsg);
+        echo json_encode(['success' => false, 'message' => 'Registration failed. Please try again.', 'error' => $errorMsg]);
+    }
     exit;
 } else {
     // ❌ Wrong OTP
