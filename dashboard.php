@@ -2,6 +2,11 @@
 require 'database/database.php'; 
 session_start();
 
+// Enable error reporting for debugging (remove in production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Create an instance of the Database class
 $db = new Database();
 
@@ -61,6 +66,8 @@ if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
 
     if ($db->saveFeedback($invoice_id, $rating, $comments)) {
         $feedback_success = "Thank you for your feedback!";
+    } else {
+        $feedback_success = "Failed to save feedback. Please try again.";
     }
 }
 
@@ -121,7 +128,7 @@ if ($client_details && is_array($client_details)) {
 $feedback_prompts = $db->getFeedbackPrompts($client_id);
 $rented_units = $db->getRentedUnits($client_id);
 
-// --- 5. SOLVE THE N+1 PROBLEM ---
+// --- SOLVE THE N+1 PROBLEM ---
 $unit_ids = !empty($rented_units) ? array_column($rented_units, 'Space_ID') : [];
 $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
 // Fetch all unit photos for this client
@@ -131,185 +138,192 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Client Dashboard</title>
+  <title>Client Dashboard - ASRT Commercial Spaces</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
-    .unit-icon { font-size: 2.5rem; color: #198754; margin-bottom: 8px; }
-    .unit-photo { width: 100%; max-width: 140px; max-height: 110px; object-fit: cover; border-radius: 8px; margin-bottom: 8px; border: 2px solid #c1e3d5; }
-    .maintenance-history { font-size: 0.93rem; background: #f7f7f7; border-radius: 0.35rem; padding: 0.75rem 1rem 0.4rem 1rem; margin-top: 0.7rem; border-left: 4px solid #198754; }
-    .maintenance-history h6 { font-size: 1rem; font-weight: 600; margin-bottom: 0.3rem; color: #198754; }
-    .maintenance-history ul { padding-left: 1.2rem; margin-bottom: 0.1rem; }
-    .maintenance-history li { margin-bottom: 0.2rem; }
-    .maintenance-history .no-history { color: #888; font-style: italic; font-size: 0.98em; }
-    .photo-thumb { position:relative; display:inline-block; margin-right:7px; margin-bottom:7px; }
-    .photo-thumb form { position:absolute; top:2px; right:2px; }
-    .photo-thumb .btn { padding:2px 6px; font-size:0.8rem; }
+    /* Your existing styles here or simplified for brevity */
+    /* ... */
   </style>
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="index.php">
-      <i class="bi bi-house-door-fill"></i> ASRT Home
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto align-items-center">
-        <li class="nav-item">
-          <a class="nav-link" href="index.php">Home</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="invoice_history.php">Payment</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="handyman_type.php">Handyman</a>
-        </li>
-        <li class="nav-item ms-lg-3">
-          <form action="logout.php" method="post" class="d-inline">
-            <button type="submit" class="btn btn-danger btn-sm px-3">Logout</button>
-          </form>
-        </li>
-      </ul>
-    </div>
-  </div>
-</nav>
-<div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">Welcome, <?= htmlspecialchars($client_display) ?>!</h2>
-  </div>
 
-  <?php if ($photo_upload_success): ?>
-    <div class="alert alert-success"><?= htmlspecialchars($photo_upload_success) ?></div>
-  <?php endif; ?>
-  <?php if ($photo_upload_error): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($photo_upload_error) ?></div>
-  <?php endif; ?>
-
-  <!-- Feedback for kicked units (Now uses the pre-fetched data) -->
-  <?php if ($feedback_prompts): ?>
-    <div class="alert alert-warning">
-      <i class="fa-solid fa-comment-dots"></i> We value your experience! Please provide feedback for your recently ended rental(s):
-    </div>
-    <?php foreach ($feedback_prompts as $prompt): ?>
-      <div class="card mb-3">
-        <div class="card-header">
-          Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?> (Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)
-        </div>
-        <div class="card-body">
-          <form method="post" action="">
-            <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
-            <div class="mb-2">
-              <label class="form-label">Rating</label>
-              <select name="rating" class="form-select" required>
-                <option value="">Select</option>
-                <?php for ($i = 5; $i >= 1; $i--): ?>
-                  <option value="<?= $i ?>"><?= $i ?></option>
-                <?php endfor; ?>
-              </select>
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Comments</label>
-              <textarea name="comments" class="form-control"></textarea>
-            </div>
-            <button class="btn btn-primary" type="submit" name="submit_feedback">Submit Feedback</button>
-          </form>
-        </div>
+<body>
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+    <div class="container">
+      <a class="navbar-brand" href="index.php">
+        <i class="bi bi-house-door-fill"></i> ASRT Home
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-center">
+          <li class="nav-item"><a class="nav-link" href="index.php">Home</a></li>
+          <li class="nav-item"><a class="nav-link" href="invoice_history.php">Payment</a></li>
+          <li class="nav-item"><a class="nav-link" href="handyman_type.php">Handyman</a></li>
+          <li class="nav-item ms-lg-3">
+            <form action="logout.php" method="post" class="d-inline">
+              <button type="submit" class="btn btn-danger btn-sm px-3">Logout</button>
+            </form>
+          </li>
+        </ul>
       </div>
-    <?php endforeach; ?>
-    <?php if (!empty($feedback_success)): ?>
-      <div class="alert alert-success"><?= htmlspecialchars($feedback_success) ?></div>
-    <?php endif; ?>
-  <?php endif; ?>
+    </div>
+  </nav>
 
-  <!-- Your Rented Units (Now uses the pre-fetched data) -->
-  <h4 class="mb-3">Your Rented Units</h4>
-  <div class="row">
-  <?php if ($rented_units): ?>
-    <?php foreach ($rented_units as $rent): 
-      $photos = $unit_photos[$rent['Space_ID']] ?? [];
-    ?>
-      <div class="col-lg-4 col-md-6 mb-4">
-        <div class="card border-success shadow">
-          <div class="text-center pt-3">
-            <i class="fa-solid fa-person-shelter unit-icon"></i>
+  <div class="container mt-5 mb-5">
+    <h2 class="fw-bold mb-4">Welcome, <?= htmlspecialchars($client_display) ?>!</h2>
+
+    <?php if ($photo_upload_success): ?>
+      <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <?= htmlspecialchars($photo_upload_success) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    <?php endif; ?>
+    <?php if ($photo_upload_error): ?>
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <?= htmlspecialchars($photo_upload_error) ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    <?php endif; ?>
+
+    <!-- Feedback Section -->
+    <?php if ($feedback_prompts): ?>
+      <div class="alert alert-warning d-flex align-items-center gap-2" role="alert">
+        <i class="fa-solid fa-comment-dots fs-4"></i>
+        <div>We value your experience! Please provide feedback for your recently ended rental(s):</div>
+      </div>
+      <?php foreach ($feedback_prompts as $prompt): ?>
+        <div class="card mb-4 shadow-sm">
+          <div class="card-header fw-semibold text-success">
+            Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?>
+            <small class="text-muted">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)</small>
           </div>
           <div class="card-body">
-            <h5><?= htmlspecialchars($rent['Name']) ?></h5>
-            <h6>₱<?= number_format($rent['Price'], 0) ?> a month</h6>
-            <span class="badge bg-success mb-2"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
-            <p><?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></p>
-            <p class="mb-0"><b>Rental Period:</b> <?= htmlspecialchars($rent['StartDate']) ?> to <?= htmlspecialchars($rent['EndDate']) ?></p>
-
-            <!-- Unit Photo Upload/Display -->
-            <div class="mt-3 mb-2">
-              <?php if ($photos): ?>
-                  <div class="mb-2 d-flex flex-wrap">
-                    <?php foreach ($photos as $photo): ?>
-                      <div class="photo-thumb">
-                        <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" class="unit-photo" alt="Unit Photo">
-                        <form method="post">
-                          <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
-                          <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
-                          <button type="submit" name="delete_unit_photo" class="btn btn-danger btn-sm" 
-                            onclick="return confirm('Delete this photo?');"><i class="fa fa-times"></i></button>
-                        </form>
-                      </div>
-                    <?php endforeach; ?>
-                  </div>
-              <?php else: ?>
-                  <span class="text-muted mb-2">No photo uploaded for this unit.</span>
-              <?php endif; ?>
-              <?php if (count($photos) < 5): ?>
-              <form method="post" enctype="multipart/form-data" class="d-flex flex-column align-items-start">
-                <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
-                <input type="file" name="unit_photo" accept="image/*" class="form-control mb-2" style="max-width: 220px;" required>
-                <button type="submit" name="upload_unit_photo" class="btn btn-outline-success btn-sm">
-                  Upload Photo
-                </button>
-              </form>
-              <?php endif; ?>
-            </div>
-
-            <div class="maintenance-history mt-3">
-              <h6><i class="fa-solid fa-screwdriver-wrench"></i> Maintenance History</h6>
-              <?php if (isset($maintenance_history[$rent['Space_ID']])): ?>
-                <ul>
-                  <?php foreach ($maintenance_history[$rent['Space_ID']] as $mh): ?>
-                  <li>
-                    <b><?= htmlspecialchars($mh['RequestDate']) ?></b> - 
-                    <span class="badge bg-<?= ($mh['Status']=='Completed'?'success':'secondary') ?>"><?= htmlspecialchars($mh['Status']) ?></span>
-                  </li>
-                  <?php endforeach; ?>
-                </ul>
-              <?php else: ?>
-                <div class="no-history">No maintenance requests yet for this unit.</div>
-              <?php endif; ?>
-            </div>
+            <form method="post" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>">
+              <input type="hidden" name="invoice_id" value="<?= (int)$prompt['Invoice_ID'] ?>">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label for="rating-<?= (int)$prompt['Invoice_ID'] ?>" class="form-label">Rating</label>
+                  <select id="rating-<?= (int)$prompt['Invoice_ID'] ?>" name="rating" class="form-select" required>
+                    <option value="" selected disabled>Select Rating</option>
+                    <?php for ($i = 5; $i >= 1; $i--): ?>
+                      <option value="<?= $i ?>"><?= str_repeat('★', $i) . str_repeat('☆', 5 - $i) ?> (<?= $i ?>)</option>
+                    <?php endfor; ?>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label for="comments-<?= (int)$prompt['Invoice_ID'] ?>" class="form-label">Comments</label>
+                  <textarea id="comments-<?= (int)$prompt['Invoice_ID'] ?>" name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
+                </div>
+              </div>
+              <button type="submit" name="submit_feedback" class="btn btn-primary mt-3">
+                <i class="fa fa-paper-plane me-1"></i> Submit Feedback
+              </button>
+            </form>
           </div>
         </div>
-      </div>
-    <?php endforeach; ?>
-  <?php else: ?>
-    <div class="col-12 text-center"><div class="alert alert-warning">You have no active rentals.</div></div>
-  <?php endif; ?>
+      <?php endforeach; ?>
+      <?php if ($feedback_success): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+          <?= htmlspecialchars($feedback_success) ?>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      <?php endif; ?>
+    <?php endif; ?>
+
+    <!-- Rented Units Section -->
+    <h4 class="mb-3">Your Rented Units</h4>
+    <div class="row g-4">
+      <?php if ($rented_units): ?>
+        <?php foreach ($rented_units as $rent): 
+          $photos = $unit_photos[$rent['Space_ID']] ?? [];
+        ?>
+          <div class="col-lg-4 col-md-6">
+            <div class="card border-success shadow-sm h-100">
+              <div class="text-center pt-3">
+                <i class="fa-solid fa-person-shelter fa-3x text-success"></i>
+              </div>
+              <div class="card-body d-flex flex-column">
+                <h5><?= htmlspecialchars($rent['Name']) ?></h5>
+                <h6 class="text-success mb-2">₱<?= number_format($rent['Price'], 0) ?> / month</h6>
+                <span class="badge bg-success mb-3"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
+                <p class="mb-1"><?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></p>
+                <p class="mb-3"><strong>Rental Period:</strong> <?= htmlspecialchars($rent['StartDate']) ?> to <?= htmlspecialchars($rent['EndDate']) ?></p>
+
+                <!-- Unit Photos -->
+                <div class="mb-3">
+                  <?php if ($photos): ?>
+                    <div class="d-flex flex-wrap gap-2">
+                      <?php foreach ($photos as $photo): ?>
+                        <div class="position-relative" style="width: 140px; height: 110px; border-radius: 0.5rem; overflow: hidden; border: 2px solid #c1e3d5;">
+                          <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" alt="Unit Photo" style="width: 100%; height: 100%; object-fit: cover;">
+                          <form method="post" class="position-absolute top-0 end-0 m-1" onsubmit="return confirm('Delete this photo?');">
+                            <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
+                            <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
+                            <button type="submit" name="delete_unit_photo" class="btn btn-danger btn-sm p-1" aria-label="Delete photo">
+                              <i class="fa fa-times"></i>
+                            </button>
+                          </form>
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                  <?php else: ?>
+                    <p class="text-muted fst-italic mb-2">No photo uploaded for this unit.</p>
+                  <?php endif; ?>
+                  <?php if (count($photos) < 5): ?>
+                    <form method="post" enctype="multipart/form-data" class="mt-2">
+                      <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
+                      <input type="file" name="unit_photo" accept="image/*" class="form-control form-control-sm mb-2" required>
+                      <button type="submit" name="upload_unit_photo" class="btn btn-outline-success btn-sm w-100">Upload Photo</button>
+                    </form>
+                  <?php endif; ?>
+                </div>
+
+                <!-- Maintenance History -->
+                <div class="mt-auto bg-light p-3 rounded border-start border-4 border-success">
+                  <h6 class="text-success mb-2"><i class="fa-solid fa-screwdriver-wrench me-1"></i>Maintenance History</h6>
+                  <?php if (isset($maintenance_history[$rent['Space_ID']]) && count($maintenance_history[$rent['Space_ID']]) > 0): ?>
+                    <ul class="list-unstyled mb-0">
+                      <?php foreach ($maintenance_history[$rent['Space_ID']] as $mh): ?>
+                        <li class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                          <span class="text-muted small"><?= htmlspecialchars($mh['RequestDate']) ?></span>
+                          <span class="badge bg-<?= ($mh['Status'] === 'Completed' ? 'success' : 'secondary') ?>">
+                            <?= htmlspecialchars($mh['Status']) ?>
+                          </span>
+                        </li>
+                      <?php endforeach; ?>
+                    </ul>
+                  <?php else: ?>
+                    <p class="text-muted fst-italic mb-0">No maintenance requests yet for this unit.</p>
+                  <?php endif; ?>
+                </div>
+              </div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      <?php else: ?>
+        <div class="col-12 text-center">
+          <div class="alert alert-warning">You have no active rentals.</div>
+        </div>
+      <?php endif; ?>
+    </div>
   </div>
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
-<?php if ($show_login_success): ?>
-<script>
-Swal.fire({
-  icon: 'success',
-  title: 'Login Successful!',
-  text: 'Welcome!',
-  confirmButtonColor: '#3085d6'
-});
-</script>
-<?php endif; ?>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
+  <?php if ($show_login_success): ?>
+  <script>
+    Swal.fire({
+      icon: 'success',
+      title: 'Login Successful!',
+      text: 'Welcome!',
+      confirmButtonColor: '#3085d6'
+    });
+  </script>
+  <?php endif; ?>
 </body>
 </html>
