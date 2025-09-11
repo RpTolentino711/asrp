@@ -700,13 +700,16 @@ if (isset($_SESSION['login_error'])) {
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
             <?php if (!empty($photo_urls)): ?>
-              <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
+              <div style="position:relative;">
+                <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
+                <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($photo_urls) ?>/6 </span>
+              </div>
             <?php else: ?>
               <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
                 <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
               </div>
             <?php endif; ?>
-            
+
             <div class="card-body">
               <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
               <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
@@ -746,7 +749,7 @@ if (isset($_SESSION['login_error'])) {
               <div class="modal-body text-center">
                 <?php if (count($photo_urls) === 1): ?>
                   <img src="<?= $photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
-                <?php else: ?>
+                <?php elseif (count($photo_urls) > 1): ?>
                   <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
                     <div class="carousel-inner">
                       <?php foreach ($photo_urls as $idx => $url): ?>
@@ -763,6 +766,10 @@ if (isset($_SESSION['login_error'])) {
                         <span class="carousel-control-next-icon" aria-hidden="true"></span>
                         <span class="visually-hidden">Next</span>
                     </button>
+                  </div>
+                <?php else: ?>
+                  <div class="text-center mb-3" style="font-size:56px;color:#2563eb;">
+                    <i class="fa-solid fa-house"></i>
                   </div>
                 <?php endif; ?>
               </div>
