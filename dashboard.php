@@ -54,78 +54,177 @@ if (isset($_SESSION['login_success'])) {
 }
 
 $feedback_success = '';
-if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
+if (isset($_POST['submit_feedback']) && isset($_POST['invoice_id']) && isset($_POST['rating'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $rating = intval($_POST['rating']);
-    $comments = trim($_POST['comments']);
+    $comments = isset($_POST['comments']) ? trim($_POST['comments']) : '';
 
-    if ($db->saveFeedback($invoice_id, $rating, $comments)) {
-        $feedback_success = "Thank you for your feedback!";
+    // Validate rating range
+    if ($rating >= 1 && $rating <= 5) {
+        if ($db->saveFeedback($invoice_id, $rating, $comments)) {
+            $feedback_success = "Thank you for your feedback!";
+        } else {
+            $feedback_success = "Failed to save feedback. Please try again.";
+        }
+    } else {
+        $feedback_success = "Invalid rating value.";
     }
 }
 
 // --- PHOTO UPLOAD/DELETE LOGIC ---
 $photo_upload_success = '';
 $photo_upload_error = '';
-if (isset($_POST['upload_unit_photo'], $_POST['space_id']) && isset($_FILES['unit_photo'])) {
+
+if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
     $space_id = intval($_POST['space_id']);
     $file = $_FILES['unit_photo'];
 
-    // Fetch current photos to enforce limit
-    $unit_photos = $db->getUnitPhotosForClient($client_id);
-    $current_photos = $unit_photos[$space_id] ?? [];
-    if (count($current_photos) >= 5) {
-        $photo_upload_error = "You can upload up to 5 photos only.";
-    } elseif ($file['error'] === UPLOAD_ERR_OK) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        if (in_array($file['type'], $allowed_types) && $file['size'] <= 2*1024*1024) {
-            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $upload_dir = __DIR__ . "/uploads/unit_photos/";
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
-            $filepath = $upload_dir . $filename;
-            if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $db->addUnitPhoto($space_id, $client_id, $filename);
-                $photo_upload_success = "Photo uploaded for this unit!";
+    // Validate space_id belongs to client
+    $rented_units = $db->getRentedUnits($client_id);
+    $valid_space_ids = array_column($rented_units, 'Space_ID');
+    
+    if (!in_array($space_id, $valid_space_ids)) {
+        $photo_upload_error = "Invalid space ID.";
+    } else {
+        // Fetch current photos to enforce limit
+        $unit_photos = $db->getUnitPhotosForClient($client_id);
+        $current_photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+        
+        if (count($current_photos) >= 5) {
+            $photo_upload_error = "You can upload up to 5 photos only.";
+        } elseif ($file['error'] === UPLOAD_ERR_OK) {
+            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+            $max_size = 2 * 1024 * 1024; // 2MB
+            
+            // Get actual file type using finfo
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $actual_type = $finfo->file($file['tmp_name']);
+            
+            if (in_array($actual_type, $allowed_types) && $file['size'] <= $max_size) {
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+                
+                if (in_array($ext, $allowed_extensions)) {
+                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                    if (!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
+                    
+                    $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
+                    $filepath = $upload_dir . $filename;
+                    
+                    if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                        if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
+                            $photo_upload_success = "Photo uploaded for this unit!";
+                        } else {
+                            // Delete uploaded file if database insert failed
+                            unlink($filepath);
+                            $photo_upload_error = "Database error occurred.";
+                        }
+                    } else {
+                        $photo_upload_error = "Failed to move uploaded file.";
+                    }
+                } else {
+                    $photo_upload_error = "Invalid file extension.";
+                }
             } else {
-                $photo_upload_error = "Failed to move uploaded file.";
+                if ($file['size'] > $max_size) {
+                    $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+                } else {
+                    $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF allowed.";
+                }
             }
         } else {
-            $photo_upload_error = "Invalid file type or size too large.";
+            switch($file['error']) {
+                case UPLOAD_ERR_INI_SIZE:
+                case UPLOAD_ERR_FORM_SIZE:
+                    $photo_upload_error = "File size too large.";
+                    break;
+                case UPLOAD_ERR_PARTIAL:
+                    $photo_upload_error = "File upload was interrupted.";
+                    break;
+                case UPLOAD_ERR_NO_FILE:
+                    $photo_upload_error = "No file selected.";
+                    break;
+                default:
+                    $photo_upload_error = "File upload error occurred.";
+            }
         }
-    } else {
-        $photo_upload_error = "File upload error. Please try again.";
     }
 }
 
-if (isset($_POST['delete_unit_photo'], $_POST['space_id'], $_POST['photo_filename'])) {
+if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
-    $photo_filename = $_POST['photo_filename'];
-    $db->deleteUnitPhoto($space_id, $client_id, $photo_filename);
-    $file_to_delete = __DIR__ . "/uploads/unit_photos/" . $photo_filename;
-    if (file_exists($file_to_delete)) unlink($file_to_delete);
-    $photo_upload_success = "Photo deleted!";
+    $photo_filename = trim($_POST['photo_filename']);
+    
+    // Validate space_id belongs to client
+    $rented_units = $db->getRentedUnits($client_id);
+    $valid_space_ids = array_column($rented_units, 'Space_ID');
+    
+    if (in_array($space_id, $valid_space_ids) && !empty($photo_filename)) {
+        // Validate filename to prevent directory traversal
+        if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+            if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
+                $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
+                if (file_exists($file_to_delete)) {
+                    unlink($file_to_delete);
+                }
+                $photo_upload_success = "Photo deleted!";
+            } else {
+                $photo_upload_error = "Failed to delete photo from database.";
+            }
+        } else {
+            $photo_upload_error = "Invalid photo filename.";
+        }
+    } else {
+        $photo_upload_error = "Invalid request.";
+    }
 }
 
 // --- SAFELY GET CLIENT DETAILS ---
 $client_details = $db->getClientDetails($client_id);
+$client_display = "Unknown User";
+
 if ($client_details && is_array($client_details)) {
-    $first_name = $client_details['Client_fn'] ?? '';
-    $last_name = $client_details['Client_ln'] ?? '';
-    $username = $client_details['C_username'] ?? '';
-    $client_display = trim("$first_name $last_name") ?: $username;
-} else {
-    $client_display = "Unknown User";
+    $first_name = isset($client_details['Client_fn']) ? trim($client_details['Client_fn']) : '';
+    $last_name = isset($client_details['Client_ln']) ? trim($client_details['Client_ln']) : '';
+    $username = isset($client_details['C_username']) ? trim($client_details['C_username']) : '';
+    
+    $full_name = trim("$first_name $last_name");
+    $client_display = !empty($full_name) ? $full_name : (!empty($username) ? $username : "Unknown User");
 }
 
-$feedback_prompts = $db->getFeedbackPrompts($client_id);
-$rented_units = $db->getRentedUnits($client_id);
-
-// --- 5. SOLVE THE N+1 PROBLEM ---
-$unit_ids = !empty($rented_units) ? array_column($rented_units, 'Space_ID') : [];
-$maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-// Fetch all unit photos for this client
-$unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1, photo2, ...] ]
+// Get data with error handling
+try {
+    $feedback_prompts = $db->getFeedbackPrompts($client_id);
+    $rented_units = $db->getRentedUnits($client_id);
+    
+    // Ensure arrays are returned
+    $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
+    $rented_units = is_array($rented_units) ? $rented_units : [];
+    
+    // Get maintenance history and photos only if there are rented units
+    $maintenance_history = [];
+    $unit_photos = [];
+    
+    if (!empty($rented_units)) {
+        $unit_ids = array_column($rented_units, 'Space_ID');
+        $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
+        $unit_photos = $db->getUnitPhotosForClient($client_id);
+        
+        // Ensure arrays are returned
+        $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
+        $unit_photos = is_array($unit_photos) ? $unit_photos : [];
+    }
+    
+} catch (Exception $e) {
+    // Log error and set defaults
+    error_log("Dashboard data fetch error: " . $e->getMessage());
+    $feedback_prompts = [];
+    $rented_units = [];
+    $maintenance_history = [];
+    $unit_photos = [];
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -798,7 +897,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
         <?php endif; ?>
 
         <!-- Feedback Section -->
-        <?php if ($feedback_prompts): ?>
+        <?php if (!empty($feedback_prompts)): ?>
             <div class="alert alert-warning fade-in">
                 <i class="bi bi-chat-heart me-2"></i>
                 We value your experience! Please provide feedback for your recently ended rental(s).
@@ -808,12 +907,12 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                 <div class="card feedback-card mb-3 fade-in">
                     <div class="card-header">
                         <i class="bi bi-star me-2"></i>
-                        Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?>
-                        <small class="text-muted ms-2">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)</small>
+                        Feedback for <?= htmlspecialchars($prompt['SpaceName'] ?? 'Unit') ?>
+                        <small class="text-muted ms-2">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate'] ?? 'N/A') ?>)</small>
                     </div>
                     <div class="card-body">
                         <form method="post" action="">
-                            <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
+                            <input type="hidden" name="invoice_id" value="<?= intval($prompt['Invoice_ID']) ?>">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label">
@@ -860,15 +959,31 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
             </div>
         </div>
 
-        <?php if ($rented_units): ?>
+        <?php if (!empty($rented_units)): ?>
             <div class="row g-4">
                 <?php foreach ($rented_units as $rent): 
-                    $photos = $unit_photos[$rent['Space_ID']] ?? [];
-                    // Fetch latest invoice with Flow_Status = 'new' for this unit
-                    $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $rent['Space_ID']);
-                    $rental_start = $latest_invoice['StartDate'] ?? $rent['StartDate'];
-                    $rental_end = $latest_invoice['EndDate'] ?? $rent['EndDate'];
+                    $space_id = intval($rent['Space_ID']);
+                    $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                    
+                    // Get dates safely
+                    $rental_start = isset($rent['StartDate']) ? htmlspecialchars($rent['StartDate']) : 'N/A';
+                    $rental_end = isset($rent['EndDate']) ? htmlspecialchars($rent['EndDate']) : 'N/A';
                     $due_date = $rental_end;
+                    
+                    // Try to get latest invoice data if method exists
+                    if (method_exists($db, 'getLatestNewInvoiceForUnit')) {
+                        try {
+                            $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $space_id);
+                            if ($latest_invoice && is_array($latest_invoice)) {
+                                $rental_start = isset($latest_invoice['StartDate']) ? htmlspecialchars($latest_invoice['StartDate']) : $rental_start;
+                                $rental_end = isset($latest_invoice['EndDate']) ? htmlspecialchars($latest_invoice['EndDate']) : $rental_end;
+                                $due_date = $rental_end;
+                            }
+                        } catch (Exception $e) {
+                            // Use default values if method fails
+                            error_log("Failed to get latest invoice: " . $e->getMessage());
+                        }
+                    }
                 ?>
                     <div class="col-12 col-lg-6 col-xl-4">
                         <div class="card unit-card fade-in h-100">
@@ -880,24 +995,24 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
 
                                 <!-- Unit Info -->
                                 <div class="text-center mb-3">
-                                    <h5 class="unit-title"><?= htmlspecialchars($rent['Name']) ?></h5>
-                                    <div class="unit-price">₱<?= number_format($rent['Price'], 0) ?>/month</div>
-                                    <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
+                                    <h5 class="unit-title"><?= htmlspecialchars($rent['Name'] ?? 'Unit') ?></h5>
+                                    <div class="unit-price">₱<?= number_format(floatval($rent['Price'] ?? 0), 0) ?>/month</div>
+                                    <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName'] ?? 'Space') ?></span>
                                 </div>
 
                                 <!-- Location & Dates -->
                                 <div class="mb-3">
                                     <div class="unit-details">
                                         <i class="bi bi-geo-alt me-1"></i>
-                                        <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?>
+                                        <?= htmlspecialchars($rent['Street'] ?? '') ?>, <?= htmlspecialchars($rent['Brgy'] ?? '') ?>, <?= htmlspecialchars($rent['City'] ?? '') ?>
                                     </div>
                                     <div class="unit-details">
                                         <i class="bi bi-calendar-range me-1"></i>
-                                        <strong>Period:</strong> <?= htmlspecialchars($rental_start) ?> to <?= htmlspecialchars($rental_end) ?>
+                                        <strong>Period:</strong> <?= $rental_start ?> to <?= $rental_end ?>
                                     </div>
                                     <div class="unit-details">
                                         <i class="bi bi-calendar-check me-1"></i>
-                                        <strong>Due:</strong> <?= htmlspecialchars($due_date) ?>
+                                        <strong>Due:</strong> <?= $due_date ?>
                                     </div>
                                 </div>
 
@@ -910,7 +1025,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                                         <small class="text-muted"><?= count($photos) ?>/5</small>
                                     </div>
 
-                                    <?php if ($photos): ?>
+                                    <?php if (!empty($photos)): ?>
                                         <div class="photo-gallery">
                                             <?php foreach ($photos as $photo): ?>
                                                 <div class="photo-item">
@@ -918,7 +1033,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                                                          alt="Unit Photo"
                                                          onclick="showImageModal('uploads/unit_photos/<?= htmlspecialchars($photo) ?>')">
                                                     <form method="post" class="d-inline">
-                                                        <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
+                                                        <input type="hidden" name="space_id" value="<?= $space_id ?>">
                                                         <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
                                                         <button type="submit" 
                                                                 name="delete_unit_photo" 
@@ -942,13 +1057,14 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                                     <?php if (count($photos) < 5): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data">
-                                                <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
+                                                <input type="hidden" name="space_id" value="<?= $space_id ?>">
                                                 <div class="mb-2">
                                                     <input type="file" 
                                                            name="unit_photo" 
-                                                           accept="image/*" 
+                                                           accept="image/jpeg,image/jpg,image/png,image/gif" 
                                                            class="form-control" 
                                                            required>
+                                                    <small class="text-muted">Max 2MB. JPG, PNG, GIF only.</small>
                                                 </div>
                                                 <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100">
                                                     <i class="bi bi-cloud-upload me-1"></i>Upload Photo
@@ -965,24 +1081,24 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                                         <h6>Maintenance History</h6>
                                     </div>
                                     
-                                    <?php if (isset($maintenance_history[$rent['Space_ID']])): ?>
+                                    <?php if (isset($maintenance_history[$space_id]) && !empty($maintenance_history[$space_id])): ?>
                                         <ul class="maintenance-list">
-                                            <?php foreach (array_slice($maintenance_history[$rent['Space_ID']], 0, 3) as $mh): ?>
+                                            <?php foreach (array_slice($maintenance_history[$space_id], 0, 3) as $mh): ?>
                                                 <li class="maintenance-item">
                                                     <div>
-                                                        <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate']) ?></div>
+                                                        <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
                                                         <small class="text-muted">Maintenance Request</small>
                                                     </div>
-                                                    <span class="maintenance-status <?= strtolower($mh['Status']) ?>">
-                                                        <?= htmlspecialchars($mh['Status']) ?>
+                                                    <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
+                                                        <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
                                                     </span>
                                                 </li>
                                             <?php endforeach; ?>
                                         </ul>
-                                        <?php if (count($maintenance_history[$rent['Space_ID']]) > 3): ?>
+                                        <?php if (count($maintenance_history[$space_id]) > 3): ?>
                                             <small class="text-muted">
                                                 <i class="bi bi-three-dots me-1"></i>
-                                                +<?= count($maintenance_history[$rent['Space_ID']]) - 3 ?> more records
+                                                +<?= count($maintenance_history[$space_id]) - 3 ?> more records
                                             </small>
                                         <?php endif; ?>
                                     <?php else: ?>
@@ -1133,12 +1249,18 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                             return;
                         }
                         
-                        // Show preview or filename
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            // Could add image preview here if desired
-                        };
-                        reader.readAsDataURL(file);
+                        // Validate file type
+                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                        if (!allowedTypes.includes(file.type)) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Invalid File Type',
+                                text: 'Please select a JPG, PNG, or GIF image.',
+                                confirmButtonColor: '#2563eb'
+                            });
+                            this.value = '';
+                            return;
+                        }
                     }
                 });
             });
