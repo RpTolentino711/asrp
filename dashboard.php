@@ -1,6 +1,12 @@
 <?php
+
 require 'database/database.php'; 
 session_start();
+
+// DEBUG: Log POST data for feedback troubleshooting
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log('POST DATA: ' . print_r($_POST, true));
+}
 
 // Create an instance of the Database class
 $db = new Database();
