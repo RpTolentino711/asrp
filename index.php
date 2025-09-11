@@ -861,6 +861,7 @@ if (isset($_SESSION['login_error'])) {
       // Always auto-refresh available units every 5 seconds
       fetchAndRenderAvailableUnits();
       setInterval(fetchAndRenderAvailableUnits, 5000);
+    </script>
 
   <!-- All rental modals rendered here -->
   <?php if (!empty($modals)) echo $modals; ?>
