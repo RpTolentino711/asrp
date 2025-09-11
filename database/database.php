@@ -1,3 +1,4 @@
+ 
 <?php
 
 class Database {
@@ -1448,6 +1449,11 @@ public function getAdminMonthChartData($startDate, $endDate) {
     }
 
 }
+
+   public function getNewInvoiceForRental($client_id, $space_id) {
+        $sql = "SELECT * FROM invoice WHERE Client_ID = ? AND Space_ID = ? AND Flow_Status = 'new' ORDER BY InvoiceDate DESC LIMIT 1";
+        return $this->runQuery($sql, [$client_id, $space_id]);
+    }
 
 
 

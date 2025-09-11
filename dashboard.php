@@ -480,6 +480,8 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
   <?php if ($rented_units): ?>
     <?php foreach ($rented_units as $rent): 
       $photos = $unit_photos[$rent['Space_ID']] ?? [];
+      // Fetch the correct invoice for this rental
+      $invoice = $db->getNewInvoiceForRental($client_id, $rent['Space_ID']);
     ?>
   <div class="col-12 col-sm-6 col-md-6 col-lg-4 d-flex">
         <div class="card shadow">
@@ -491,7 +493,14 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
             <h6 class="mb-2" style="color:#2563eb;">₱<?= number_format($rent['Price'], 0) ?> a month</h6>
             <span class="badge mb-2"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
             <p class="mb-1 text-secondary"><?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></p>
-            <p class="mb-0 text-secondary"><b>Rental Period:</b> <?= htmlspecialchars($rent['StartDate']) ?> to <?= htmlspecialchars($rent['EndDate']) ?></p>
+            <?php if ($invoice): ?>
+              <p class="mb-0 text-secondary"><b>Rental Period:</b> <?= htmlspecialchars($invoice['InvoiceDate']) ?> to <?= htmlspecialchars($invoice['EndDate']) ?></p>
+              <p class="mb-0 text-secondary"><b>Status:</b> <?= htmlspecialchars($invoice['Flow_Status']) ?></p>
+              <p class="mb-0 text-secondary"><b>Due Date:</b> <?= htmlspecialchars($invoice['EndDate']) ?></p>
+            <?php else: ?>
+              <p class="mb-0 text-secondary"><b>Rental Period:</b> <?= htmlspecialchars($rent['StartDate']) ?> to <?= htmlspecialchars($rent['EndDate']) ?></p>
+              <p class="mb-0 text-secondary text-danger">No active invoice found.</p>
+            <?php endif; ?>
 
             <!-- Unit Photo Upload/Display -->
             <div class="mt-3 mb-2">
