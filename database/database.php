@@ -440,7 +440,12 @@ public function getHomepageRentedUnits($limit = 12) {
     // --- Feedback and Testimonials ---
     public function saveFeedback($invoice_id, $rating, $comments) {
         $sql = "INSERT INTO clientfeedback (CS_ID, Rating, Comments, Dates) VALUES (?, ?, ?, NOW())";
-        return $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
+        try {
+            return $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
+        } catch (PDOException $e) {
+            error_log('saveFeedback error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function getFeedbackPrompts($client_id) {
