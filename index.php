@@ -1143,9 +1143,7 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-  
+
   <script>
     let existingUnitIds = new Set();
 
@@ -1157,7 +1155,7 @@ if (isset($_SESSION['login_error'])) {
       });
       
       // Start checking for new units every 45 seconds
-      setInterval(checkForNewUnits, 45000);
+setInterval(checkForNewUnits, 2000);
       
       // Initialize Swiper for testimonials
       if (document.querySelector('.testimonials-swiper')) {
