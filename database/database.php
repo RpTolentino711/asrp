@@ -817,12 +817,11 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_filenam
 
     $this->pdo->beginTransaction();
     try {
-        // Insert into all columns as defined in your SQL
-        // Space_ID is assumed to be AUTO_INCREMENT or handled in DB
+        // Only set Photo1 for the main photo, Photo (legacy) is always NULL for new units
         $sql1 = "INSERT INTO space (
                     Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Price, Flow_Status,
                     Photo1, Photo2, Photo3, Photo4, Photo5
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?)";
+                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'new', ?, NULL, NULL, NULL, NULL)";
         $space_id = $this->insertAndGetId($sql1, [
             $name,                // Name
             $spacetype_id,        // SpaceType_ID
@@ -830,13 +829,8 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_filenam
             $street,              // Street
             $brgy,                // Brgy
             $city,                // City
-            $photo_filename,      // Photo (legacy/optional)
             $price,               // Price
-            $photo_filename,      // Photo1 (main photo)
-            null,                 // Photo2
-            null,                 // Photo3
-            null,                 // Photo4
-            null                  // Photo5
+            $photo_filename       // Photo1 (main photo)
         ]);
 
         if (!$space_id) {
