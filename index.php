@@ -675,157 +675,7 @@ if (isset($_SESSION['login_error'])) {
         <h2>Available Units</h2>
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
-
-      <div class="row g-4">
-        <?php
-        if (!empty($available_units)) {
-            $modal_counter = 0;
-            $modals = '';
-            foreach ($available_units as $space) {
-                if (in_array($space['Space_ID'], $hide_client_rented_unit_ids)) continue;
-                $modal_counter++;
-                $modal_id = "unitModal" . $modal_counter;
-                $photo_modal_id = "photoModal" . $modal_counter;
-
-                // Multi-photo display logic
-                $photo_urls = [];
-                for ($i=1; $i<=5; $i++) {
-                    $photo_field = "Photo$i";
-                    if (!empty($space[$photo_field])) {
-                        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
-                    }
-                }
-                if (empty($photo_urls) && !empty($space['Photo'])) {
-                    $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
-                }
-        ?>
-        <div class="col-lg-4 col-md-6 animate-on-scroll">
-          <div class="card unit-card">
-            <?php if (!empty($photo_urls)): ?>
-              <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
-            <?php else: ?>
-              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-                <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
-              </div>
-            <?php endif; ?>
-            
-            <div class="card-body">
-              <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
-              <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
-              <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
-                <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
-              </div>
-              
-              <?php if ($is_logged_in && !$client_is_inactive): ?>
-                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">
-                  <i class="bi bi-key me-2"></i>Rent Now
-                </button>
-              <?php elseif ($is_logged_in && $client_is_inactive): ?>
-                <button class="btn btn-secondary w-100" disabled>
-                  Account Inactive
-                </button>
-              <?php else: ?>
-                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
-                  <i class="bi bi-key me-2"></i>Login to Rent
-                </button>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
-
-        <!-- Photo Modal -->
-        <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-xl">
-            <div class="modal-content bg-dark">
-              <div class="modal-header border-0">
-                <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
-                  Photo Gallery: <?= htmlspecialchars($space['Name']) ?>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body text-center">
-                <?php if (count($photo_urls) === 1): ?>
-                  <img src="<?= $photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
-                <?php else: ?>
-                  <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner">
-                      <?php foreach ($photo_urls as $idx => $url): ?>
-                        <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
-                          <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
-                        </div>
-                      <?php endforeach; ?>
-                    </div>
-                    <button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Previous</span>
-                    </button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Next</span>
-                    </button>
-                  </div>
-                <?php endif; ?>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <?php
-                // Build rental modal
-                if ($is_logged_in && !$client_is_inactive) {
-                    $modals .= '
-                    <div class="modal fade" id="' . $modal_id . '" tabindex="-1" aria-labelledby="' . $modal_id . 'Label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="' . $modal_id . 'Label">Contact Admin to Rent: ' . htmlspecialchars($space['Name']) . '</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-info-circle me-2"></i>
-                                        To rent this unit and receive an invoice, please contact our admin team for rental approval.
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="fw-bold">Admin Contact:</h6>
-                                            <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:rom_telents@asrt.com">rom_telents@asrt.com</a></p>
-                                            <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+639171234567">+63 917 123 4567</a></p>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="alert alert-warning">
-                                                <strong>Invoice Required:</strong><br>
-                                                Please request your invoice from the admin for the rental process.
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <ul class="list-group list-group-flush">
-                                        <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
-                                        <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
-                                        <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
-                                    </ul>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                    <a href="rent_request.php?space_id=' . urlencode($space['Space_ID']) . '" class="btn btn-success">
-                                        <i class="bi bi-receipt me-2"></i>Request Invoice
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>';
-                }
-            }
-        } else {
-            echo '<div class="col-12 text-center">
-                    <div class="alert alert-info">No units currently available.</div>
-                  </div>';
-        }
-        ?>
-      </div>
-
+      <div id="available-units-row" class="row g-4"></div>
       <div class="text-center mt-5">
         <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
       </div>
@@ -1189,9 +1039,116 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
+  <script>
+    // --- LIVE AVAILABLE UNITS ---
+    const isLoggedIn = <?= json_encode($is_logged_in) ?>;
+    const clientIsInactive = <?= json_encode($client_is_inactive) ?>;
+    const hideClientRentedUnitIds = <?= json_encode($hide_client_rented_unit_ids) ?>;
+
+    function renderAvailableUnits(units) {
+      const row = document.getElementById('available-units-row');
+      row.innerHTML = '';
+      let modalCounter = 0;
+      let modals = '';
+      units.forEach(space => {
+        if (hideClientRentedUnitIds.includes(space.Space_ID)) return;
+        modalCounter++;
+        const modalId = `unitModal${modalCounter}`;
+        const photoModalId = `photoModal${modalCounter}`;
+        // Gather photos
+        let photoUrls = [];
+        for (let i = 1; i <= 5; i++) {
+          const photoField = `Photo${i}`;
+          if (space[photoField]) photoUrls.push('uploads/unit_photos/' + space[photoField]);
+        }
+        if (photoUrls.length === 0 && space.Photo) photoUrls.push('uploads/unit_photos/' + space.Photo);
+
+        // Card HTML
+        let card = `<div class="col-lg-4 col-md-6 animate-on-scroll">
+          <div class="card unit-card">`;
+        if (photoUrls.length > 0) {
+          card += `<img src="${photoUrls[0]}" class="card-img-top" alt="${escapeHtml(space.Name)}" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#${photoModalId}">`;
+        } else {
+          card += `<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;"><i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i></div>`;
+        }
+        card += `<div class="card-body">
+            <h5 class="card-title fw-bold">${escapeHtml(space.Name)}</h5>
+            <p class="unit-price">₱${Number(space.Price).toLocaleString()} / month</p>
+            <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="unit-type">${escapeHtml(space.SpaceTypeName)}</span>
+              <small class="unit-location">${escapeHtml(space.City)}</small>
+            </div>`;
+        if (isLoggedIn && !clientIsInactive) {
+          card += `<button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#${modalId}"><i class="bi bi-key me-2"></i>Rent Now</button>`;
+        } else if (isLoggedIn && clientIsInactive) {
+          card += `<button class="btn btn-secondary w-100" disabled>Account Inactive</button>`;
+        } else {
+          card += `<button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal"><i class="bi bi-key me-2"></i>Login to Rent</button>`;
+        }
+        card += `</div></div></div>`;
+
+        // Photo Modal
+        let modalHtml = `<div class="modal fade" id="${photoModalId}" tabindex="-1" aria-labelledby="${photoModalId}Label" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content bg-dark">
+              <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="${photoModalId}Label">Photo Gallery: ${escapeHtml(space.Name)}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body text-center">`;
+        if (photoUrls.length === 1) {
+          modalHtml += `<img src="${photoUrls[0]}" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">`;
+        } else if (photoUrls.length > 1) {
+          modalHtml += `<div id="zoomCarousel${modalCounter}" class="carousel slide" data-bs-ride="carousel"><div class="carousel-inner">`;
+          photoUrls.forEach((url, idx) => {
+            modalHtml += `<div class="carousel-item${idx === 0 ? ' active' : ''}"><img src="${url}" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo ${idx+1}" style="max-height:60vh;"></div>`;
+          });
+          modalHtml += `</div><button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel${modalCounter}" data-bs-slide="prev"><span class="carousel-control-prev-icon" aria-hidden="true"></span><span class="visually-hidden">Previous</span></button><button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel${modalCounter}" data-bs-slide="next"><span class="carousel-control-next-icon" aria-hidden="true"></span><span class="visually-hidden">Next</span></button></div>`;
+        }
+        modalHtml += `</div></div></div></div>`;
+
+        // Rental Modal
+        let rentModal = '';
+        if (isLoggedIn && !clientIsInactive) {
+          rentModal = `<div class="modal fade" id="${modalId}" tabindex="-1" aria-labelledby="${modalId}Label" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="${modalId}Label">Contact Admin to Rent: ${escapeHtml(space.Name)}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="alert alert-info"><i class="bi bi-info-circle me-2"></i>To rent this unit and receive an invoice, please contact our admin team for rental approval.</div><div class="row"><div class="col-md-6"><h6 class="fw-bold">Admin Contact:</h6><p class="mb-1"><i class="bi bi-envelope me-2"></i><a href=\"mailto:rom_telents@asrt.com\">rom_telents@asrt.com</a></p><p class="mb-3"><i class="bi bi-telephone me-2"></i><a href=\"tel:+639171234567\">+63 917 123 4567</a></p></div><div class="col-md-6"><div class="alert alert-warning"><strong>Invoice Required:</strong><br>Please request your invoice from the admin for the rental process.</div></div></div><ul class="list-group list-group-flush"><li class="list-group-item"><strong>Price:</strong> ₱${Number(space.Price).toLocaleString()} per month</li><li class="list-group-item"><strong>Unit Type:</strong> ${escapeHtml(space.SpaceTypeName)}</li><li class="list-group-item"><strong>Location:</strong> ${escapeHtml(space.Street)}, ${escapeHtml(space.Brgy)}, ${escapeHtml(space.City)}</li></ul></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button><a href="rent_request.php?space_id=${encodeURIComponent(space.Space_ID)}" class="btn btn-success"><i class="bi bi-receipt me-2"></i>Request Invoice</a></div></div></div></div>`;
+        }
+
+        row.insertAdjacentHTML('beforeend', card);
+        modals += modalHtml + rentModal;
+      });
+      // Remove old modals
+      document.querySelectorAll('.dynamic-unit-modal').forEach(m => m.remove());
+      // Add new modals
+      const container = document.createElement('div');
+      container.innerHTML = modals;
+      container.querySelectorAll('.modal').forEach(m => m.classList.add('dynamic-unit-modal'));
+      document.body.appendChild(container);
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/[&<>"']/g, function (c) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c];
+      });
+    }
+
+    async function pollAvailableUnits() {
+      try {
+        const res = await fetch('AJAX/get_available_units.php');
+        if (!res.ok) throw new Error('Network response was not ok');
+        const units = await res.json();
+        renderAvailableUnits(units);
+      } catch (e) {
+        // Optionally show error
+      }
+    }
+
+    setInterval(pollAvailableUnits, 5000); // Poll every 5 seconds
+    document.addEventListener('DOMContentLoaded', pollAvailableUnits);
+  </script>
   
   <!-- Swiper JS -->
-  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   
   <!-- Custom JavaScript -->
   <script>
