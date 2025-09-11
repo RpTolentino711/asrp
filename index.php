@@ -346,19 +346,6 @@ $testimonials = $db->getHomepageTestimonials(6);
       background: var(--lighter);
     }
 
-    /* New unit highlight */
-    .new-unit {
-      border: 2px solid var(--success) !important;
-      box-shadow: 0 0 20px rgba(5, 150, 105, 0.3) !important;
-    }
-
-    /* Toast notifications */
-    .toast {
-      background: var(--lighter);
-      border: 1px solid var(--success);
-      box-shadow: var(--shadow-lg);
-    }
-
     /* Rented Units Section */
     .rented-units {
       padding: 6rem 0;
@@ -687,7 +674,7 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-      <div class="row g-4" id="unitsContainer">
+      <div class="row g-4">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -710,7 +697,7 @@ if (isset($_SESSION['login_error'])) {
                     $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
                 }
         ?>
-        <div class="col-lg-4 col-md-6 animate-on-scroll" data-unit-id="<?= $space['Space_ID'] ?>">
+        <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
             <?php if (!empty($photo_urls)): ?>
               <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
@@ -1079,6 +1066,8 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </section>
 
+
+
   <!-- Floating Message Button (only for non-logged-in users) -->
   <?php if (!$is_logged_in): ?>
   <div class="floating-message" data-bs-toggle="modal" data-bs-target="#messageModal">
@@ -1143,230 +1132,93 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
+  
+  <!-- Swiper JS -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   
+  <!-- Custom JavaScript -->
   <script>
-    let existingUnitIds = new Set();
+    // Initialize Swiper for testimonials
+    const testimonialSwiper = new Swiper('.testimonials-swiper', {
+      effect: 'coverflow',
+      grabCursor: true,
+      centeredSlides: true,
+      slidesPerView: 'auto',
+      loop: true,
+      coverflowEffect: {
+        rotate: 50,
+        stretch: 0,
+        depth: 100,
+        modifier: 1,
+        slideShadows: false,
+      },
+      pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+      },
+      autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+      },
+      breakpoints: {
+        320: { slidesPerView: 1, spaceBetween: 20 },
+        768: { slidesPerView: 2, spaceBetween: 30 },
+        1024: { slidesPerView: 3, spaceBetween: 40 }
+      },
+    });
 
-    // Store initial unit IDs and start live updates
-    document.addEventListener('DOMContentLoaded', function() {
-      // Store existing unit IDs
-      document.querySelectorAll('[data-unit-id]').forEach(card => {
-        existingUnitIds.add(card.getAttribute('data-unit-id'));
+    // Scroll animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate');
+        }
       });
-      
-      // Start checking for new units every 2 seconds
-      setInterval(checkForNewUnits, 2000);
+    }, observerOptions);
 
-      // Initialize Swiper for testimonials
-      if (document.querySelector('.testimonials-swiper')) {
-        new Swiper('.testimonials-swiper', {
-          effect: 'coverflow',
-          grabCursor: true,
-          centeredSlides: true,
-          slidesPerView: 'auto',
-          loop: true,
-          coverflowEffect: {
-            rotate: 50,
-            stretch: 0,
-            depth: 100,
-            modifier: 1,
-            slideShadows: false,
-          },
-          pagination: {
-            el: '.swiper-pagination',
-            clickable: true,
-          },
-          autoplay: {
-            delay: 4000,
-            disableOnInteraction: false,
-          },
-          breakpoints: {
-            320: { slidesPerView: 1, spaceBetween: 20 },
-            768: { slidesPerView: 2, spaceBetween: 30 },
-            1024: { slidesPerView: 3, spaceBetween: 40 }
-          },
-        });
-      }
-      
-      // Scroll animations
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('animate');
-          }
-        });
-      }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    // Observe all elements with animate-on-scroll class
+    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+      observer.observe(el);
+    });
 
-      document.querySelectorAll('.animate-on-scroll').forEach((el) => {
-        observer.observe(el);
-      });
-      
-      // More Units button
-      const moreBtn = document.getElementById('moreUnitsBtn');
-      if (moreBtn) {
-        moreBtn.addEventListener('click', function(e) {
-          e.preventDefault();
-          Swal.fire({
-            icon: 'info',
-            title: 'More Units Coming Soon!',
-            text: 'We are working on adding more properties. Please check back later!',
-            confirmButtonColor: '#1e40af'
-          });
-        });
+    // Smooth navbar background change on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (window.scrollY > 50) {
+        navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+        navbar.style.boxShadow = 'var(--shadow-md)';
+      } else {
+        navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+        navbar.style.boxShadow = 'var(--shadow-sm)';
       }
-      
-      // Add hover effects to cards
-      document.querySelectorAll('.card').forEach(card => {
-        card.addEventListener('mouseenter', function() {
-          this.style.transform = 'translateY(-8px)';
-        });
-        
-        card.addEventListener('mouseleave', function() {
-          this.style.transform = 'translateY(0)';
-        });
+    });
+
+    // More Units button
+    document.getElementById('moreUnitsBtn').addEventListener('click', function (e) {
+      e.preventDefault();
+      Swal.fire({
+        icon: 'info',
+        title: 'More Units Coming Soon!',
+        text: 'We are working on adding more properties. Please check back later!',
+        confirmButtonColor: 'var(--primary)'
       });
     });
 
-    // Check for new units function
-    function checkForNewUnits() {
-      fetch('AJAX/get_units.php')
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            addNewUnits(data.units);
-          }
-        })
-        .catch(error => {
-          // Fail silently to avoid disrupting user experience
-          console.log('Unit check failed:', error);
-        });
-    }
-
-    function addNewUnits(units) {
-      const container = document.getElementById('unitsContainer');
-      let newUnitsAdded = false;
-      
-      units.forEach(unit => {
-        if (!existingUnitIds.has(unit.Space_ID)) {
-          const unitCard = createUnitCard(unit);
-          container.insertBefore(unitCard, container.firstChild);
-          existingUnitIds.add(unit.Space_ID);
-          newUnitsAdded = true;
-          
-          // Show notification
-          showNewUnitNotification(unit.Name);
-        }
+    // Add hover effects to cards
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-8px)';
       });
-    }
-
-    function createUnitCard(unit) {
-      const col = document.createElement('div');
-      col.className = 'col-lg-4 col-md-6 animate-on-scroll';
-      col.setAttribute('data-unit-id', unit.Space_ID);
-      col.style.opacity = '0';
-      col.style.transform = 'translateY(-20px)';
       
-      let buttonHtml = '';
-      if (unit.is_logged_in && !unit.client_is_inactive) {
-        buttonHtml = `<button class="btn btn-accent w-100" onclick="showRentAlert('${unit.Name}')">
-                        <i class="bi bi-key me-2"></i>Rent Now
-                      </button>`;
-      } else if (unit.is_logged_in && unit.client_is_inactive) {
-        buttonHtml = `<button class="btn btn-secondary w-100" disabled>Account Inactive</button>`;
-      } else {
-        buttonHtml = `<button class="btn btn-accent w-100" onclick="showLoginAlert()">
-                        <i class="bi bi-key me-2"></i>Login to Rent
-                      </button>`;
-      }
-      
-      col.innerHTML = `
-        <div class="card unit-card new-unit">
-          ${unit.Photo1 ? 
-            `<img src="uploads/unit_photos/${unit.Photo1}" class="card-img-top" alt="${escapeHtml(unit.Name)}">` :
-            `<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-               <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
-             </div>`
-          }
-          <div class="card-body">
-            <div class="badge bg-success mb-2">NEW</div>
-            <h5 class="card-title fw-bold">${escapeHtml(unit.Name)}</h5>
-            <p class="unit-price">₱${Number(unit.Price).toLocaleString()} / month</p>
-            <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <span class="unit-type">${escapeHtml(unit.SpaceTypeName || 'Commercial Space')}</span>
-              <small class="unit-location">${escapeHtml(unit.City || '')}</small>
-            </div>
-            ${buttonHtml}
-          </div>
-        </div>
-      `;
-      
-      // Animate the new card
-      setTimeout(() => {
-        col.style.transition = 'all 0.5s ease';
-        col.style.opacity = '1';
-        col.style.transform = 'translateY(0)';
-      }, 100);
-      
-      return col;
-    }
-
-    function showNewUnitNotification(unitName) {
-      const toast = document.createElement('div');
-      toast.className = 'position-fixed top-0 end-0 p-3';
-      toast.style.zIndex = '9999';
-      toast.innerHTML = `
-        <div class="toast show" role="alert">
-          <div class="toast-header">
-            <strong class="me-auto text-success">New Unit Available!</strong>
-            <button type="button" class="btn-close" onclick="this.closest('.position-fixed').remove()"></button>
-          </div>
-          <div class="toast-body">
-            ${escapeHtml(unitName)} has been added to available units
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(toast);
-      
-      // Auto remove after 4 seconds
-      setTimeout(() => {
-        if (toast.parentNode) {
-          toast.remove();
-        }
-      }, 4000);
-    }
-
-    function showRentAlert(unitName) {
-      Swal.fire({
-        title: 'Contact Admin to Rent',
-        text: `To rent ${unitName}, please contact our admin team for rental approval and invoice.`,
-        icon: 'info',
-        confirmButtonColor: '#1e40af'
+      card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
       });
-    }
-
-    function showLoginAlert() {
-      Swal.fire({
-        title: 'Login Required',
-        text: 'Please login first to rent a unit.',
-        icon: 'warning',
-        confirmButtonColor: '#1e40af'
-      });
-    }
-
-    function escapeHtml(text) {
-      if (!text) return '';
-      const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
-      return text.replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
+    });
   </script>
 </body>
 </html>
