@@ -97,7 +97,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
 
-    // Handle file upload (main photo goes to Photo1)
+    // Handle file upload (main photo goes to Photo1 only)
     $photo1_filename = null;
     $upload_dir = __DIR__ . "/../uploads/unit_photos/";
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
