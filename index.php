@@ -689,9 +689,10 @@ if (isset($_SESSION['login_error'])) {
         document.getElementById('available-units-list').innerHTML = html;
       });
   }
-  setInterval(fetchAvailableUnits, 10000); // 10 seconds
-  // Optionally, fetch once on page load
+  // Fetch immediately on page load
   document.addEventListener('DOMContentLoaded', fetchAvailableUnits);
+  // Continue polling every 10 seconds
+  setInterval(fetchAvailableUnits, 10000);
   </script>
 
   <!-- All rental modals rendered here -->
