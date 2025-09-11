@@ -1073,7 +1073,6 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
     </div>
 
     <!-- Bootstrap JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Image modal functionality
