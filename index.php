@@ -674,7 +674,7 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-      <div class="row g-4">
+      <div class="row g-4" id="available-units-list">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -803,7 +803,7 @@ if (isset($_SESSION['login_error'])) {
                                         <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
                                         <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
                                         <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
-                                    </ul>
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -829,6 +829,20 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
+
+  <script>
+  // Live update available units every 10 seconds
+  function fetchAvailableUnits() {
+    fetch('AJAX/get_available_units.php')
+      .then(response => response.text())
+      .then(html => {
+        document.getElementById('available-units-list').innerHTML = html;
+      });
+  }
+  setInterval(fetchAvailableUnits, 10000); // 10 seconds
+  // Optionally, fetch once on page load
+  document.addEventListener('DOMContentLoaded', fetchAvailableUnits);
+  </script>
 
   <!-- All rental modals rendered here -->
   <?php if (!empty($modals)) echo $modals; ?>
