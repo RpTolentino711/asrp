@@ -490,63 +490,6 @@ $testimonials = $db->getHomepageTestimonials(6);
       box-shadow: var(--shadow-xl);
     }
 
-    /* New items animation */
-    .new-item {
-      animation: slideInFadeIn 0.6s ease-out;
-      border: 2px solid var(--success);
-      box-shadow: 0 0 20px rgba(5, 150, 105, 0.3);
-    }
-
-    @keyframes slideInFadeIn {
-      0% {
-        opacity: 0;
-        transform: translateY(-20px) scale(0.95);
-      }
-      100% {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-    }
-
-    /* Loading spinner */
-    .loading-spinner {
-      display: none;
-      text-align: center;
-      padding: 2rem;
-    }
-
-    .spinner-border-custom {
-      width: 3rem;
-      height: 3rem;
-      border: 0.3em solid var(--primary-light);
-      border-right-color: transparent;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Update notification */
-    .update-notification {
-      position: fixed;
-      top: 100px;
-      right: 20px;
-      background: var(--gradient-success);
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: var(--border-radius-sm);
-      box-shadow: var(--shadow-lg);
-      z-index: 1050;
-      transform: translateX(100%);
-      transition: transform 0.3s ease-out;
-    }
-
-    .update-notification.show {
-      transform: translateX(0);
-    }
-
     /* Animations */
     @keyframes fadeInUp {
       from {
@@ -641,12 +584,6 @@ $testimonials = $db->getHomepageTestimonials(6);
 
 <body>
 
-<!-- Update Notification -->
-<div id="updateNotification" class="update-notification">
-  <i class="bi bi-check-circle me-2"></i>
-  <span id="notificationText">New content available!</span>
-</div>
-
 <!-- Show alerts for login messages -->
 <?php if (isset($_GET['free_msg']) && $_GET['free_msg'] === 'sent'): ?>
   <script>
@@ -737,13 +674,154 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-      <div class="loading-spinner" id="availableUnitsLoading">
-        <div class="spinner-border-custom"></div>
-        <p class="mt-2 text-muted">Loading available units...</p>
-      </div>
+      <div class="row g-4">
+        <?php
+        if (!empty($available_units)) {
+            $modal_counter = 0;
+            $modals = '';
+            foreach ($available_units as $space) {
+                if (in_array($space['Space_ID'], $hide_client_rented_unit_ids)) continue;
+                $modal_counter++;
+                $modal_id = "unitModal" . $modal_counter;
+                $photo_modal_id = "photoModal" . $modal_counter;
 
-      <div class="row g-4" id="availableUnitsContainer">
-        <!-- Available units will be loaded here via AJAX -->
+                // Multi-photo display logic
+                $photo_urls = [];
+                for ($i=1; $i<=5; $i++) {
+                    $photo_field = "Photo$i";
+                    if (!empty($space[$photo_field])) {
+                        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
+                    }
+                }
+                if (empty($photo_urls) && !empty($space['Photo'])) {
+                    $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
+                }
+        ?>
+        <div class="col-lg-4 col-md-6 animate-on-scroll">
+          <div class="card unit-card">
+            <?php if (!empty($photo_urls)): ?>
+              <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
+            <?php else: ?>
+              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+                <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
+              </div>
+            <?php endif; ?>
+            
+            <div class="card-body">
+              <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
+              <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
+              <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
+                <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
+              </div>
+              
+              <?php if ($is_logged_in && !$client_is_inactive): ?>
+                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">
+                  <i class="bi bi-key me-2"></i>Rent Now
+                </button>
+              <?php elseif ($is_logged_in && $client_is_inactive): ?>
+                <button class="btn btn-secondary w-100" disabled>
+                  Account Inactive
+                </button>
+              <?php else: ?>
+                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
+                  <i class="bi bi-key me-2"></i>Login to Rent
+                </button>
+              <?php endif; ?>
+            </div>
+          </div>
+        </div>
+
+        <!-- Photo Modal -->
+        <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content bg-dark">
+              <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
+                  Photo Gallery: <?= htmlspecialchars($space['Name']) ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body text-center">
+                <?php if (count($photo_urls) === 1): ?>
+                  <img src="<?= $photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
+                <?php else: ?>
+                  <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                      <?php foreach ($photo_urls as $idx => $url): ?>
+                        <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
+                          <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <?php
+                // Build rental modal
+                if ($is_logged_in && !$client_is_inactive) {
+                    $modals .= '
+                    <div class="modal fade" id="' . $modal_id . '" tabindex="-1" aria-labelledby="' . $modal_id . 'Label" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="' . $modal_id . 'Label">Contact Admin to Rent: ' . htmlspecialchars($space['Name']) . '</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        To rent this unit and receive an invoice, please contact our admin team for rental approval.
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <h6 class="fw-bold">Admin Contact:</h6>
+                                            <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:rom_telents@asrt.com">rom_telents@asrt.com</a></p>
+                                            <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+639171234567">+63 917 123 4567</a></p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="alert alert-warning">
+                                                <strong>Invoice Required:</strong><br>
+                                                Please request your invoice from the admin for the rental process.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
+                                        <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
+                                        <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
+                                    </ul>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    <a href="rent_request.php?space_id=' . urlencode($space['Space_ID']) . '" class="btn btn-success">
+                                        <i class="bi bi-receipt me-2"></i>Request Invoice
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>';
+                }
+            }
+        } else {
+            echo '<div class="col-12 text-center">
+                    <div class="alert alert-info">No units currently available.</div>
+                  </div>';
+        }
+        ?>
       </div>
 
       <div class="text-center mt-5">
@@ -751,6 +829,9 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
+
+  <!-- All rental modals rendered here -->
+  <?php if (!empty($modals)) echo $modals; ?>
 
   <!-- Rented Units Section -->
   <section class="rented-units">
@@ -760,13 +841,73 @@ if (isset($_SESSION['login_error'])) {
         <p>See our successful partnerships with businesses across various industries.</p>
       </div>
 
-      <div class="loading-spinner" id="rentedUnitsLoading">
-        <div class="spinner-border-custom"></div>
-        <p class="mt-2 text-muted">Loading rented units...</p>
-      </div>
+      <div class="row g-4">
+        <?php
+        if (!empty($rented_units_display)) {
+            $rented_modal_counter = 0;
+            foreach ($rented_units_display as $rent) {
+                $rented_modal_counter++;
+                $rented_modal_id = "rentedModal" . $rented_modal_counter;
+        ?>
+        <div class="col-lg-4 col-md-6 animate-on-scroll">
+          <div class="card unit-card">
+            <div class="rented-badge">
+              <i class="bi bi-check-circle me-1"></i>Rented
+            </div>
+            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+              <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
+            </div>
+            <div class="card-body">
+              <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
+              <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p>
+              <p class="card-text text-muted">Currently occupied commercial space.</p>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
+                <small class="unit-location"><?= htmlspecialchars($rent['City']) ?></small>
+              </div>
+              <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
+                <i class="bi bi-eye me-2"></i>View Details
+              </button>
+            </div>
+          </div>
+        </div>
 
-      <div class="row g-4" id="rentedUnitsContainer">
-        <!-- Rented units will be loaded here via AJAX -->
+        <!-- Rented Unit Modal -->
+        <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold" id="<?= $rented_modal_id ?>Label">
+                  <?= htmlspecialchars($rent['Name']) ?> - Rented Unit Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="text-center mb-3" style="font-size:56px;color:#059669;">
+                  <i class="fa-solid fa-house-user"></i>
+                </div>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li>
+                  <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
+                  <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
+                  <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>
+                  <li class="list-group-item"><strong>Rental Period:</strong> <?= htmlspecialchars($rent['StartDate']) ?> → <?= htmlspecialchars($rent['EndDate']) ?></li>
+                </ul>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <?php
+            }
+        } else {
+            echo '<div class="col-12 text-center">
+                    <div class="alert alert-info">No units currently rented.</div>
+                  </div>';
+        }
+        ?>
       </div>
     </div>
   </section>
@@ -779,13 +920,40 @@ if (isset($_SESSION['login_error'])) {
         <p>Comprehensive maintenance and repair services to keep your business running smoothly.</p>
       </div>
 
-      <div class="loading-spinner" id="servicesLoading">
-        <div class="spinner-border-custom"></div>
-        <p class="mt-2 text-muted">Loading services...</p>
-      </div>
+      <div class="row g-4 justify-content-center">
+        <?php
+        $icon_map = [
+          "CARPENTRY" => "IMG/show/CARPENTRY.png",
+          "ELECTRICAL" => "IMG/show/ELECTRICAL.png",
+          "PLUMBING" => "IMG/show/PLUMBING.png",
+          "PAINTING" => "IMG/show/PAINTING.png",
+          "APPLIANCE REPAIR" => "IMG/show/APPLIANCE.png",
+        ];
 
-      <div class="row g-4 justify-content-center" id="servicesContainer">
-        <!-- Services will be loaded here via AJAX -->
+        if (!empty($job_types_display)) {
+          foreach ($job_types_display as $row) {
+            $name_upper = strtoupper($row['JobType_Name']);
+            $img_src = $icon_map[$name_upper] ?? "IMG/show/wifi.png";
+        ?>
+        <div class="col-lg-2 col-md-4 col-sm-6 animate-on-scroll">
+          <form method="get" action="handyman_type.php">
+            <input type="hidden" name="jobtype_id" value="<?= htmlspecialchars($row['JobType_ID']) ?>">
+            <button type="submit" class="handyman-card w-100 border-0" 
+                    <?= ($is_logged_in && $client_is_inactive) ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : '' ?>>
+              <img src="<?= $img_src ?>" alt="<?= htmlspecialchars($row['JobType_Name']) ?>" class="handyman-icon">
+              <h5 class="fw-bold"><?= htmlspecialchars($row['JobType_Name']) ?></h5>
+              <p class="text-muted small">Professional service available</p>
+            </button>
+          </form>
+        </div>
+        <?php
+          }
+        } else {
+          echo '<div class="col-12 text-center">
+                  <div class="alert alert-info">No services currently available.</div>
+                </div>';
+        }
+        ?>
       </div>
 
       <div class="text-center mt-5">
@@ -802,13 +970,35 @@ if (isset($_SESSION['login_error'])) {
         <p>Hear from businesses that have found their perfect space with us.</p>
       </div>
 
-      <div class="loading-spinner" id="testimonialsLoading">
-        <div class="spinner-border-custom"></div>
-        <p class="mt-2 text-muted">Loading testimonials...</p>
-      </div>
-
-      <div class="swiper testimonials-swiper" id="testimonialsContainer">
-        <!-- Testimonials will be loaded here via AJAX -->
+      <div class="swiper testimonials-swiper">
+        <div class="swiper-wrapper">
+          <?php
+          if (!empty($testimonials)) {
+            foreach ($testimonials as $fb) {
+              $stars = str_repeat('<i class="bi bi-star-fill"></i>', $fb['Rating']);
+              $stars .= str_repeat('<i class="bi bi-star text-muted"></i>', 5 - $fb['Rating']);
+          ?>
+          <div class="swiper-slide">
+            <div class="testimonial-card">
+              <div class="testimonial-stars">
+                <?= $stars ?>
+              </div>
+              <p class="testimonial-text"><?= htmlspecialchars($fb['Comments']) ?></p>
+              <div class="testimonial-author"><?= htmlspecialchars($fb['Client_fn'] . ' ' . $fb['Client_ln']) ?></div>
+            </div>
+          </div>
+          <?php
+            }
+          } else {
+            echo '<div class="swiper-slide">
+                    <div class="testimonial-card">
+                      <p class="testimonial-text">No testimonials available yet.</p>
+                    </div>
+                  </div>';
+          }
+          ?>
+        </div>
+        <div class="swiper-pagination"></div>
       </div>
     </div>
   </section>
@@ -876,8 +1066,7 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </section>
 
-  <!-- Dynamic Modal Container -->
-  <div id="dynamicModalsContainer"></div>
+
 
   <!-- Floating Message Button (only for non-logged-in users) -->
   <?php if (!$is_logged_in): ?>
@@ -943,399 +1132,93 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   
   <!-- Swiper JS -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   
   <!-- Custom JavaScript -->
   <script>
-    // Global variables
-    let testimonialSwiper = null;
-    let lastDataHashes = {};
-    let isLoggedIn = <?= $is_logged_in ? 'true' : 'false' ?>;
-    let clientIsInactive = <?= $client_is_inactive ? 'true' : 'false' ?>;
-    let hideClientRentedUnitIds = <?= json_encode($hide_client_rented_unit_ids) ?>;
-
-    // Initialize page
-    document.addEventListener('DOMContentLoaded', function() {
-      initializePage();
-      startRealTimeUpdates();
+    // Initialize Swiper for testimonials
+    const testimonialSwiper = new Swiper('.testimonials-swiper', {
+      effect: 'coverflow',
+      grabCursor: true,
+      centeredSlides: true,
+      slidesPerView: 'auto',
+      loop: true,
+      coverflowEffect: {
+        rotate: 50,
+        stretch: 0,
+        depth: 100,
+        modifier: 1,
+        slideShadows: false,
+      },
+      pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+      },
+      autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+      },
+      breakpoints: {
+        320: { slidesPerView: 1, spaceBetween: 20 },
+        768: { slidesPerView: 2, spaceBetween: 30 },
+        1024: { slidesPerView: 3, spaceBetween: 40 }
+      },
     });
 
-    // Initialize all components
-    function initializePage() {
-      loadAvailableUnits();
-      loadRentedUnits();
-      loadHandymanServices();
-      loadTestimonials();
-      initializeScrollAnimations();
-      initializeNavbarEffects();
-      initializeEventListeners();
-    }
+    // Scroll animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
 
-    // Start real-time updates
-    function startRealTimeUpdates() {
-      // Check for updates every 3 seconds
-      setInterval(() => {
-        checkForUpdates();
-      }, 3000);
-    }
-
-    // Check for updates
-    async function checkForUpdates() {
-      try {
-        const response = await fetch('ajax/check_updates.php');
-        const data = await response.json();
-        
-        if (data.success) {
-          // Check each section for updates
-          if (data.hashes.available_units !== lastDataHashes.available_units) {
-            loadAvailableUnits(true);
-            lastDataHashes.available_units = data.hashes.available_units;
-          }
-          
-          if (data.hashes.rented_units !== lastDataHashes.rented_units) {
-            loadRentedUnits(true);
-            lastDataHashes.rented_units = data.hashes.rented_units;
-          }
-          
-          if (data.hashes.services !== lastDataHashes.services) {
-            loadHandymanServices(true);
-            lastDataHashes.services = data.hashes.services;
-          }
-          
-          if (data.hashes.testimonials !== lastDataHashes.testimonials) {
-            loadTestimonials(true);
-            lastDataHashes.testimonials = data.hashes.testimonials;
-          }
-        }
-      } catch (error) {
-        console.error('Error checking for updates:', error);
-      }
-    }
-
-    // Show update notification
-    function showUpdateNotification(message) {
-      const notification = document.getElementById('updateNotification');
-      const notificationText = document.getElementById('notificationText');
-      
-      notificationText.textContent = message;
-      notification.classList.add('show');
-      
-      setTimeout(() => {
-        notification.classList.remove('show');
-      }, 3000);
-    }
-
-    // Load available units
-    async function loadAvailableUnits(isUpdate = false) {
-      const container = document.getElementById('availableUnitsContainer');
-      const loading = document.getElementById('availableUnitsLoading');
-      
-      if (!isUpdate) {
-        loading.style.display = 'block';
-        container.style.display = 'none';
-      }
-      
-      try {
-        const response = await fetch('ajax/get_available_units.php');
-        const data = await response.json();
-        
-        if (data.success) {
-          container.innerHTML = data.html;
-          
-          if (isUpdate) {
-            showUpdateNotification('New available units loaded!');
-            // Add animation to new items
-            container.querySelectorAll('.col-lg-4').forEach(item => {
-              item.classList.add('new-item');
-              setTimeout(() => item.classList.remove('new-item'), 2000);
-            });
-          }
-        } else {
-          container.innerHTML = '<div class="col-12 text-center"><div class="alert alert-info">No units currently available.</div></div>';
-        }
-      } catch (error) {
-        console.error('Error loading available units:', error);
-        container.innerHTML = '<div class="col-12 text-center"><div class="alert alert-danger">Error loading units. Please try again.</div></div>';
-      } finally {
-        if (!isUpdate) {
-          loading.style.display = 'none';
-          container.style.display = 'flex';
-        }
-      }
-    }
-
-    // Load rented units
-    async function loadRentedUnits(isUpdate = false) {
-      const container = document.getElementById('rentedUnitsContainer');
-      const loading = document.getElementById('rentedUnitsLoading');
-      
-      if (!isUpdate) {
-        loading.style.display = 'block';
-        container.style.display = 'none';
-      }
-      
-      try {
-        const response = await fetch('ajax/get_rented_units.php');
-        const data = await response.json();
-        
-        if (data.success) {
-          container.innerHTML = data.html;
-          
-          if (isUpdate) {
-            showUpdateNotification('Rented units updated!');
-            // Add animation to new items
-            container.querySelectorAll('.col-lg-4').forEach(item => {
-              item.classList.add('new-item');
-              setTimeout(() => item.classList.remove('new-item'), 2000);
-            });
-          }
-        } else {
-          container.innerHTML = '<div class="col-12 text-center"><div class="alert alert-info">No units currently rented.</div></div>';
-        }
-      } catch (error) {
-        console.error('Error loading rented units:', error);
-        container.innerHTML = '<div class="col-12 text-center"><div class="alert alert-danger">Error loading rented units. Please try again.</div></div>';
-      } finally {
-        if (!isUpdate) {
-          loading.style.display = 'none';
-          container.style.display = 'flex';
-        }
-      }
-    }
-
-    // Load handyman services
-    async function loadHandymanServices(isUpdate = false) {
-      const container = document.getElementById('servicesContainer');
-      const loading = document.getElementById('servicesLoading');
-      
-      if (!isUpdate) {
-        loading.style.display = 'block';
-        container.style.display = 'none';
-      }
-      
-      try {
-        const response = await fetch('ajax/get_handyman_services.php');
-        const data = await response.json();
-        
-        if (data.success) {
-          container.innerHTML = data.html;
-          
-          if (isUpdate) {
-            showUpdateNotification('Services updated!');
-            // Add animation to new items
-            container.querySelectorAll('.col-lg-2').forEach(item => {
-              item.classList.add('new-item');
-              setTimeout(() => item.classList.remove('new-item'), 2000);
-            });
-          }
-        } else {
-          container.innerHTML = '<div class="col-12 text-center"><div class="alert alert-info">No services currently available.</div></div>';
-        }
-      } catch (error) {
-        console.error('Error loading handyman services:', error);
-        container.innerHTML = '<div class="col-12 text-center"><div class="alert alert-danger">Error loading services. Please try again.</div></div>';
-      } finally {
-        if (!isUpdate) {
-          loading.style.display = 'none';
-          container.style.display = 'flex';
-        }
-      }
-    }
-
-    // Load testimonials
-    async function loadTestimonials(isUpdate = false) {
-      const container = document.getElementById('testimonialsContainer');
-      const loading = document.getElementById('testimonialsLoading');
-      
-      if (!isUpdate) {
-        loading.style.display = 'block';
-        container.style.display = 'none';
-      }
-      
-      try {
-        const response = await fetch('ajax/get_testimonials.php');
-        const data = await response.json();
-        
-        if (data.success) {
-          container.innerHTML = data.html;
-          
-          // Destroy existing swiper if it exists
-          if (testimonialSwiper) {
-            testimonialSwiper.destroy(true, true);
-          }
-          
-          // Initialize new swiper
-          initializeTestimonialSwiper();
-          
-          if (isUpdate) {
-            showUpdateNotification('New testimonials loaded!');
-          }
-        } else {
-          container.innerHTML = '<div class="swiper-wrapper"><div class="swiper-slide"><div class="testimonial-card"><p class="testimonial-text">No testimonials available yet.</p></div></div></div>';
-        }
-      } catch (error) {
-        console.error('Error loading testimonials:', error);
-        container.innerHTML = '<div class="swiper-wrapper"><div class="swiper-slide"><div class="testimonial-card"><p class="testimonial-text">Error loading testimonials. Please try again.</p></div></div></div>';
-      } finally {
-        if (!isUpdate) {
-          loading.style.display = 'none';
-          container.style.display = 'block';
-        }
-      }
-    }
-
-    // Initialize testimonial swiper
-    function initializeTestimonialSwiper() {
-      testimonialSwiper = new Swiper('.testimonials-swiper', {
-        effect: 'coverflow',
-        grabCursor: true,
-        centeredSlides: true,
-        slidesPerView: 'auto',
-        loop: true,
-        coverflowEffect: {
-          rotate: 50,
-          stretch: 0,
-          depth: 100,
-          modifier: 1,
-          slideShadows: false,
-        },
-        pagination: {
-          el: '.swiper-pagination',
-          clickable: true,
-        },
-        autoplay: {
-          delay: 4000,
-          disableOnInteraction: false,
-        },
-        breakpoints: {
-          320: { slidesPerView: 1, spaceBetween: 20 },
-          768: { slidesPerView: 2, spaceBetween: 30 },
-          1024: { slidesPerView: 3, spaceBetween: 40 }
-        },
-      });
-    }
-
-    // Initialize scroll animations
-    function initializeScrollAnimations() {
-      const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-      };
-
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('animate');
-          }
-        });
-      }, observerOptions);
-
-      // Observe all elements with animate-on-scroll class
-      document.querySelectorAll('.animate-on-scroll').forEach((el) => {
-        observer.observe(el);
-      });
-    }
-
-    // Initialize navbar effects
-    function initializeNavbarEffects() {
-      window.addEventListener('scroll', () => {
-        const navbar = document.querySelector('.navbar');
-        if (window.scrollY > 50) {
-          navbar.style.background = 'rgba(255, 255, 255, 0.98)';
-          navbar.style.boxShadow = 'var(--shadow-md)';
-        } else {
-          navbar.style.background = 'rgba(255, 255, 255, 0.95)';
-          navbar.style.boxShadow = 'var(--shadow-sm)';
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate');
         }
       });
-    }
+    }, observerOptions);
 
-    // Initialize event listeners
-    function initializeEventListeners() {
-      // More Units button
-      document.getElementById('moreUnitsBtn').addEventListener('click', function (e) {
-        e.preventDefault();
-        Swal.fire({
-          icon: 'info',
-          title: 'More Units Coming Soon!',
-          text: 'We are working on adding more properties. Please check back later!',
-          confirmButtonColor: 'var(--primary)'
-        });
-      });
+    // Observe all elements with animate-on-scroll class
+    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+      observer.observe(el);
+    });
 
-      // Add hover effects to cards (delegated event handling)
-      document.addEventListener('mouseenter', function(e) {
-        if (e.target.classList.contains('card')) {
-          e.target.style.transform = 'translateY(-8px)';
-        }
-      }, true);
-      
-      document.addEventListener('mouseleave', function(e) {
-        if (e.target.classList.contains('card')) {
-          e.target.style.transform = 'translateY(0)';
-        }
-      }, true);
-
-      // Handle dynamic modal events
-      document.addEventListener('click', function(e) {
-        if (e.target.matches('[data-bs-toggle="modal"]')) {
-          const modalId = e.target.getAttribute('data-bs-target');
-          if (modalId && modalId.startsWith('#unitModal')) {
-            // Handle unit rental modal
-            loadUnitModal(modalId);
-          } else if (modalId && modalId.startsWith('#photoModal')) {
-            // Handle photo modal
-            loadPhotoModal(modalId);
-          }
-        }
-      });
-    }
-
-    // Load unit modal dynamically
-    async function loadUnitModal(modalId) {
-      const spaceId = modalId.replace('#unitModal', '');
-      
-      try {
-        const response = await fetch(`ajax/get_unit_modal.php?space_id=${spaceId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          let modalContainer = document.getElementById('dynamicModalsContainer');
-          if (!document.querySelector(modalId)) {
-            modalContainer.innerHTML += data.html;
-          }
-        }
-      } catch (error) {
-        console.error('Error loading unit modal:', error);
+    // Smooth navbar background change on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (window.scrollY > 50) {
+        navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+        navbar.style.boxShadow = 'var(--shadow-md)';
+      } else {
+        navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+        navbar.style.boxShadow = 'var(--shadow-sm)';
       }
-    }
+    });
 
-    // Load photo modal dynamically  
-    async function loadPhotoModal(modalId) {
-      const spaceId = modalId.replace('#photoModal', '');
+    // More Units button
+    document.getElementById('moreUnitsBtn').addEventListener('click', function (e) {
+      e.preventDefault();
+      Swal.fire({
+        icon: 'info',
+        title: 'More Units Coming Soon!',
+        text: 'We are working on adding more properties. Please check back later!',
+        confirmButtonColor: 'var(--primary)'
+      });
+    });
+
+    // Add hover effects to cards
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-8px)';
+      });
       
-      try {
-        const response = await fetch(`ajax/get_photo_modal.php?space_id=${spaceId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-          let modalContainer = document.getElementById('dynamicModalsContainer');
-          if (!document.querySelector(modalId)) {
-            modalContainer.innerHTML += data.html;
-          }
-        }
-      } catch (error) {
-        console.error('Error loading photo modal:', error);
-      }
-    }
-
-    // Auto-refresh data every 30 seconds for important updates
-    setInterval(() => {
-      loadAvailableUnits(true);
-    }, 30000);
+      card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
+      });
+    });
   </script>
 </body>
 </html>
