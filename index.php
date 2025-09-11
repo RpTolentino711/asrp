@@ -1155,9 +1155,9 @@ if (isset($_SESSION['login_error'])) {
         existingUnitIds.add(card.getAttribute('data-unit-id'));
       });
       
-      // Start checking for new units every 45 seconds
-      setInterval(checkForNewUnits, 45000);
-      
+      // Start checking for new units every 2 seconds
+      setInterval(checkForNewUnits, 2000);
+
       // Initialize Swiper for testimonials
       if (document.querySelector('.testimonials-swiper')) {
         new Swiper('.testimonials-swiper', {
