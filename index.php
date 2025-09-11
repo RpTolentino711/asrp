@@ -685,14 +685,14 @@ if (isset($_SESSION['login_error'])) {
                 $modal_id = "unitModal" . $modal_counter;
                 $photo_modal_id = "photoModal" . $modal_counter;
 
-        // Multi-photo display logic: always include Photo, Photo1-Photo5 if present
-        $photo_urls = [];
-        $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-        foreach ($photo_fields as $photo_field) {
-          if (!empty($space[$photo_field])) {
-            $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
-          }
-        }
+    // Multi-photo display logic for available units
+    $photo_urls = [];
+    $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
+    foreach ($photo_fields as $photo_field) {
+      if (!empty($space[$photo_field])) {
+        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
+      }
+    }
         ?>
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
@@ -852,15 +852,30 @@ if (isset($_SESSION['login_error'])) {
             foreach ($rented_units_display as $rent) {
                 $rented_modal_counter++;
                 $rented_modal_id = "rentedModal" . $rented_modal_counter;
+                // Multi-photo display logic for rented units
+                $rented_photo_urls = [];
+                $rented_photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
+                foreach ($rented_photo_fields as $photo_field) {
+                    if (!empty($rent[$photo_field])) {
+                        $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($rent[$photo_field]);
+                    }
+                }
         ?>
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
             <div class="rented-badge">
               <i class="bi bi-check-circle me-1"></i>Rented
             </div>
-            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-              <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
-            </div>
+            <?php if (!empty($rented_photo_urls)): ?>
+              <div style="position:relative;">
+                <img src="<?= $rented_photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
+                <span class="badge bg-success position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($rented_photo_urls) ?>/6 </span>
+              </div>
+            <?php else: ?>
+              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+                <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
+              </div>
+            <?php endif; ?>
             <div class="card-body">
               <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
               <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p>
@@ -872,6 +887,47 @@ if (isset($_SESSION['login_error'])) {
               <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
                 <i class="bi bi-eye me-2"></i>View Details
               </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rented Unit Photo Modal -->
+        <div class="modal fade" id="<?= $rented_modal_id ?>_photo" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>_photoLabel" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content bg-dark">
+              <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="<?= $rented_modal_id ?>_photoLabel">
+                  Photo Gallery: <?= htmlspecialchars($rent['Name']) ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body text-center">
+                <?php if (count($rented_photo_urls) === 1): ?>
+                  <img src="<?= $rented_photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
+                <?php elseif (count($rented_photo_urls) > 1): ?>
+                  <div id="rentedZoomCarousel<?= $rented_modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                      <?php foreach ($rented_photo_urls as $idx => $url): ?>
+                        <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
+                          <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                  </div>
+                <?php else: ?>
+                  <div class="text-center mb-3" style="font-size:56px;color:#059669;">
+                    <i class="fa-solid fa-house-user"></i>
+                  </div>
+                <?php endif; ?>
+              </div>
             </div>
           </div>
         </div>
