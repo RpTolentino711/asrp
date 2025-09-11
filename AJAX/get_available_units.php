@@ -5,17 +5,22 @@ $db = new Database();
 // Fetch available units (limit as needed)
 $available_units = $db->getHomepageAvailableUnits(10);
 
+if (empty($available_units)) {
+    echo '<div class="col-12 text-center text-muted py-5">No available units at the moment.</div>';
+    exit;
+}
+
 // Output HTML for each unit card (same markup as in index.php)
 foreach ($available_units as $space) {
     $photo_urls = [];
     for ($i=1; $i<=5; $i++) {
         $photo_field = "Photo$i";
         if (!empty($space[$photo_field])) {
-            $photo_urls[] = "../uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
+            $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
         }
     }
     if (empty($photo_urls) && !empty($space['Photo'])) {
-        $photo_urls[] = "../uploads/unit_photos/" . htmlspecialchars($space['Photo']);
+        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
     }
     echo '<div class="col-lg-4 col-md-6 animate-on-scroll">';
     echo '<div class="card unit-card">';
