@@ -674,7 +674,9 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-      <div class="row g-4">
+      <!-- This part will be refreshed every 5 seconds -->
+      <div id="units-container">
+        <div class="row g-4">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -732,6 +734,7 @@ if (isset($_SESSION['login_error'])) {
             </div>
           </div>
         </div>
+      </div>
 
         <!-- Photo Modal -->
         <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
@@ -1282,7 +1285,23 @@ if (isset($_SESSION['login_error'])) {
         this.style.transform = 'translateY(0)';
       });
     });
-  </script>
+
+    
+function refreshUnits() {
+  fetch("'AJAX/get_units.php")
+    .then(response => response.text())
+    .then(data => {
+      document.getElementById("units-container").innerHTML = data;
+    })
+    .catch(error => console.error("Error loading units:", error));
+}
+
+// Refresh every 5 seconds
+setInterval(refreshUnits, 5000);
+</script>
+
+
+  
 </body>
 </html>
 
