@@ -102,19 +102,28 @@ public function getAllUnitPhotosForUnits($unit_ids) {
 }
 
 public function addUnitPhoto($space_id, $client_id, $filename) {
-    $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-            FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$space_id, $client_id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) return false;
-    for ($i = 1; $i <= 5; $i++) {
-        if (empty($row["BusinessPhoto$i"])) {
-            $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
-            return $this->executeStatement($update, [$filename, $space_id, $client_id]);
+    try {
+        $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$space_id, $client_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return false;
+        for ($i = 1; $i <= 5; $i++) {
+            if (empty($row["BusinessPhoto$i"])) {
+                $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
+                $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
+                if (!$result) {
+                    error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
+                }
+                return $result;
+            }
         }
+        return false;
+    } catch (PDOException $e) {
+        error_log("addUnitPhoto PDOException: " . $e->getMessage());
+        return false;
     }
-    return false;
 }
 
 public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
@@ -439,12 +448,21 @@ public function getHomepageRentedUnits($limit = 12) {
 
     // --- Feedback and Testimonials ---
     public function saveFeedback($invoice_id, $rating, $comments) {
-        $sql = "INSERT INTO clientfeedback (CS_ID, Rating, Comments, Dates) VALUES (?, ?, ?, NOW())";
-        return $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
+        try {
+            $sql = "INSERT INTO clientfeedback (CS_ID, Rating, Comments, Dates) VALUES (?, ?, ?, NOW())";
+            $result = $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
+            if (!$result) {
+                error_log("saveFeedback failed: " . print_r([$sql, $invoice_id, $rating, $comments], true));
+            }
+            return $result;
+        } catch (PDOException $e) {
+            error_log("saveFeedback PDOException: " . $e->getMessage());
+            return false;
+        }
     }
 
 
-    
+
     public function getFeedbackPrompts($client_id) {
         $sql = "SELECT i.Invoice_ID, i.InvoiceDate, s.Name AS SpaceName
                 FROM invoice i
