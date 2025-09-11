@@ -857,9 +857,18 @@ if (isset($_SESSION['login_error'])) {
               <i class="bi bi-check-circle me-1"></i>Rented
             </div>
       <?php
-      $photos = $rented_unit_photos[$rent['Space_ID']] ?? [];
-      if (!empty($photos)) {
-        echo '<img src="uploads/unit_photos/' . htmlspecialchars($photos[0]) . '" class="card-img-top" alt="Rented Unit Photo" style="height:250px;object-fit:cover;">';
+      // Gather all 6 possible photos (BusinessPhoto, BusinessPhoto1-5)
+      $photo_fields = [];
+      if (isset($rented_unit_photos[$rent['Space_ID']])) {
+        $photo_fields = $rented_unit_photos[$rent['Space_ID']];
+      }
+      // Add BusinessPhoto if present and not already in the array
+      if (!empty($rent['BusinessPhoto']) && (!in_array($rent['BusinessPhoto'], $photo_fields))) {
+        array_unshift($photo_fields, $rent['BusinessPhoto']);
+      }
+      $photo_fields = array_values(array_filter($photo_fields));
+      if (!empty($photo_fields)) {
+        echo '<img src="uploads/unit_photos/' . htmlspecialchars($photo_fields[0]) . '" class="card-img-top" alt="Rented Unit Photo" style="height:250px;object-fit:cover;cursor:pointer;" data-bs-toggle="modal" data-bs-target="#rentedPhotoModal' . $rented_modal_counter . '">';
       } else {
         echo '<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">';
         echo '<i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>';
@@ -881,7 +890,48 @@ if (isset($_SESSION['login_error'])) {
           </div>
         </div>
 
-        <!-- Rented Unit Modal -->
+        <!-- Rented Unit Photo Modal (carousel) -->
+        <div class="modal fade" id="rentedPhotoModal<?= $rented_modal_counter ?>" tabindex="-1" aria-labelledby="rentedPhotoModal<?= $rented_modal_counter ?>Label" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content bg-dark">
+              <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="rentedPhotoModal<?= $rented_modal_counter ?>Label">
+                  Photo Gallery: <?= htmlspecialchars($rent['Name']) ?>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body text-center">
+                <?php if (count($photo_fields) === 1): ?>
+                  <img src="uploads/unit_photos/<?= htmlspecialchars($photo_fields[0]) ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
+                <?php elseif (count($photo_fields) > 1): ?>
+                  <div id="rentedCarousel<?= $rented_modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                      <?php foreach ($photo_fields as $idx => $url): ?>
+                        <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
+                          <img src="uploads/unit_photos/<?= htmlspecialchars($url) ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Rented Photo <?= $idx+1 ?>" style="max-height:60vh;">
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                    <button class="carousel-control-prev" type="button" data-bs-target="#rentedCarousel<?= $rented_modal_counter ?>" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Previous</span>
+                    </button>
+                    <button class="carousel-control-next" type="button" data-bs-target="#rentedCarousel<?= $rented_modal_counter ?>" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Next</span>
+                    </button>
+                  </div>
+                <?php else: ?>
+                  <div class="text-center mb-3" style="font-size:56px;color:#059669;">
+                    <i class="fa-solid fa-house-user"></i>
+                  </div>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rented Unit Details Modal -->
         <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -892,9 +942,6 @@ if (isset($_SESSION['login_error'])) {
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
               </div>
               <div class="modal-body">
-                <div class="text-center mb-3" style="font-size:56px;color:#059669;">
-                  <i class="fa-solid fa-house-user"></i>
-                </div>
                 <ul class="list-group list-group-flush">
                   <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li>
                   <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
