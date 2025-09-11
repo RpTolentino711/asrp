@@ -40,29 +40,6 @@ $available_units = $db->getHomepageAvailableUnits(10);
 $rented_units_display = $db->getHomepageRentedUnits(10);
 $job_types_display = $db->getAllJobTypes();
 $testimonials = $db->getHomepageTestimonials(6);
-    // Initial fetch
-    fetchAndRenderAvailableUnits();
-
-    // Auto-refresh logic for available units
-    let autoRefreshInterval = null;
-    const refreshBtn = document.getElementById('refreshUnitsBtn');
-    let isAutoRefreshing = false;
-    function toggleAutoRefresh() {
-      if (!isAutoRefreshing) {
-        autoRefreshInterval = setInterval(fetchAndRenderAvailableUnits, 5000);
-        refreshBtn.classList.remove('btn-outline-success');
-        refreshBtn.classList.add('btn-success');
-        refreshBtn.innerHTML = '<i class="bi bi-pause-circle"></i> Stop Auto-Refresh';
-        isAutoRefreshing = true;
-      } else {
-        clearInterval(autoRefreshInterval);
-        refreshBtn.classList.remove('btn-success');
-        refreshBtn.classList.add('btn-outline-success');
-        refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Auto-Refresh Available Units';
-        isAutoRefreshing = false;
-      }
-    }
-    refreshBtn.addEventListener('click', toggleAutoRefresh);
 ?>
 
 <!doctype html>
@@ -856,12 +833,6 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
-  
-    <script>
-      // Always auto-refresh available units every 5 seconds
-      fetchAndRenderAvailableUnits();
-      setInterval(fetchAndRenderAvailableUnits, 5000);
-    </script>
 
   <!-- All rental modals rendered here -->
   <?php if (!empty($modals)) echo $modals; ?>
