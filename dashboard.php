@@ -855,4 +855,5 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       </h2>
       <?php if ($rented_units): ?>
         <span class="badge bg-primary fs-6"><?= count($rented_units) ?> Active</span>
-      <?php endif; ?>
+      <?php endif; 
+      ?>
