@@ -164,7 +164,7 @@ if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_P
     if (in_array($space_id, $valid_space_ids) && !empty($photo_filename)) {
         // Validate filename to prevent directory traversal
         if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
-            if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
+            if ($db->DeleteUnitPhoto($space_id, $client_id, $photo_filename)) {
                 $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
                 if (file_exists($file_to_delete)) {
                     unlink($file_to_delete);
