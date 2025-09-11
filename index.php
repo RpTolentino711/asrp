@@ -668,7 +668,7 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </section>
 
-  <!-- Available Units Section -->
+    <!-- Available Units Section -->
   <section id="units" class="available-units">
     <div class="container">
       <div class="section-title animate-on-scroll">
@@ -831,6 +831,7 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
+
 
   <!-- All rental modals rendered here -->
   <?php if (!empty($modals)) echo $modals; ?>
