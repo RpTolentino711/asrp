@@ -848,18 +848,22 @@ if (isset($_SESSION['login_error'])) {
       <div class="row g-4">
         <?php
         if (!empty($rented_units_display)) {
-            $rented_modal_counter = 0;
-            foreach ($rented_units_display as $rent) {
-                $rented_modal_counter++;
-                $rented_modal_id = "rentedModal" . $rented_modal_counter;
-                // Multi-photo display logic for rented units
-                $rented_photo_urls = [];
-                $rented_photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-                foreach ($rented_photo_fields as $photo_field) {
-                    if (!empty($rent[$photo_field])) {
-                        $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($rent[$photo_field]);
-                    }
-                }
+      $rented_modal_counter = 0;
+      // Get all rented unit photos for the units being displayed
+      $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
+      $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
+      foreach ($rented_units_display as $rent) {
+        $rented_modal_counter++;
+        $rented_modal_id = "rentedModal" . $rented_modal_counter;
+        // Multi-photo display logic for rented units (BusinessPhoto1-5 from clientspace)
+        $rented_photo_urls = [];
+        if (!empty($rented_unit_photos[$rent['Space_ID']])) {
+          foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
+            if (!empty($photo)) {
+              $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo);
+            }
+          }
+        }
         ?>
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
