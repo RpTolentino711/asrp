@@ -686,7 +686,7 @@ if (isset($_SESSION['login_error'])) {
                 $photo_modal_id = "photoModal" . $modal_counter;
 
     // Multi-photo display logic for available units
-    $photo_urls = [];
+  $photo_urls = [];
   $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
     foreach ($photo_fields as $photo_field) {
       if (!empty($space[$photo_field])) {
