@@ -453,18 +453,18 @@ public function getHomepageRentedUnits($limit = 12) {
     }
 
     public function getHomepageTestimonials($limit = 6) {
-        $sql = "SELECT cf.*, c.Client_fn, c.Client_ln
-                FROM clientfeedback cf
-                JOIN invoice i ON cf.CS_ID = i.Invoice_ID
-                JOIN client c ON i.Client_ID = c.Client_ID
-                ORDER BY cf.Dates DESC
-                LIMIT :limit";
-        try {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
-            $stmt->execute();
-            return $stmt->fetchAll();
-        } catch (PDOException $e) { return []; }
+    $sql = "SELECT cf.*, c.Client_fn, c.Client_ln
+        FROM clientfeedback cf
+        JOIN invoice i ON cf.CS_ID = i.Invoice_ID
+        JOIN client c ON i.Client_ID = c.Client_ID
+        ORDER BY cf.Dates DESC
+        LIMIT :limit";
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    } catch (PDOException $e) { return []; }
     }
 
     // --- Invoice and Payment ---
