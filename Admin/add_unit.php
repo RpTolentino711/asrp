@@ -848,6 +848,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                                                             <input type="hidden" name="photo_field" value="<?= $field ?>">
                                                                         </div>
                                                                         <span class="filename-display" id="update<?= $space['Space_ID'].$i ?>"></span>
+                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
                                                                     </form>
                                                                     <form method="post" class="d-inline" onsubmit="return confirm('Delete this photo?');">
                                                                         <input type="hidden" name="form_type" value="delete_photo">
@@ -872,6 +873,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                                                     <input type="hidden" name="photo_field" value="<?= $field ?>">
                                                                 </div>
                                                                 <span class="filename-display" id="upload<?= $space['Space_ID'].$i ?>"></span>
+                                                                <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
                                                             </form>
                                                         <?php endif; ?>
                                                     </div>
