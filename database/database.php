@@ -1435,30 +1435,7 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 }
 
-public function getLiveAvailableUnits($limit = null) {
-    $sql = "SELECT s.*, st.SpaceTypeName
-            FROM space s
-            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-            LEFT JOIN (
-                SELECT Space_ID FROM spaceavailability
-                WHERE LOWER(Status) = 'occupied' AND EndDate >= CURDATE()
-            ) sa ON s.Space_ID = sa.Space_ID
-            WHERE sa.Space_ID IS NULL
-              AND s.Flow_Status = 'new'
-            ORDER BY s.Space_ID DESC";
-    
-    if ($limit) {
-        $sql .= " LIMIT " . (int)$limit;
-    }
-    
-    try {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        return [];
-    }
-}
+
 
 ?>
 

@@ -1,86 +1,8 @@
 <?php
 require 'database/database.php';
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 session_start();
 
-// Handle AJAX request for live units
-if (isset($_GET['ajax']) && $_GET['ajax'] === 'live_units') {
-    header('Content-Type: application/json');
-    header('Cache-Control: no-cache, must-revalidate');
-    
-    try {
-        $db = new Database();
-        
-        $is_logged_in = isset($_SESSION['client_id']);
-        $client_is_inactive = false;
-        $client_id = $is_logged_in ? $_SESSION['client_id'] : null;
-        
-        if ($is_logged_in) {
-            if (!isset($_SESSION['C_status']) && $client_id) {
-                $status_record = $db->getClientStatus($client_id);
-                if ($status_record) {
-                    $_SESSION['C_status'] = $status_record['Status'];
-                }
-            }
-            
-            if (isset($_SESSION['C_status'])) {
-                $client_is_inactive = ($_SESSION['C_status'] == 0 || $_SESSION['C_status'] === 'inactive');
-            }
-        }
-        
-        $hide_client_rented_unit_ids = $is_logged_in ? $db->getClientRentedUnitIds($client_id) : [];
-        $available_units = $db->getLiveAvailableUnits(10);
-        
-        $filtered_units = [];
-        foreach ($available_units as $unit) {
-            if (!in_array($unit['Space_ID'], $hide_client_rented_unit_ids)) {
-                $unit['is_logged_in'] = $is_logged_in;
-                $unit['client_is_inactive'] = $client_is_inactive;
-                
-                $photo_urls = [];
-                for ($i = 1; $i <= 5; $i++) {
-                    $photo_field = "Photo$i";
-                    if (!empty($unit[$photo_field])) {
-                        $photo_urls[] = "uploads/unit_photos/" . $unit[$photo_field];
-                    }
-                }
-                
-                if (empty($photo_urls) && !empty($unit['Photo'])) {
-                    $photo_urls[] = "uploads/unit_photos/" . $unit['Photo'];
-                }
-                
-                $unit['photo_urls'] = $photo_urls;
-                $unit['Street'] = $unit['Street'] ?? '';
-                $unit['Brgy'] = $unit['Brgy'] ?? '';
-                $unit['City'] = $unit['City'] ?? '';
-                $unit['SpaceTypeName'] = $unit['SpaceTypeName'] ?? 'Commercial Space';
-                
-                $filtered_units[] = $unit;
-            }
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'data' => $filtered_units,
-            'timestamp' => date('Y-m-d H:i:s'),
-            'total_count' => count($filtered_units)
-        ]);
-        
-    } catch (Exception $e) {
-        http_response_code(500);
-        echo json_encode([
-            'success' => false,
-            'error' => 'Failed to fetch units',
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-    }
-    
-    exit; // Stop execution after AJAX response
-}
-
-// Regular page load continues here
+// Create an instance of the Database class
 $db = new Database();
 
 $is_logged_in = isset($_SESSION['client_id']);
@@ -364,15 +286,6 @@ $testimonials = $db->getHomepageTestimonials(6);
       color: var(--gray);
       max-width: 600px;
       margin: 0 auto;
-    }
-
-    /* Loading indicator */
-    .loading-container {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      margin: 1rem 0;
     }
 
     /* Cards */
@@ -759,20 +672,9 @@ if (isset($_SESSION['login_error'])) {
       <div class="section-title animate-on-scroll">
         <h2>Available Units</h2>
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
-        
-        <!-- Loading indicator -->
-        <div id="unitsLoading" class="loading-container" style="display: none;">
-          <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-          </div>
-          <span class="text-muted">Updating units...</span>
-        </div>
-        
-        <!-- Last updated timestamp -->
-        <small id="lastUpdated" class="text-muted" style="display: none;"></small>
       </div>
 
-      <div class="row g-4" id="unitsContainer">
+      <div class="row g-4">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -795,7 +697,7 @@ if (isset($_SESSION['login_error'])) {
                     $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
                 }
         ?>
-        <div class="col-lg-4 col-md-6 animate-on-scroll unit-card-container">
+        <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
             <?php if (!empty($photo_urls)): ?>
               <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
@@ -915,7 +817,7 @@ if (isset($_SESSION['login_error'])) {
                 }
             }
         } else {
-            echo '<div class="col-12 text-center" id="noUnitsMessage">
+            echo '<div class="col-12 text-center">
                     <div class="alert alert-info">No units currently available.</div>
                   </div>';
         }
@@ -924,21 +826,247 @@ if (isset($_SESSION['login_error'])) {
 
       <div class="text-center mt-5">
         <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
-        <button id="refreshUnitsBtn" class="btn btn-primary btn-lg ms-2">
-          <i class="bi bi-arrow-clockwise me-2"></i>Refresh Now
-        </button>
       </div>
     </div>
   </section>
 
-  <!-- Dynamic Modals Container -->
-  <div id="dynamicModals"></div>
-  
   <!-- All rental modals rendered here -->
   <?php if (!empty($modals)) echo $modals; ?>
 
-  <!-- Continue with all your existing sections... -->
-  <!-- Rented Units, Handyman, Testimonials, Contact, etc. -->
+  <!-- Rented Units Section -->
+  <section class="rented-units">
+    <div class="container">
+      <div class="section-title animate-on-scroll">
+        <h2>Currently Rented</h2>
+        <p>See our successful partnerships with businesses across various industries.</p>
+      </div>
+
+      <div class="row g-4">
+        <?php
+        if (!empty($rented_units_display)) {
+            $rented_modal_counter = 0;
+            foreach ($rented_units_display as $rent) {
+                $rented_modal_counter++;
+                $rented_modal_id = "rentedModal" . $rented_modal_counter;
+        ?>
+        <div class="col-lg-4 col-md-6 animate-on-scroll">
+          <div class="card unit-card">
+            <div class="rented-badge">
+              <i class="bi bi-check-circle me-1"></i>Rented
+            </div>
+            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+              <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
+            </div>
+            <div class="card-body">
+              <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
+              <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p>
+              <p class="card-text text-muted">Currently occupied commercial space.</p>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
+                <small class="unit-location"><?= htmlspecialchars($rent['City']) ?></small>
+              </div>
+              <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
+                <i class="bi bi-eye me-2"></i>View Details
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rented Unit Modal -->
+        <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold" id="<?= $rented_modal_id ?>Label">
+                  <?= htmlspecialchars($rent['Name']) ?> - Rented Unit Details
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="text-center mb-3" style="font-size:56px;color:#059669;">
+                  <i class="fa-solid fa-house-user"></i>
+                </div>
+                <ul class="list-group list-group-flush">
+                  <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li>
+                  <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
+                  <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
+                  <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>
+                  <li class="list-group-item"><strong>Rental Period:</strong> <?= htmlspecialchars($rent['StartDate']) ?> → <?= htmlspecialchars($rent['EndDate']) ?></li>
+                </ul>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <?php
+            }
+        } else {
+            echo '<div class="col-12 text-center">
+                    <div class="alert alert-info">No units currently rented.</div>
+                  </div>';
+        }
+        ?>
+      </div>
+    </div>
+  </section>
+
+  <!-- Handyman Services Section -->
+  <section id="services" class="handyman-section">
+    <div class="container">
+      <div class="section-title animate-on-scroll">
+        <h2>Professional Services</h2>
+        <p>Comprehensive maintenance and repair services to keep your business running smoothly.</p>
+      </div>
+
+      <div class="row g-4 justify-content-center">
+        <?php
+        $icon_map = [
+          "CARPENTRY" => "IMG/show/CARPENTRY.png",
+          "ELECTRICAL" => "IMG/show/ELECTRICAL.png",
+          "PLUMBING" => "IMG/show/PLUMBING.png",
+          "PAINTING" => "IMG/show/PAINTING.png",
+          "APPLIANCE REPAIR" => "IMG/show/APPLIANCE.png",
+        ];
+
+        if (!empty($job_types_display)) {
+          foreach ($job_types_display as $row) {
+            $name_upper = strtoupper($row['JobType_Name']);
+            $img_src = $icon_map[$name_upper] ?? "IMG/show/wifi.png";
+        ?>
+        <div class="col-lg-2 col-md-4 col-sm-6 animate-on-scroll">
+          <form method="get" action="handyman_type.php">
+            <input type="hidden" name="jobtype_id" value="<?= htmlspecialchars($row['JobType_ID']) ?>">
+            <button type="submit" class="handyman-card w-100 border-0" 
+                    <?= ($is_logged_in && $client_is_inactive) ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : '' ?>>
+              <img src="<?= $img_src ?>" alt="<?= htmlspecialchars($row['JobType_Name']) ?>" class="handyman-icon">
+              <h5 class="fw-bold"><?= htmlspecialchars($row['JobType_Name']) ?></h5>
+              <p class="text-muted small">Professional service available</p>
+            </button>
+          </form>
+        </div>
+        <?php
+          }
+        } else {
+          echo '<div class="col-12 text-center">
+                  <div class="alert alert-info">No services currently available.</div>
+                </div>';
+        }
+        ?>
+      </div>
+
+      <div class="text-center mt-5">
+        <a href="handyman_type.php" class="btn btn-primary btn-lg">View All Services</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section id="testimonials" class="testimonials-section">
+    <div class="container">
+      <div class="section-title animate-on-scroll">
+        <h2>What Our Clients Say</h2>
+        <p>Hear from businesses that have found their perfect space with us.</p>
+      </div>
+
+      <div class="swiper testimonials-swiper">
+        <div class="swiper-wrapper">
+          <?php
+          if (!empty($testimonials)) {
+            foreach ($testimonials as $fb) {
+              $stars = str_repeat('<i class="bi bi-star-fill"></i>', $fb['Rating']);
+              $stars .= str_repeat('<i class="bi bi-star text-muted"></i>', 5 - $fb['Rating']);
+          ?>
+          <div class="swiper-slide">
+            <div class="testimonial-card">
+              <div class="testimonial-stars">
+                <?= $stars ?>
+              </div>
+              <p class="testimonial-text"><?= htmlspecialchars($fb['Comments']) ?></p>
+              <div class="testimonial-author"><?= htmlspecialchars($fb['Client_fn'] . ' ' . $fb['Client_ln']) ?></div>
+            </div>
+          </div>
+          <?php
+            }
+          } else {
+            echo '<div class="swiper-slide">
+                    <div class="testimonial-card">
+                      <p class="testimonial-text">No testimonials available yet.</p>
+                    </div>
+                  </div>';
+          }
+          ?>
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="contact-section">
+    <div class="container">
+      <div class="section-title animate-on-scroll">
+        <h2>Get In Touch</h2>
+        <p>Ready to find your ideal commercial space? Contact us today for a consultation.</p>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-lg-8">
+          <div class="map-container animate-on-scroll">
+            <iframe 
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3872.161920992376!2d121.16322267491122!3d13.948962686463787!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x33bd6c9ea0e9c9bf%3A0xf9daae5e3d997480!2sGen.%20Luna%20St%2C%20Lipa%2C%20Batangas!5e0!3m2!1sen!2sph!4v1748185696621!5m2!1sen!2sph" 
+              width="100%" 
+              height="400" 
+              style="border:0;" 
+              allowfullscreen="" 
+              loading="lazy" 
+              referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="row g-3">
+            <div class="col-12 animate-on-scroll">
+              <div class="contact-card">
+                <div class="contact-icon">
+                  <i class="bi bi-telephone"></i>
+                </div>
+                <h5 class="fw-bold">Call Us</h5>
+                <p class="text-muted mb-2">Speak with our leasing specialists</p>
+                <a href="tel:+639123456789" class="text-decoration-none">+63 912 345 6789</a>
+              </div>
+            </div>
+
+            <div class="col-12 animate-on-scroll">
+              <div class="contact-card">
+                <div class="contact-icon">
+                  <i class="bi bi-envelope"></i>
+                </div>
+                <h5 class="fw-bold">Email Us</h5>
+                <p class="text-muted mb-2">Get detailed information</p>
+                <a href="mailto:info@asrt.com" class="text-decoration-none">info@asrt.com</a>
+              </div>
+            </div>
+
+            <div class="col-12 animate-on-scroll">
+              <div class="contact-card">
+                <div class="contact-icon">
+                  <i class="bi bi-geo-alt"></i>
+                </div>
+                <h5 class="fw-bold">Visit Us</h5>
+                <p class="text-muted mb-2">Our main office location</p>
+                <address class="mb-0">Gen. Luna St, Lipa, Batangas</address>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
 
   <!-- Floating Message Button (only for non-logged-in users) -->
   <?php if (!$is_logged_in): ?>
@@ -1004,290 +1132,92 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Swiper JS -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   
+  <!-- Custom JavaScript -->
   <script>
-    // Live units loading functionality
-    class LiveUnitsLoader {
-      constructor() {
-        this.container = document.getElementById('unitsContainer');
-        this.loadingIndicator = document.getElementById('unitsLoading');
-        this.lastUpdatedElement = document.getElementById('lastUpdated');
-        this.refreshBtn = document.getElementById('refreshUnitsBtn');
-        this.dynamicModalsContainer = document.getElementById('dynamicModals');
-        this.modalCounter = 0;
-        
-        this.init();
-      }
+    // Initialize Swiper for testimonials
+    const testimonialSwiper = new Swiper('.testimonials-swiper', {
+      effect: 'coverflow',
+      grabCursor: true,
+      centeredSlides: true,
+      slidesPerView: 'auto',
+      loop: true,
+      coverflowEffect: {
+        rotate: 50,
+        stretch: 0,
+        depth: 100,
+        modifier: 1,
+        slideShadows: false,
+      },
+      pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+      },
+      autoplay: {
+        delay: 4000,
+        disableOnInteraction: false,
+      },
+      breakpoints: {
+        320: { slidesPerView: 1, spaceBetween: 20 },
+        768: { slidesPerView: 2, spaceBetween: 30 },
+        1024: { slidesPerView: 3, spaceBetween: 40 }
+      },
+    });
 
-      init() {
-        this.startAutoRefresh();
-        
-        if (this.refreshBtn) {
-          this.refreshBtn.addEventListener('click', () => {
-            this.loadUnits();
-          });
+    // Scroll animations
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('animate');
         }
-        
-        this.updateLastUpdated();
-      }
+      });
+    }, observerOptions);
 
-      async loadUnits() {
-        try {
-          this.showLoading(true);
-          
-          // Call the same index.php file with ajax parameter
-          const response = await fetch("?ajax=live_units");
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
-          
-          const result = await response.json();
-          
-          if (result.success) {
-            this.updateUnitsDisplay(result.data);
-            this.updateLastUpdated(result.timestamp);
-          } else {
-            throw new Error(result.error || 'Failed to load units');
-          }
-          
-        } catch (error) {
-          console.error("Failed to load units:", error);
-          this.showError("Failed to refresh units. Please try again later.");
-        } finally {
-          this.showLoading(false);
-        }
-      }
+    // Observe all elements with animate-on-scroll class
+    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+      observer.observe(el);
+    });
 
-      updateUnitsDisplay(units) {
-        this.container.innerHTML = "";
-        this.dynamicModalsContainer.innerHTML = "";
-        this.modalCounter = 0;
-
-        if (units.length === 0) {
-          this.container.innerHTML = `
-            <div class="col-12 text-center" id="noUnitsMessage">
-              <div class="alert alert-info">No units currently available.</div>
-            </div>
-          `;
-          return;
-        }
-
-        let modalsHtml = '';
-
-        units.forEach(unit => {
-          this.modalCounter++;
-          const modalId = `unitModal${this.modalCounter}`;
-          const photoModalId = `photoModal${this.modalCounter}`;
-          
-          const unitCard = this.createUnitCard(unit, modalId, photoModalId);
-          this.container.appendChild(unitCard);
-          
-          modalsHtml += this.createModalsHtml(unit, modalId, photoModalId);
-        });
-
-        this.dynamicModalsContainer.innerHTML = modalsHtml;
-        this.initializeNewCards();
-      }
-
-      createUnitCard(unit, modalId, photoModalId) {
-        const col = document.createElement('div');
-        col.className = 'col-lg-4 col-md-6 animate-on-scroll unit-card-container';
-        
-        const hasPhoto = unit.photo_urls && unit.photo_urls.length > 0;
-        const primaryPhoto = hasPhoto ? unit.photo_urls[0] : '';
-        
-        let buttonHtml = '';
-        if (unit.is_logged_in && !unit.client_is_inactive) {
-          buttonHtml = `
-            <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#${modalId}">
-              <i class="bi bi-key me-2"></i>Rent Now
-            </button>
-          `;
-        } else if (unit.is_logged_in && unit.client_is_inactive) {
-          buttonHtml = `
-            <button class="btn btn-secondary w-100" disabled>
-              Account Inactive
-            </button>
-          `;
-        } else {
-          buttonHtml = `
-            <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
-              <i class="bi bi-key me-2"></i>Login to Rent
-            </button>
-          `;
-        }
-
-        col.innerHTML = `
-          <div class="card unit-card">
-            ${hasPhoto ? 
-              `<img src="${primaryPhoto}" class="card-img-top" alt="${this.escapeHtml(unit.Name)}" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#${photoModalId}">` :
-              `<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-                 <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
-               </div>`
-            }
-            <div class="card-body">
-              <h5 class="card-title fw-bold">${this.escapeHtml(unit.Name)}</h5>
-              <p class="unit-price">₱${Number(unit.Price).toLocaleString()} / month</p>
-              <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="unit-type">${this.escapeHtml(unit.SpaceTypeName || 'Commercial Space')}</span>
-                <small class="unit-location">${this.escapeHtml(unit.City || '')}</small>
-              </div>
-              ${buttonHtml}
-            </div>
-          </div>
-        `;
-
-        return col;
-      }
-
-      createModalsHtml(unit, modalId, photoModalId) {
-        const hasPhoto = unit.photo_urls && unit.photo_urls.length > 0;
-        let modalsHtml = '';
-
-        if (hasPhoto) {
-          modalsHtml += `
-            <div class="modal fade" id="${photoModalId}" tabindex="-1">
-              <div class="modal-dialog modal-dialog-centered modal-xl">
-                <div class="modal-content bg-dark">
-                  <div class="modal-header border-0">
-                    <h5 class="modal-title text-white">Photo Gallery: ${this.escapeHtml(unit.Name)}</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body text-center">
-                    ${unit.photo_urls.length === 1 ? 
-                      `<img src="${unit.photo_urls[0]}" alt="Unit Photo" class="img-fluid rounded shadow" style="max-height:60vh;">` :
-                      this.createPhotoCarousel(unit.photo_urls, this.modalCounter)
-                    }
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-        }
-
-        if (unit.is_logged_in && !unit.client_is_inactive) {
-          modalsHtml += `
-            <div class="modal fade" id="${modalId}" tabindex="-1">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <div class="modal-header">
-                    <h5 class="modal-title">Contact Admin to Rent: ${this.escapeHtml(unit.Name)}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body">
-                    <div class="alert alert-info">
-                      <i class="bi bi-info-circle me-2"></i>
-                      To rent this unit and receive an invoice, please contact our admin team.
-                    </div>
-                    <ul class="list-group">
-                      <li class="list-group-item"><strong>Price:</strong> ₱${Number(unit.Price).toLocaleString()} per month</li>
-                      <li class="list-group-item"><strong>Type:</strong> ${this.escapeHtml(unit.SpaceTypeName)}</li>
-                      <li class="list-group-item"><strong>Location:</strong> ${this.escapeHtml(unit.City)}</li>
-                    </ul>
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <a href="rent_request.php?space_id=${unit.Space_ID}" class="btn btn-success">Request Invoice</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-        }
-
-        return modalsHtml;
-      }
-
-      createPhotoCarousel(photoUrls, counter) {
-        let items = '';
-        photoUrls.forEach((url, i) => {
-          items += `<div class="carousel-item${i === 0 ? ' active' : ''}">
-            <img src="${url}" class="d-block mx-auto img-fluid" alt="Photo ${i+1}" style="max-height:60vh;">
-          </div>`;
-        });
-
-        return `
-          <div id="carousel${counter}" class="carousel slide" data-bs-ride="carousel">
-            <div class="carousel-inner">${items}</div>
-            <button class="carousel-control-prev" type="button" data-bs-target="#carousel${counter}" data-bs-slide="prev">
-              <span class="carousel-control-prev-icon"></span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#carousel${counter}" data-bs-slide="next">
-              <span class="carousel-control-next-icon"></span>
-            </button>
-          </div>
-        `;
-      }
-
-      initializeNewCards() {
-        document.querySelectorAll('.unit-card-container').forEach(el => {
-          el.classList.add('animate');
-        });
-      }
-
-      showLoading(show) {
-        if (this.loadingIndicator) {
-          this.loadingIndicator.style.display = show ? 'flex' : 'none';
-        }
-      }
-
-      showError(message) {
-        console.error(message);
-      }
-
-      updateLastUpdated(timestamp = null) {
-        if (this.lastUpdatedElement) {
-          const now = timestamp ? new Date(timestamp) : new Date();
-          this.lastUpdatedElement.textContent = `Last updated: ${now.toLocaleString()}`;
-          this.lastUpdatedElement.style.display = 'block';
-        }
-      }
-
-      startAutoRefresh(intervalMs = 30000) {
-        this.refreshInterval = setInterval(() => this.loadUnits(), intervalMs);
-      }
-
-      stopAutoRefresh() {
-        if (this.refreshInterval) {
-          clearInterval(this.refreshInterval);
-        }
-      }
-
-      escapeHtml(text) {
-        if (!text) return '';
-        return text.replace(/[&<>"']/g, function(m) {
-          return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
-        });
-      }
-    }
-
-    // Initialize when page loads
-    document.addEventListener('DOMContentLoaded', function() {
-      window.liveUnitsLoader = new LiveUnitsLoader();
-      
-      // More units button
-      const moreBtn = document.getElementById('moreUnitsBtn');
-      if (moreBtn) {
-        moreBtn.addEventListener('click', function(e) {
-          e.preventDefault();
-          Swal.fire({
-            icon: 'info',
-            title: 'More Units Coming Soon!',
-            text: 'We are working on adding more properties.',
-            confirmButtonColor: '#1e40af'
-          });
-        });
+    // Smooth navbar background change on scroll
+    window.addEventListener('scroll', () => {
+      const navbar = document.querySelector('.navbar');
+      if (window.scrollY > 50) {
+        navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+        navbar.style.boxShadow = 'var(--shadow-md)';
+      } else {
+        navbar.style.background = 'rgba(255, 255, 255, 0.95)';
+        navbar.style.boxShadow = 'var(--shadow-sm)';
       }
     });
 
-    // Cleanup
-    window.addEventListener('beforeunload', function() {
-      if (window.liveUnitsLoader) {
-        window.liveUnitsLoader.stopAutoRefresh();
-      }
+    // More Units button
+    document.getElementById('moreUnitsBtn').addEventListener('click', function (e) {
+      e.preventDefault();
+      Swal.fire({
+        icon: 'info',
+        title: 'More Units Coming Soon!',
+        text: 'We are working on adding more properties. Please check back later!',
+        confirmButtonColor: 'var(--primary)'
+      });
+    });
+
+    // Add hover effects to cards
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-8px)';
+      });
+      
+      card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
+      });
     });
   </script>
 </body>
