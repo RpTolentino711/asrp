@@ -38,6 +38,8 @@ if ($is_logged_in) {
 $hide_client_rented_unit_ids = $is_logged_in ? $db->getClientRentedUnitIds($_SESSION['client_id']) : [];
 $available_units = $db->getHomepageAvailableUnits(10);
 $rented_units_display = $db->getHomepageRentedUnits(10);
+$rented_unit_ids = array_column($rented_units_display, 'Space_ID');
+$rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
 $job_types_display = $db->getAllJobTypes();
 $testimonials = $db->getHomepageTestimonials(6);
 ?>
@@ -854,9 +856,16 @@ if (isset($_SESSION['login_error'])) {
             <div class="rented-badge">
               <i class="bi bi-check-circle me-1"></i>Rented
             </div>
-            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-              <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
-            </div>
+      <?php
+      $photos = $rented_unit_photos[$rent['Space_ID']] ?? [];
+      if (!empty($photos)) {
+        echo '<img src="uploads/unit_photos/' . htmlspecialchars($photos[0]) . '" class="card-img-top" alt="Rented Unit Photo" style="height:250px;object-fit:cover;">';
+      } else {
+        echo '<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">';
+        echo '<i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>';
+        echo '</div>';
+      }
+      ?>
             <div class="card-body">
               <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
               <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p>
