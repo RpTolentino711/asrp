@@ -685,17 +685,14 @@ if (isset($_SESSION['login_error'])) {
                 $modal_id = "unitModal" . $modal_counter;
                 $photo_modal_id = "photoModal" . $modal_counter;
 
-                // Multi-photo display logic
-                $photo_urls = [];
-                for ($i=1; $i<=5; $i++) {
-                    $photo_field = "Photo$i";
-                    if (!empty($space[$photo_field])) {
-                        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
-                    }
-                }
-                if (empty($photo_urls) && !empty($space['Photo'])) {
-                    $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space['Photo']);
-                }
+        // Multi-photo display logic: always include Photo, Photo1-Photo5 if present
+        $photo_urls = [];
+        $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
+        foreach ($photo_fields as $photo_field) {
+          if (!empty($space[$photo_field])) {
+            $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
+          }
+        }
         ?>
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
