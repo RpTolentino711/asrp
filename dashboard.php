@@ -53,7 +53,16 @@ if (isset($_SESSION['login_success'])) {
     unset($_SESSION['login_success']);
 }
 
+$feedback_success = '';
+if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
+    $invoice_id = intval($_POST['invoice_id']);
+    $rating = intval($_POST['rating']);
+    $comments = trim($_POST['comments']);
 
+    if ($db->saveFeedback($invoice_id, $rating, $comments)) {
+        $feedback_success = "Thank you for your feedback!";
+    }
+}
 
 // --- PHOTO UPLOAD/DELETE LOGIC ---
 $photo_upload_success = '';
@@ -108,23 +117,11 @@ if ($client_details && is_array($client_details)) {
 } else {
     $client_display = "Unknown User";
 }
-$feedback_success = '';
+
 $feedback_prompts = $db->getFeedbackPrompts($client_id);
 $rented_units = $db->getRentedUnits($client_id);
 
-if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
-    $invoice_id = intval($_POST['invoice_id']);
-    $rating = intval($_POST['rating']);
-    $comments = trim($_POST['comments']);
-
-    if ($db->saveFeedback($invoice_id, $rating, $comments)) {
-        $feedback_success = "Thank you for your feedback!";
-        // Refresh prompts so the submitted one disappears
-        $feedback_prompts = $db->getFeedbackPrompts($client_id);
-    }
-}
-
-// --- SOLVE THE N+1 PROBLEM ---
+// --- 5. SOLVE THE N+1 PROBLEM ---
 $unit_ids = !empty($rented_units) ? array_column($rented_units, 'Space_ID') : [];
 $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
 // Fetch all unit photos for this client
@@ -136,6 +133,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
   <meta charset="utf-8">
   <title>Client Dashboard - ASRT Commercial Spaces</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -161,6 +159,10 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
       --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
       --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
     }
 
     body {
@@ -227,12 +229,21 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       font-size: 2.5rem;
       font-weight: 700;
       margin-bottom: 0.5rem;
+      position: relative;
+      z-index: 1;
     }
 
     .welcome-subtitle {
       font-size: 1.1rem;
       opacity: 0.9;
       margin-bottom: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .dashboard-header-content {
+      position: relative;
+      z-index: 1;
     }
 
     /* Alert Styles */
@@ -364,6 +375,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       height: 100%;
       object-fit: cover;
       transition: var(--transition);
+      cursor: pointer;
     }
 
     .photo-item:hover img {
@@ -459,7 +471,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       border-radius: var(--border-radius-sm);
       margin-bottom: 0.5rem;
       display: flex;
-      justify-content: between;
+      justify-content: space-between;
       align-items: center;
       border: 1px solid var(--gray-light);
     }
@@ -474,7 +486,6 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       border-radius: var(--border-radius-sm);
       font-size: 0.8rem;
       font-weight: 500;
-      margin-left: auto;
     }
 
     .maintenance-status.completed {
@@ -562,16 +573,6 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
       margin-bottom: 0.5rem;
     }
 
-    /* Feedback Section */
-    .feedback-card {
-      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-      border: 1px solid var(--warning);
-    }
-
-    .rating-select {
-      background: white;
-    }
-
     /* Responsive Design */
     @media (max-width: 768px) {
       .welcome-title {
@@ -603,8 +604,30 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
         gap: 0.5rem;
       }
 
-      .maintenance-status {
-        margin-left: 0;
+      .navbar-collapse {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100vw;
+        background: #fff;
+        z-index: 1050;
+        border-bottom-left-radius: 1rem;
+        border-bottom-right-radius: 1rem;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.07);
+      }
+      
+      .navbar-nav {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        margin: 0;
+        padding: 0.5rem 0;
+      }
+      
+      .nav-item, .nav-link {
+        width: 100% !important;
+        text-align: left !important;
+        padding: 12px 16px !important;
+        margin: 0 !important;
       }
     }
 
@@ -680,6 +703,15 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
         opacity: 1;
         transform: translateY(0);
       }
+    }
+
+    .badge {
+      border-radius: 6px;
+      font-size: 0.95em;
+      padding: 0.4em 0.8em;
+      background: #e0e7ff;
+      color: #2563eb;
+      font-weight: 500;
     }
   </style>
 </head>
@@ -767,51 +799,40 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
     <?php endif; ?>
 
     <!-- Feedback Section -->
-<?php if (!empty($feedback_prompts)): ?>
-  <div class="alert alert-warning">
-    <i class="fa-solid fa-comment-dots"></i> We value your experience! Please provide feedback for your recently ended rental(s):
-  </div>
-
-  <?php foreach ($feedback_prompts as $prompt): ?>
-    <div class="card mb-3">
-      <div class="card-header">
-        Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?> 
-        (Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)
+    <?php if ($feedback_prompts): ?>
+      <div class="alert alert-warning">
+        <i class="fa-solid fa-comment-dots me-2"></i> We value your experience! Please provide feedback for your recently ended rental(s):
       </div>
-      <div class="card-body">
-        <form method="post" action="">
-          <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
-
-          <div class="mb-2">
-            <label class="form-label">Rating</label>
-            <select name="rating" class="form-select" required>
-              <option value="">Select</option>
-              <?php for ($i = 5; $i >= 1; $i--): ?>
-                <option value="<?= $i ?>"><?= $i ?></option>
-              <?php endfor; ?>
-            </select>
+      <?php foreach ($feedback_prompts as $prompt): ?>
+        <div class="card mb-3">
+          <div class="card-header">
+            Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?> (Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)
           </div>
-
-          <div class="mb-2">
-            <label class="form-label">Comments</label>
-            <textarea name="comments" class="form-control"></textarea>
+          <div class="card-body">
+            <form method="post" action="">
+              <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
+              <div class="mb-2">
+                <label class="form-label">Rating</label>
+                <select name="rating" class="form-select" required>
+                  <option value="">Select</option>
+                  <?php for ($i = 5; $i >= 1; $i--): ?>
+                    <option value="<?= $i ?>"><?= $i ?></option>
+                  <?php endfor; ?>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Comments</label>
+                <textarea name="comments" class="form-control"></textarea>
+              </div>
+              <button class="btn btn-primary" type="submit" name="submit_feedback">Submit Feedback</button>
+            </form>
           </div>
-
-          <button class="btn btn-primary" type="submit" name="submit_feedback">
-            Submit Feedback
-          </button>
-        </form>
-      </div>
-    </div>
-  <?php endforeach; ?>
-
-  <?php if (!empty($feedback_success)): ?>
-    <div class="alert alert-success">
-      <?= htmlspecialchars($feedback_success) ?>
-    </div>
-  <?php endif; ?>
-<?php endif; ?>
-
+        </div>
+      <?php endforeach; ?>
+      <?php if (!empty($feedback_success)): ?>
+        <div class="alert alert-success"><?= htmlspecialchars($feedback_success) ?></div>
+      <?php endif; ?>
+    <?php endif; ?>
 
     <!-- Rented Units Section -->
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -1027,7 +1048,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
   </div>
 
   <!-- Bootstrap JavaScript -->
-  
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // Image modal functionality
     function showImageModal(imageSrc) {
