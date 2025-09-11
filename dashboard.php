@@ -22,7 +22,6 @@ if ($client_status && isset($client_status['Status']) && strtolower($client_stat
       <meta charset="utf-8">
       <title>Account Inactive</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
       <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     </head>
     <body>
@@ -1048,7 +1047,6 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
   </div>
 
   <!-- Bootstrap JavaScript -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     // Image modal functionality
     function showImageModal(imageSrc) {
