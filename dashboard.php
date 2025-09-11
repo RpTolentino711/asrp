@@ -78,11 +78,10 @@ if (isset($_POST['upload_unit_photo'], $_POST['space_id']) && isset($_FILES['uni
         $photo_upload_error = "You can upload up to 5 photos only.";
     } elseif ($file['error'] === UPLOAD_ERR_OK) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        $allowed_exts = ['jpg', 'jpeg', 'png', 'gif'];
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (in_array($file['type'], $allowed_types) && in_array($ext, $allowed_exts) && $file['size'] <= 2*1024*1024) {
+        if (in_array($file['type'], $allowed_types) && $file['size'] <= 2*1024*1024) {
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
             $upload_dir = __DIR__ . "/uploads/unit_photos/";
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
             $filepath = $upload_dir . $filename;
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
@@ -102,18 +101,10 @@ if (isset($_POST['upload_unit_photo'], $_POST['space_id']) && isset($_FILES['uni
 if (isset($_POST['delete_unit_photo'], $_POST['space_id'], $_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = $_POST['photo_filename'];
-    // Validate filename to prevent directory traversal
-    if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
-        if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
-            $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
-            if (file_exists($file_to_delete)) unlink($file_to_delete);
-            $photo_upload_success = "Photo deleted!";
-        } else {
-            $photo_upload_error = "Failed to delete photo from database.";
-        }
-    } else {
-        $photo_upload_error = "Invalid photo filename.";
-    }
+    $db->deleteUnitPhoto($space_id, $client_id, $photo_filename);
+    $file_to_delete = __DIR__ . "/uploads/unit_photos/" . $photo_filename;
+    if (file_exists($file_to_delete)) unlink($file_to_delete);
+    $photo_upload_success = "Photo deleted!";
 }
 
 // --- SAFELY GET CLIENT DETAILS ---
@@ -792,56 +783,72 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
         </div>
     </div>
 
-    <div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="fw-bold mb-0">Welcome, <?= htmlspecialchars($client_display) ?>!</h2>
-  </div>
-
-  <?php if ($photo_upload_success): ?>
-    <div class="alert alert-success"><?= htmlspecialchars($photo_upload_success) ?></div>
-  <?php endif; ?>
-  <?php if ($photo_upload_error): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($photo_upload_error) ?></div>
-  <?php endif; ?>
-
-
-
-     <!-- Feedback for kicked units (Now uses the pre-fetched data) -->
-  <?php if ($feedback_prompts): ?>
-    <div class="alert alert-warning">
-      <i class="fa-solid fa-comment-dots"></i> We value your experience! Please provide feedback for your recently ended rental(s):
-    </div>
-    <?php foreach ($feedback_prompts as $prompt): ?>
-      <div class="card mb-3">
-        <div class="card-header">
-          Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?> (Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)
-        </div>
-        <div class="card-body">
-          <form method="post" action="">
-            <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
-            <div class="mb-2">
-              <label class="form-label">Rating</label>
-              <select name="rating" class="form-select" required>
-                <option value="">Select</option>
-                <?php for ($i = 5; $i >= 1; $i--): ?>
-                  <option value="<?= $i ?>"><?= $i ?></option>
-                <?php endfor; ?>
-              </select>
+    <div class="container mb-5">
+        <!-- Alerts -->
+        <?php if ($photo_upload_success): ?>
+            <div class="alert alert-success fade-in">
+                <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($photo_upload_success) ?>
             </div>
-            <div class="mb-2">
-              <label class="form-label">Comments</label>
-              <textarea name="comments" class="form-control"></textarea>
+        <?php endif; ?>
+        
+        <?php if ($photo_upload_error): ?>
+            <div class="alert alert-danger fade-in">
+                <i class="bi bi-exclamation-triangle me-2"></i><?= htmlspecialchars($photo_upload_error) ?>
             </div>
-            <button class="btn btn-primary" type="submit" name="submit_feedback">Submit Feedback</button>
-          </form>
-        </div>
-      </div>
-    <?php endforeach; ?>
-    <?php if (!empty($feedback_success)): ?>
-      <div class="alert alert-success"><?= htmlspecialchars($feedback_success) ?></div>
-    <?php endif; ?>
-  <?php endif; ?>
+        <?php endif; ?>
 
+        <!-- Feedback Section -->
+        <?php if ($feedback_prompts): ?>
+            <div class="alert alert-warning fade-in">
+                <i class="bi bi-chat-heart me-2"></i>
+                We value your experience! Please provide feedback for your recently ended rental(s).
+            </div>
+            
+            <?php foreach ($feedback_prompts as $prompt): ?>
+                <div class="card feedback-card mb-3 fade-in">
+                    <div class="card-header">
+                        <i class="bi bi-star me-2"></i>
+                        Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?>
+                        <small class="text-muted ms-2">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)</small>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="">
+                            <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-star-fill me-1"></i>Rating
+                                    </label>
+                                    <select name="rating" class="form-select rating-select" required>
+                                        <option value="">Select Rating</option>
+                                        <option value="5">★★★★★ Excellent (5)</option>
+                                        <option value="4">★★★★☆ Very Good (4)</option>
+                                        <option value="3">★★★☆☆ Good (3)</option>
+                                        <option value="2">★★☆☆☆ Fair (2)</option>
+                                        <option value="1">★☆☆☆☆ Poor (1)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">
+                                        <i class="bi bi-chat-text me-1"></i>Comments
+                                    </label>
+                                    <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" type="submit" name="submit_feedback">
+                                <i class="bi bi-send me-1"></i>Submit Feedback
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            
+            <?php if (!empty($feedback_success)): ?>
+                <div class="alert alert-success fade-in">
+                    <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($feedback_success) ?>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
 
         <!-- Rented Units Section -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -894,35 +901,62 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
                                     </div>
                                 </div>
 
-                                <!-- Unit Photo Upload/Display -->
-            <div class="mt-3 mb-2">
-              <?php if ($photos): ?>
-                  <div class="mb-2 d-flex flex-wrap">
-                    <?php foreach ($photos as $photo): ?>
-                      <div class="photo-thumb">
-                        <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" class="unit-photo" alt="Unit Photo">
-                        <form method="post">
-                          <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
-                          <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
-                          <button type="submit" name="delete_unit_photo" class="btn btn-danger btn-sm" 
-                            onclick="return confirm('Delete this photo?');"><i class="fa fa-times"></i></button>
-                        </form>
-                      </div>
-                    <?php endforeach; ?>
-                  </div>
-              <?php else: ?>
-                  <span class="text-muted mb-2">No photo uploaded for this unit.</span>
-              <?php endif; ?>
-              <?php if (count($photos) < 5): ?>
-              <form method="post" enctype="multipart/form-data" class="d-flex flex-column align-items-start">
-                <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
-                <input type="file" name="unit_photo" accept="image/*" class="form-control mb-2" style="max-width: 220px;" required>
-                <button type="submit" name="upload_unit_photo" class="btn btn-outline-success btn-sm">
-                  Upload Photo
-                </button>
-              </form>
-              <?php endif; ?>
-            </div>
+                                <!-- Photo Gallery -->
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">
+                                            <i class="bi bi-images me-1"></i>Unit Photos
+                                        </h6>
+                                        <small class="text-muted"><?= count($photos) ?>/5</small>
+                                    </div>
+
+                                    <?php if ($photos): ?>
+                                        <div class="photo-gallery">
+                                            <?php foreach ($photos as $photo): ?>
+                                                <div class="photo-item">
+                                                    <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" 
+                                                         alt="Unit Photo"
+                                                         onclick="showImageModal('uploads/unit_photos/<?= htmlspecialchars($photo) ?>')">
+                                                    <form method="post" class="d-inline">
+                                                        <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
+                                                        <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
+                                                        <button type="submit" 
+                                                                name="delete_unit_photo" 
+                                                                class="delete-photo-btn"
+                                                                onclick="return confirm('Delete this photo?');"
+                                                                title="Delete photo">
+                                                            <i class="bi bi-x"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="no-photos">
+                                            <i class="bi bi-camera mb-2 d-block fs-3"></i>
+                                            No photos uploaded yet
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <!-- Upload Form -->
+                                    <?php if (count($photos) < 5): ?>
+                                        <div class="upload-form">
+                                            <form method="post" enctype="multipart/form-data">
+                                                <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
+                                                <div class="mb-2">
+                                                    <input type="file" 
+                                                           name="unit_photo" 
+                                                           accept="image/*" 
+                                                           class="form-control" 
+                                                           required>
+                                                </div>
+                                                <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100">
+                                                    <i class="bi bi-cloud-upload me-1"></i>Upload Photo
+                                                </button>
+                                            </form>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
 
                                 <!-- Maintenance History -->
                                 <div class="maintenance-section mt-auto">
@@ -1039,6 +1073,7 @@ $unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1,
     </div>
 
     <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Image modal functionality
