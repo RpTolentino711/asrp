@@ -22,7 +22,6 @@ if ($client_status && isset($client_status['Status']) && strtolower($client_stat
       <meta charset="utf-8">
       <title>Account Inactive</title>
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
       <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     </head>
     <body>
@@ -66,14 +65,25 @@ if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
 }
 
 // --- PHOTO UPLOAD/DELETE LOGIC ---
-// --- PHOTO UPLOAD/DELETE LOGIC (old version) ---
+// --- Feedback Logic ---
+$feedback_success = '';
+if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
+    $invoice_id = intval($_POST['invoice_id']);
+    $rating = intval($_POST['rating']);
+    $comments = trim($_POST['comments']);
+    if ($db->saveFeedback($invoice_id, $rating, $comments)) {
+        $feedback_success = "Thank you for your feedback!";
+    }
+}
+
+// --- Photo Upload Logic ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 if (isset($_POST['upload_unit_photo'], $_POST['space_id']) && isset($_FILES['unit_photo'])) {
     $space_id = intval($_POST['space_id']);
     $file = $_FILES['unit_photo'];
 
-    // Fetch current photos to enforce limit
+    // Get how many photos already exist for this unit
     $unit_photos = $db->getUnitPhotosForClient($client_id);
     $current_photos = $unit_photos[$space_id] ?? [];
     if (count($current_photos) >= 5) {
@@ -100,26 +110,23 @@ if (isset($_POST['upload_unit_photo'], $_POST['space_id']) && isset($_FILES['uni
     }
 }
 
+// --- Photo Delete Logic ---
 if (isset($_POST['delete_unit_photo'], $_POST['space_id'], $_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
-    $photo_filename = $_POST['photo_filename'];
-    $db->deleteUnitPhoto($space_id, $client_id, $photo_filename);
-    $file_to_delete = __DIR__ . "/uploads/unit_photos/" . $photo_filename;
-    if (file_exists($file_to_delete)) unlink($file_to_delete);
-    $photo_upload_success = "Photo deleted!";
+    $photo_filename = trim($_POST['photo_filename']);
+    // Prevent directory traversal
+    if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+        if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
+            $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
+            if (file_exists($file_to_delete)) unlink($file_to_delete);
+            $photo_upload_success = "Photo deleted!";
+        } else {
+            $photo_upload_error = "Failed to delete photo from database.";
+        }
+    } else {
+        $photo_upload_error = "Invalid photo filename.";
+    }
 }
-
-// --- SAFELY GET CLIENT DETAILS ---
-$client_details = $db->getClientDetails($client_id);
-$client_display = "Unknown User";
-
-if ($client_details && is_array($client_details)) {
-    $first_name = isset($client_details['Client_fn']) ? trim($client_details['Client_fn']) : '';
-    $last_name = isset($client_details['Client_ln']) ? trim($client_details['Client_ln']) : '';
-    $username = isset($client_details['C_username']) ? trim($client_details['C_username']) : '';
-    
-    $full_name = trim("$first_name $last_name");
-    $client_display = !empty($full_name) ? $full_name : (!empty($username) ? $username : "Unknown User");
 }
 
 // Get data with error handling

@@ -127,7 +127,7 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
     }
 }
 
-public function DeleteUnitPhoto($space_id, $client_id, $photo_filename) {
+public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
     $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
             FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
     $stmt = $this->pdo->prepare($sql);
