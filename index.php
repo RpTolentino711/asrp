@@ -675,13 +675,16 @@ if (isset($_SESSION['login_error'])) {
       </div>
 
       <div class="row g-4" id="available-units-list">
-        <!-- Cards will be loaded here by AJAX -->
+        <!-- Cards and modals will be loaded here by AJAX -->
+      </div>
+
+      <div class="text-center mt-5">
+        <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
       </div>
     </div>
   </section>
 
   <script>
-  // Live update available units every 10 seconds
   function fetchAvailableUnits() {
     fetch('AJAX/get_available_units.php')
       .then(response => response.text())
@@ -689,14 +692,9 @@ if (isset($_SESSION['login_error'])) {
         document.getElementById('available-units-list').innerHTML = html;
       });
   }
-  // Fetch immediately on page load
   document.addEventListener('DOMContentLoaded', fetchAvailableUnits);
-  // Continue polling every 10 seconds
   setInterval(fetchAvailableUnits, 10000);
   </script>
-
-  <!-- All rental modals rendered here -->
-  <?php if (!empty($modals)) echo $modals; ?>
 
   <!-- Rented Units Section -->
   <section class="rented-units">
