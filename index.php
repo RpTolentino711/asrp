@@ -688,11 +688,14 @@ if (isset($_SESSION['login_error'])) {
     // Multi-photo display logic for available units
   $photo_urls = [];
   $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-    foreach ($photo_fields as $photo_field) {
-      if (!empty($space[$photo_field])) {
+  foreach ($photo_fields as $photo_field) {
+    if (!empty($space[$photo_field])) {
+      $file_path = __DIR__ . "/uploads/unit_photos/" . $space[$photo_field];
+      if (file_exists($file_path)) {
         $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
       }
     }
+  }
         ?>
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
