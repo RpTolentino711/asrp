@@ -674,70 +674,7 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-      <div class="row g-4">
-        <?php
-        if (!empty($available_units)) {
-            $modal_counter = 0;
-            $modals = '';
-            foreach ($available_units as $space) {
-                if (in_array($space['Space_ID'], $hide_client_rented_unit_ids)) continue;
-                $modal_counter++;
-                $modal_id = "unitModal" . $modal_counter;
-                $photo_modal_id = "photoModal" . $modal_counter;
-
-    // Multi-photo display logic for available units
-  $photo_urls = [];
-  $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-    foreach ($photo_fields as $photo_field) {
-      if (!empty($space[$photo_field])) {
-        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
-      }
-    }
-        ?>
-        <div class="col-lg-4 col-md-6 animate-on-scroll">
-          <div class="card unit-card">
-            <?php if (!empty($photo_urls)): ?>
-              <div style="position:relative;">
-                <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
-                <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($photo_urls) ?>/6 </span>
-              </div>
-            <?php else: ?>
-              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-                <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
-              </div>
-            <?php endif; ?>
-
-            <div class="card-body">
-              <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
-              <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
-              <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
-                <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
-              </div>
-              
-              <?php if ($is_logged_in && !$client_is_inactive): ?>
-                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">
-                  <i class="bi bi-key me-2"></i>Rent Now
-                </button>
-              <?php elseif ($is_logged_in && $client_is_inactive): ?>
-                <button class="btn btn-secondary w-100" disabled>
-                  Account Inactive
-                </button>
-              <?php else: ?>
-                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
-                  <i class="bi bi-key me-2"></i>Login to Rent
-                </button>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
-
-        <!-- Photo Modal -->
-        <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-xl">
-            <div class="modal-content bg-dark">
-              <div class="modal-header border-0">
+  <div id="available-units-list" class="row g-4"></div>
                 <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
                   Photo Gallery: <?= htmlspecialchars($space['Name']) ?>
                 </h5>
@@ -1198,9 +1135,99 @@ if (isset($_SESSION['login_error'])) {
   
   <!-- Swiper JS -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-  
-  <!-- Custom JavaScript -->
+
+  <!-- Live Available Units JavaScript -->
   <script>
+    function renderAvailableUnits(units, isLoggedIn, clientIsInactive) {
+      const container = document.getElementById('available-units-list');
+      container.innerHTML = '';
+      let modalHtml = '';
+      let modalCounter = 0;
+      units.forEach(space => {
+        modalCounter++;
+        const modalId = `unitModal${modalCounter}`;
+        const photoModalId = `photoModal${modalCounter}`;
+        const photoFields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
+        const photoUrls = photoFields.map(f => space[f]).filter(Boolean).map(f => `uploads/unit_photos/${f}`);
+        let cardHtml = `<div class="col-lg-4 col-md-6 animate-on-scroll">
+          <div class="card unit-card">`;
+        if (photoUrls.length > 0) {
+          cardHtml += `<div style="position:relative;">
+            <img src="${photoUrls[0]}" class="card-img-top" alt="${space.Name}" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#${photoModalId}">
+            <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> ${photoUrls.length}/6 </span>
+          </div>`;
+        } else {
+          cardHtml += `<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+            <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
+          </div>`;
+        }
+        cardHtml += `<div class="card-body">
+            <h5 class="card-title fw-bold">${space.Name}</h5>
+            <p class="unit-price">₱${Number(space.Price).toLocaleString()} / month</p>
+            <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="unit-type">${space.SpaceTypeName}</span>
+              <small class="unit-location">${space.City}</small>
+            </div>`;
+        if (isLoggedIn && !clientIsInactive) {
+          cardHtml += `<button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#${modalId}"><i class="bi bi-key me-2"></i>Rent Now</button>`;
+        } else if (isLoggedIn && clientIsInactive) {
+          cardHtml += `<button class="btn btn-secondary w-100" disabled>Account Inactive</button>`;
+        } else {
+          cardHtml += `<button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal"><i class="bi bi-key me-2"></i>Login to Rent</button>`;
+        }
+        cardHtml += `</div></div></div>`;
+
+        // Photo Modal HTML
+        let modalImgs = '';
+        photoUrls.forEach((url, idx) => {
+          modalImgs += `<div class="carousel-item${idx === 0 ? ' active' : ''}"><img src="${url}" class="d-block w-100" style="max-height:600px;object-fit:contain;"></div>`;
+        });
+        modalHtml += `<div class="modal fade" id="${photoModalId}" tabindex="-1" aria-labelledby="${photoModalId}Label" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered modal-xl">
+            <div class="modal-content bg-dark">
+              <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="${photoModalId}Label">${space.Name} Photos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body p-0">
+                <div id="carousel${photoModalId}" class="carousel slide" data-bs-ride="carousel">
+                  <div class="carousel-inner">${modalImgs}</div>
+                  <button class="carousel-control-prev" type="button" data-bs-target="#carousel${photoModalId}" data-bs-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Previous</span>
+                  </button>
+                  <button class="carousel-control-next" type="button" data-bs-target="#carousel${photoModalId}" data-bs-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="visually-hidden">Next</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+
+        container.insertAdjacentHTML('beforeend', cardHtml);
+      });
+      // Insert modals at the end of the container
+      container.insertAdjacentHTML('beforeend', modalHtml);
+    }
+
+    async function fetchAndRenderAvailableUnits() {
+      try {
+        const res = await fetch('AJAX/get_available_units.php');
+        const data = await res.json();
+        renderAvailableUnits(data.units, data.is_logged_in, data.client_is_inactive);
+      } catch (e) {
+        // Optionally show error
+      }
+    }
+
+    // Initial fetch
+    fetchAndRenderAvailableUnits();
+    // Auto-refresh every 10 seconds
+    setInterval(fetchAndRenderAvailableUnits, 10000);
+
     // Initialize Swiper for testimonials
     const testimonialSwiper = new Swiper('.testimonials-swiper', {
       effect: 'coverflow',
