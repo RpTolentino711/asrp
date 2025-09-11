@@ -14,6 +14,7 @@ $client_id = $_SESSION['client_id'];
 // --- CHECK IF CLIENT IS INACTIVE ---
 $client_status = $db->getClientStatus($client_id);
 if ($client_status && isset($client_status['Status']) && strtolower($client_status['Status']) !== 'active') {
+    // Show SweetAlert and log out automatically
     echo <<<HTML
     <!doctype html>
     <html lang="en">
@@ -38,7 +39,7 @@ if ($client_status && isset($client_status['Status']) && strtolower($client_stat
       });
       setTimeout(function() {
         window.location.href = 'logout.php?inactive=1';
-      }, 7000);
+      }, 7000); // Fallback: auto-logout after 7 seconds
     </script>
     </body>
     </html>
@@ -52,86 +53,58 @@ if (isset($_SESSION['login_success'])) {
     unset($_SESSION['login_success']);
 }
 
-// --- FEEDBACK LOGIC (WORKING VERSION) ---
 $feedback_success = '';
-if (isset($_POST['submit_feedback']) && isset($_POST['invoice_id']) && isset($_POST['rating'])) {
+if (isset($_POST['submit_feedback'], $_POST['invoice_id'], $_POST['rating'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $rating = intval($_POST['rating']);
-    $comments = isset($_POST['comments']) ? trim($_POST['comments']) : '';
+    $comments = trim($_POST['comments']);
 
-    if ($rating >= 1 && $rating <= 5) {
-        if ($db->saveFeedback($invoice_id, $rating, $comments)) {
-            $feedback_success = "Thank you for your feedback!";
-        }
+    if ($db->saveFeedback($invoice_id, $rating, $comments)) {
+        $feedback_success = "Thank you for your feedback!";
     }
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC (WORKING VERSION) ---
+// --- PHOTO UPLOAD/DELETE LOGIC ---
 $photo_upload_success = '';
 $photo_upload_error = '';
-
-// Handle photo upload
-if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
+if (isset($_POST['upload_unit_photo'], $_POST['space_id']) && isset($_FILES['unit_photo'])) {
     $space_id = intval($_POST['space_id']);
     $file = $_FILES['unit_photo'];
 
     // Fetch current photos to enforce limit
     $unit_photos = $db->getUnitPhotosForClient($client_id);
     $current_photos = $unit_photos[$space_id] ?? [];
-    
     if (count($current_photos) >= 5) {
         $photo_upload_error = "You can upload up to 5 photos only.";
     } elseif ($file['error'] === UPLOAD_ERR_OK) {
-        // Enhanced validation
-        $file_info = getimagesize($file['tmp_name']);
-        if ($file_info !== false) {
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-            if (in_array($file_info['mime'], $allowed_types) && $file['size'] <= 2*1024*1024) {
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
-                
-                $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
-                $filepath = $upload_dir . $filename;
-                
-                if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                    if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
-                        $photo_upload_success = "Photo uploaded for this unit!";
-                    } else {
-                        unlink($filepath); // Remove file if DB insertion fails
-                        $photo_upload_error = "Failed to save photo information.";
-                    }
-                } else {
-                    $photo_upload_error = "Failed to move uploaded file.";
-                }
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+        if (in_array($file['type'], $allowed_types) && $file['size'] <= 2*1024*1024) {
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $upload_dir = __DIR__ . "/uploads/unit_photos/";
+            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+            $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
+            $filepath = $upload_dir . $filename;
+            if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                $db->addUnitPhoto($space_id, $client_id, $filename);
+                $photo_upload_success = "Photo uploaded for this unit!";
             } else {
-                $photo_upload_error = "Invalid file type or size too large (max 2MB).";
+                $photo_upload_error = "Failed to move uploaded file.";
             }
         } else {
-            $photo_upload_error = "Invalid image file.";
+            $photo_upload_error = "Invalid file type or size too large.";
         }
     } else {
         $photo_upload_error = "File upload error. Please try again.";
     }
 }
 
-// Handle photo deletion
-if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
+if (isset($_POST['delete_unit_photo'], $_POST['space_id'], $_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
-    $photo_filename = trim($_POST['photo_filename']);
-    
-    // Basic security check for filename
-    if (preg_match('/^unit_\d+_client_\d+_[a-f0-9]+\.[a-z]+$/i', $photo_filename)) {
-        if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
-            $file_to_delete = __DIR__ . "/uploads/unit_photos/" . $photo_filename;
-            if (file_exists($file_to_delete)) unlink($file_to_delete);
-            $photo_upload_success = "Photo deleted!";
-        } else {
-            $photo_upload_error = "Failed to delete photo.";
-        }
-    } else {
-        $photo_upload_error = "Invalid photo filename.";
-    }
+    $photo_filename = $_POST['photo_filename'];
+    $db->deleteUnitPhoto($space_id, $client_id, $photo_filename);
+    $file_to_delete = __DIR__ . "/uploads/unit_photos/" . $photo_filename;
+    if (file_exists($file_to_delete)) unlink($file_to_delete);
+    $photo_upload_success = "Photo deleted!";
 }
 
 // --- SAFELY GET CLIENT DETAILS ---
@@ -148,1112 +121,755 @@ if ($client_details && is_array($client_details)) {
 $feedback_prompts = $db->getFeedbackPrompts($client_id);
 $rented_units = $db->getRentedUnits($client_id);
 
-// --- SOLVE THE N+1 PROBLEM ---
+// --- 5. SOLVE THE N+1 PROBLEM ---
 $unit_ids = !empty($rented_units) ? array_column($rented_units, 'Space_ID') : [];
 $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
 // Fetch all unit photos for this client
-$unit_photos = $db->getUnitPhotosForClient($client_id);
+$unit_photos = $db->getUnitPhotosForClient($client_id); // [space_id => [photo1, photo2, ...] ]
 ?>
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Client Dashboard - ASRT Commercial Spaces</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- Bootstrap & Icons -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --primary-light: #3b82f6;
-            --secondary: #1e293b;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --light: #f8fafc;
-            --lighter: #ffffff;
-            --gray: #64748b;
-            --gray-light: #e2e8f0;
-            --gray-dark: #334155;
-            --border-radius: 16px;
-            --border-radius-sm: 8px;
-            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.02);
-            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
-            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
-            --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            color: var(--secondary);
-            line-height: 1.6;
-            min-height: 100vh;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Modern Navigation */
-        .navbar {
-            background: rgba(255, 255, 255, 0.95) !important;
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--gray-light);
-            padding: 1rem 0;
-            position: sticky;
-            top: 0;
-            z-index: 1030;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .navbar-brand {
-            font-family: 'Playfair Display', serif;
-            font-size: 1.75rem;
-            font-weight: 700;
-            color: var(--primary) !important;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .nav-link {
-            font-weight: 500;
-            color: var(--gray-dark) !important;
-            padding: 0.75rem 1rem !important;
-            border-radius: var(--border-radius-sm);
-            transition: var(--transition);
-            position: relative;
-        }
-
-        .nav-link:hover,
-        .nav-link.active {
-            color: var(--primary) !important;
-            background: rgba(37, 99, 235, 0.1);
-        }
-
-        .navbar-toggler {
-            border: none;
-            padding: 0.5rem;
-        }
-
-        .navbar-toggler:focus {
-            box-shadow: none;
-        }
-
-        /* Dashboard Header */
-        .dashboard-header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-            color: white;
-            padding: 3rem 0 2rem;
-            margin-bottom: 2rem;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .dashboard-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="dots" patternUnits="userSpaceOnUse" width="20" height="20"><circle cx="10" cy="10" r="1.5" fill="white" opacity="0.15"/></pattern></defs><rect width="100" height="100" fill="url(%23dots)"/></svg>');
-        }
-
-        .dashboard-header-content {
-            position: relative;
-            z-index: 2;
-        }
-
-        .welcome-title {
-            font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .welcome-subtitle {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            margin-bottom: 0;
-        }
-
-        /* Alert Styles */
-        .alert {
-            border: none;
-            border-radius: var(--border-radius);
-            padding: 1rem 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: var(--shadow-sm);
-            font-weight: 500;
-        }
-
-        .alert-success {
-            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-            color: #065f46;
-        }
-
-        .alert-danger {
-            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-            color: #991b1b;
-        }
-
-        .alert-warning {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            color: #92400e;
-        }
-
-        /* Card Styles */
-        .card {
-            border: none;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-md);
-            background: var(--lighter);
-            transition: var(--transition);
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .card-header {
-            background: var(--light);
-            border-bottom: 1px solid var(--gray-light);
-            padding: 1.25rem;
-            font-weight: 600;
-            color: var(--secondary);
-        }
-
-        .card-body {
-            padding: 1.5rem;
-        }
-
-        /* Unit Cards */
-        .unit-card {
-            border: 1px solid var(--gray-light);
-            background: var(--lighter);
-            transition: var(--transition);
-        }
-
-        .unit-card:hover {
-            border-color: var(--primary);
-            box-shadow: var(--shadow-xl);
-        }
-
-        .unit-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 2rem;
-            margin: 0 auto 1rem;
-        }
-
-        .unit-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        .unit-price {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 1rem;
-        }
-
-        .unit-badge {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            color: white;
-            padding: 0.4rem 0.8rem;
-            border-radius: var(--border-radius-sm);
-            font-size: 0.85rem;
-            font-weight: 500;
-            display: inline-block;
-            margin-bottom: 1rem;
-        }
-
-        .unit-details {
-            color: var(--gray);
-            font-size: 0.95rem;
-            margin-bottom: 0.5rem;
-        }
-
-        /* Photo Gallery */
-        .photo-gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 0.75rem;
-            margin: 1rem 0;
-        }
-
-        .photo-item {
-            position: relative;
-            border-radius: var(--border-radius-sm);
-            overflow: hidden;
-            aspect-ratio: 4/3;
-        }
-
-        .photo-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            transition: var(--transition);
-            cursor: pointer;
-        }
-
-        .photo-item:hover img {
-            transform: scale(1.05);
-        }
-
-        .delete-photo-btn {
-            position: absolute;
-            top: 0.5rem;
-            right: 0.5rem;
-            background: var(--danger);
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.8rem;
-            cursor: pointer;
-            opacity: 0;
-            transition: var(--transition);
-            z-index: 10;
-        }
-
-        .photo-item:hover .delete-photo-btn {
-            opacity: 1;
-        }
-
-        .no-photos {
-            text-align: center;
-            color: var(--gray);
-            font-style: italic;
-            padding: 2rem;
-            background: var(--light);
-            border-radius: var(--border-radius-sm);
-            margin: 1rem 0;
-        }
-
-        /* Upload Form */
-        .upload-form {
-            background: var(--light);
-            border-radius: var(--border-radius-sm);
-            padding: 1rem;
-            margin-top: 1rem;
-        }
-
-        .upload-form input[type="file"] {
-            border: 2px dashed var(--gray-light);
-            border-radius: var(--border-radius-sm);
-            padding: 1rem;
-            text-align: center;
-            transition: var(--transition);
-            background: white;
-        }
-
-        .upload-form input[type="file"]:hover {
-            border-color: var(--primary);
-        }
-
-        /* Maintenance History */
-        .maintenance-section {
-            background: var(--light);
-            border-radius: var(--border-radius-sm);
-            padding: 1.25rem;
-            margin-top: 1.5rem;
-            border-left: 4px solid var(--primary);
-        }
-
-        .maintenance-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-
-        .maintenance-header h6 {
-            font-weight: 700;
-            color: var(--primary);
-            margin: 0;
-        }
-
-        .maintenance-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .maintenance-item {
-            background: white;
-            padding: 0.75rem 1rem;
-            border-radius: var(--border-radius-sm);
-            margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 1px solid var(--gray-light);
-        }
-
-        .maintenance-date {
-            font-weight: 600;
-            color: var(--secondary);
-        }
-
-        .maintenance-status {
-            padding: 0.25rem 0.75rem;
-            border-radius: var(--border-radius-sm);
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .maintenance-status.completed {
-            background: var(--success);
-            color: white;
-        }
-
-        .maintenance-status.pending {
-            background: var(--warning);
-            color: white;
-        }
-
-        .maintenance-status.inprogress {
-            background: var(--primary);
-            color: white;
-        }
-
-        .no-maintenance {
-            text-align: center;
-            color: var(--gray);
-            font-style: italic;
-            padding: 1rem;
-        }
-
-        /* Buttons */
-        .btn {
-            border-radius: var(--border-radius-sm);
-            font-weight: 500;
-            padding: 0.6rem 1.2rem;
-            transition: var(--transition);
-            border: none;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--primary-light));
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, var(--success), #34d399);
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: linear-gradient(135deg, #059669, var(--success));
-            transform: translateY(-1px);
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #dc2626;
-            transform: translateY(-1px);
-        }
-
-        /* Form Elements */
-        .form-control,
-        .form-select {
-            border: 1px solid var(--gray-light);
-            border-radius: var(--border-radius-sm);
-            padding: 0.75rem 1rem;
-            transition: var(--transition);
-            background: white;
-        }
-
-        .form-control:focus,
-        .form-select:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-            outline: none;
-        }
-
-        .form-label {
-            font-weight: 600;
-            color: var(--secondary);
-            margin-bottom: 0.5rem;
-        }
-
-        /* Feedback Section */
-        .feedback-card {
-            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-            border: 1px solid var(--warning);
-        }
-
-        .rating-select {
-            background: white;
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .welcome-title {
-                font-size: 2rem;
-            }
-
-            .dashboard-header {
-                padding: 2rem 0 1.5rem;
-            }
-
-            .card-body {
-                padding: 1rem;
-            }
-
-            .photo-gallery {
-                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-                gap: 0.5rem;
-            }
-
-            .unit-icon {
-                width: 60px;
-                height: 60px;
-                font-size: 1.5rem;
-            }
-
-            .maintenance-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.5rem;
-            }
-
-            .maintenance-status {
-                margin-left: 0;
-            }
-        }
-
-        @media (max-width: 576px) {
-            .welcome-title {
-                font-size: 1.75rem;
-            }
-
-            .navbar-brand {
-                font-size: 1.5rem;
-            }
-
-            .upload-form {
-                padding: 0.75rem;
-            }
-
-            .maintenance-section {
-                padding: 1rem;
-            }
-        }
-
-        /* Loading States */
-        .loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid transparent;
-            border-top: 2px solid currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Empty States */
-        .empty-state {
-            text-align: center;
-            padding: 3rem 2rem;
-            color: var(--gray);
-        }
-
-        .empty-state i {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .empty-state h5 {
-            color: var(--gray-dark);
-            margin-bottom: 0.5rem;
-        }
-
-        /* Animations */
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>Client Dashboard - ASRT Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- CSS Libraries -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    :root {
+      --primary-color: #3b82f6;
+      --primary-dark: #2563eb;
+      --primary-light: #dbeafe;
+      --secondary-color: #64748b;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --dark-color: #1e293b;
+      --light-gray: #f8fafc;
+      --border-color: #e2e8f0;
+      --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+      --border-radius: 12px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+      color: var(--dark-color);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Navigation */
+    .navbar {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .navbar-brand {
+      font-weight: 700;
+      font-size: 1.5rem;
+      color: var(--primary-color) !important;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .navbar-brand i {
+      font-size: 1.8rem;
+    }
+
+    .nav-link {
+      color: var(--secondary-color) !important;
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 0.75rem 1.25rem !important;
+      border-radius: var(--border-radius);
+      transition: var(--transition);
+      position: relative;
+    }
+
+    .nav-link:hover,
+    .nav-link.active {
+      color: var(--primary-color) !important;
+      background: var(--primary-light);
+      transform: translateY(-1px);
+    }
+
+    .btn-logout {
+      background: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);
+      border: none;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      font-size: 0.9rem;
+      transition: var(--transition);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-logout:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Main Content */
+    .main-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+
+    .page-header {
+      margin-bottom: 2.5rem;
+      text-align: center;
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--dark-color);
+      margin-bottom: 0.5rem;
+    }
+
+    .page-subtitle {
+      color: var(--secondary-color);
+      font-size: 1.1rem;
+    }
+
+    /* Cards */
+    .card {
+      background: white;
+      border: none;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-4px);
+    }
+
+    .card-header-custom {
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+      color: white;
+      padding: 1.25rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+      border: none;
+    }
+
+    .card-body {
+      padding: 1.5rem;
+    }
+
+    /* Unit Cards */
+    .unit-card {
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .unit-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary-color), var(--success-color));
+    }
+
+    .unit-icon {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1rem;
+    }
+
+    .unit-icon i {
+      font-size: 1.5rem;
+      color: var(--primary-color);
+    }
+
+    .unit-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--dark-color);
+      margin-bottom: 0.5rem;
+    }
+
+    .unit-price {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--success-color);
+      margin-bottom: 0.75rem;
+    }
+
+    .unit-type-badge {
+      background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-color) 100%);
+      color: var(--primary-dark);
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-block;
+      margin-bottom: 1rem;
+    }
+
+    .unit-address {
+      color: var(--secondary-color);
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .unit-period {
+      color: var(--secondary-color);
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Photo Section */
+    .photo-section {
+      background: var(--light-gray);
+      border-radius: var(--border-radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .photo-section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--dark-color);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .photo-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .photo-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: var(--transition);
+      cursor: pointer;
+    }
+
+    .photo-item:hover img {
+      transform: scale(1.05);
+    }
+
+    .photo-delete-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      width: 28px;
+      height: 28px;
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      border-radius: 50%;
+      color: var(--danger-color);
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: var(--transition);
+      cursor: pointer;
+    }
+
+    .photo-item:hover .photo-delete-btn {
+      opacity: 1;
+    }
+
+    .photo-upload-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .file-input {
+      border: 2px dashed var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 1rem;
+      text-align: center;
+      transition: var(--transition);
+      cursor: pointer;
+      background: white;
+    }
+
+    .file-input:hover {
+      border-color: var(--primary-color);
+      background: var(--primary-light);
+    }
+
+    .file-input input[type="file"] {
+      width: 100%;
+      padding: 0.5rem;
+      border: none;
+      background: transparent;
+    }
+
+    .upload-btn {
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+      border: none;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      transition: var(--transition);
+      align-self: flex-start;
+    }
+
+    .upload-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Maintenance History */
+    .maintenance-section {
+      background: var(--light-gray);
+      border-radius: var(--border-radius);
+      padding: 1.25rem;
+      border-left: 4px solid var(--primary-color);
+    }
+
+    .maintenance-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--dark-color);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .maintenance-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .maintenance-item {
+      background: white;
+      padding: 0.75rem 1rem;
+      border-radius: var(--border-radius);
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .maintenance-date {
+      font-weight: 500;
+      color: var(--dark-color);
+    }
+
+    .maintenance-status {
+      padding: 0.25rem 0.75rem;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+
+    .no-maintenance {
+      color: var(--secondary-color);
+      font-style: italic;
+      text-align: center;
+      padding: 1rem;
+    }
+
+    /* Feedback Section */
+    .feedback-section {
+      background: linear-gradient(135deg, var(--warning-color) 0%, #f97316 100%);
+      color: white;
+      padding: 1.5rem;
+      border-radius: var(--border-radius);
+      margin-bottom: 2rem;
+    }
+
+    .feedback-card {
+      background: white;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .feedback-header {
+      background: var(--primary-color);
+      color: white;
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+    }
+
+    .feedback-form {
+      padding: 1.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: var(--dark-color);
+    }
+
+    .form-control,
+    .form-select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: 0.95rem;
+      transition: var(--transition);
+      background: white;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px var(--primary-light);
+    }
+
+    .submit-btn {
+      background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+      border: none;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      transition: var(--transition);
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Alerts */
+    .alert {
+      border: none;
+      border-radius: var(--border-radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-weight: 500;
+    }
+
+    .alert-success {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+      color: var(--success-color);
+      border-left: 4px solid var(--success-color);
+    }
+
+    .alert-danger {
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+      color: var(--danger-color);
+      border-left: 4px solid var(--danger-color);
+    }
+
+    .alert-warning {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, rgba(217, 119, 6, 0.1) 100%);
+      color: var(--warning-color);
+      border-left: 4px solid var(--warning-color);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 2rem;
+      color: var(--secondary-color);
+    }
+
+    .empty-state i {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .main-container {
+        padding: 1rem;
+      }
+
+      .page-title {
+        font-size: 2rem;
+      }
+
+      .card-body {
+        padding: 1rem;
+      }
+
+      .photo-section,
+      .maintenance-section {
+        padding: 1rem;
+      }
+
+      .navbar-nav {
+        background: white;
+        padding: 1rem;
+        border-radius: var(--border-radius);
+        margin-top: 1rem;
+        box-shadow: var(--shadow-md);
+      }
+
+      .photo-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 0.5rem;
+      }
+    }
+
+    @media (max-width: 576px) {
+      .page-title {
+        font-size: 1.75rem;
+      }
+
+      .unit-card {
+        margin-bottom: 1rem;
+      }
+
+      .photo-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Loading Animation */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Smooth Scrolling */
+    html {
+      scroll-behavior: smooth;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--light-gray);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--secondary-color);
+    }
+
+    .btn {
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      padding: 0.75rem 1.25rem;
+      transition: var(--transition);
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+      color: white;
+    }
+
+    .btn-success:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-danger {
+      background: var(--danger-color);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+      transform: translateY(-1px);
+    }
+  </style>
 </head>
-
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg">
-        <div class="container">
-            <a class="navbar-brand" href="index.php">
-                <i class="bi bi-house-door-fill"></i>
-                ASRT Home
+  <!-- Navigation -->
+  <nav class="navbar navbar-expand-lg">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand" href="index.php">
+        <i class="bi bi-house-door-fill"></i>
+        ASRT Home
+      </a>
+      
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto align-items-lg-center">
+          <li class="nav-item">
+            <a class="nav-link active" href="index.php">
+              <i class="bi bi-house-door me-2"></i>Home
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item">
-                        <a class="nav-link" href="index.php">
-                            <i class="bi bi-house me-1"></i>Home
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="invoice_history.php">
-                            <i class="bi bi-credit-card me-1"></i>Payment
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="handyman_type.php">
-                            <i class="bi bi-tools me-1"></i>Handyman
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="maintenance.php">
-                            <i class="bi bi-gear me-1"></i>Maintenance
-                        </a>
-                    </li>
-                    <li class="nav-item ms-lg-3">
-                        <form action="logout.php" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-danger">
-                                <i class="bi bi-box-arrow-right me-1"></i>Logout
-                            </button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="invoice_history.php">
+              <i class="bi bi-receipt me-2"></i>Payment
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="handyman_type.php">
+              <i class="bi bi-tools me-2"></i>Handyman
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="maintenance.php">
+              <i class="bi bi-gear me-2"></i>Maintenance
+            </a>
+          </li>
+          <li class="nav-item ms-lg-3">
+            <form action="logout.php" method="post" class="d-inline">
+              <button type="submit" class="btn btn-logout">
+                <i class="bi bi-box-arrow-right me-2"></i>Logout
+              </button>
+            </form>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
 
-    <!-- Dashboard Header -->
-    <div class="dashboard-header">
-        <div class="container">
-            <div class="dashboard-header-content">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h1 class="welcome-title">Welcome back, <?= htmlspecialchars($client_display) ?>!</h1>
-                        <p class="welcome-subtitle">Manage your rental units and stay updated with your property status</p>
-                    </div>
-                    <div class="col-md-4 text-md-end">
-                        <div class="d-flex align-items-center justify-content-md-end">
-                            <i class="bi bi-speedometer2 fs-1 me-3"></i>
-                            <div>
-                                <div class="fw-bold fs-5">Dashboard</div>
-                                <small class="opacity-75">Your Control Center</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+  <!-- Main Content -->
+  <div class="main-container">
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 class="page-title">Welcome back, <?= htmlspecialchars($client_display) ?>!</h1>
+      <p class="page-subtitle">Manage your rental properties and stay updated with your account</p>
     </div>
 
-    <div class="container mb-5">
-        <!-- Alerts -->
-        <?php if ($photo_upload_success): ?>
-            <div class="alert alert-success fade-in">
-                <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($photo_upload_success) ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if ($photo_upload_error): ?>
-            <div class="alert alert-danger fade-in">
-                <i class="bi bi-exclamation-triangle me-2"></i><?= htmlspecialchars($photo_upload_error) ?>
-            </div>
-        <?php endif; ?>
-
-        <!-- Feedback Section -->
-        <?php if ($feedback_prompts): ?>
-            <div class="alert alert-warning fade-in">
-                <i class="bi bi-chat-heart me-2"></i>
-                We value your experience! Please provide feedback for your recently ended rental(s).
-            </div>
-            
-            <?php foreach ($feedback_prompts as $prompt): ?>
-                <div class="card feedback-card mb-3 fade-in">
-                    <div class="card-header">
-                        <i class="bi bi-star me-2"></i>
-                        Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?>
-                        <small class="text-muted ms-2">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)</small>
-                    </div>
-                    <div class="card-body">
-                        <form method="post" action="" onsubmit="return validateFeedback(this);">
-                            <input type="hidden" name="invoice_id" value="<?= (int)$prompt['Invoice_ID'] ?>">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">
-                                        <i class="bi bi-star-fill me-1"></i>Rating
-                                    </label>
-                                    <select name="rating" class="form-select rating-select" required>
-                                        <option value="">Select Rating</option>
-                                        <option value="5">★★★★★ Excellent (5)</option>
-                                        <option value="4">★★★★☆ Very Good (4)</option>
-                                        <option value="3">★★★☆☆ Good (3)</option>
-                                        <option value="2">★★☆☆☆ Fair (2)</option>
-                                        <option value="1">★☆☆☆☆ Poor (1)</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">
-                                        <i class="bi bi-chat-text me-1"></i>Comments
-                                    </label>
-                                    <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
-                                </div>
-                            </div>
-                            <button class="btn btn-primary" type="submit" name="submit_feedback">
-                                <i class="bi bi-send me-1"></i>Submit Feedback
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-            
-            <?php if (!empty($feedback_success)): ?>
-                <div class="alert alert-success fade-in">
-                    <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($feedback_success) ?>
-                </div>
-            <?php endif; ?>
-        <?php endif; ?>
-
-        <!-- Rented Units Section -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold mb-0">
-                <i class="bi bi-buildings me-2"></i>Your Rental Portfolio
-            </h2>
-            <div class="badge bg-primary fs-6">
-                <?= count($rented_units) ?> Active Unit<?= count($rented_units) !== 1 ? 's' : '' ?>
-            </div>
-        </div>
-
-        <?php if ($rented_units): ?>
-            <div class="row g-4">
-                <?php foreach ($rented_units as $rent): 
-                    $photos = $unit_photos[$rent['Space_ID']] ?? [];
-                    // Use rental period from the rent data directly
-                    $rental_start = $rent['StartDate'];
-                    $rental_end = $rent['EndDate'];
-                    $due_date = $rental_end;
-                ?>
-                    <div class="col-12 col-lg-6 col-xl-4">
-                        <div class="card unit-card fade-in h-100">
-                            <div class="card-body d-flex flex-column">
-                                <!-- Unit Icon -->
-                                <div class="unit-icon">
-                                    <i class="bi bi-house-door"></i>
-                                </div>
-
-                                <!-- Unit Info -->
-                                <div class="text-center mb-3">
-                                    <h5 class="unit-title"><?= htmlspecialchars($rent['Name']) ?></h5>
-                                    <div class="unit-price">₱<?= number_format($rent['Price'], 0) ?>/month</div>
-                                    <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
-                                </div>
-
-                                <!-- Location & Dates -->
-                                <div class="mb-3">
-                                    <div class="unit-details">
-                                        <i class="bi bi-geo-alt me-1"></i>
-                                        <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?>
-                                    </div>
-                                    <div class="unit-details">
-                                        <i class="bi bi-calendar-range me-1"></i>
-                                        <strong>Period:</strong> <?= htmlspecialchars($rental_start) ?> to <?= htmlspecialchars($rental_end) ?>
-                                    </div>
-                                    <div class="unit-details">
-                                        <i class="bi bi-calendar-check me-1"></i>
-                                        <strong>Due:</strong> <?= htmlspecialchars($due_date) ?>
-                                    </div>
-                                </div>
-
-                                <!-- Photo Gallery -->
-                                <div class="flex-grow-1">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="mb-0">
-                                            <i class="bi bi-images me-1"></i>Unit Photos
-                                        </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/5</small>
-                                    </div>
-
-                                    <?php if ($photos): ?>
-                                        <div class="photo-gallery">
-                                            <?php foreach ($photos as $photo): ?>
-                                                <div class="photo-item">
-                                                    <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" 
-                                                         alt="Unit Photo"
-                                                         onclick="showImageModal('uploads/unit_photos/<?= htmlspecialchars($photo) ?>')">
-                                                    <form method="post" class="d-inline" onsubmit="return confirmPhotoDelete(event);">
-                                                        <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
-                                                        <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
-                                                        <button type="submit" 
-                                                                name="delete_unit_photo" 
-                                                                class="delete-photo-btn"
-                                                                title="Delete photo">
-                                                            <i class="bi bi-x"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="no-photos">
-                                            <i class="bi bi-camera mb-2 d-block fs-3"></i>
-                                            No photos uploaded yet
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <!-- Upload Form -->
-                                    <?php if (count($photos) < 5): ?>
-                                        <div class="upload-form">
-                                            <form method="post" enctype="multipart/form-data" onsubmit="return validatePhotoUpload(this);">
-                                                <input type="hidden" name="space_id" value="<?= (int)$rent['Space_ID'] ?>">
-                                                <div class="mb-2">
-                                                    <input type="file" 
-                                                           name="unit_photo" 
-                                                           accept="image/jpeg,image/jpg,image/png,image/gif" 
-                                                           class="form-control" 
-                                                           required>
-                                                </div>
-                                                <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100">
-                                                    <i class="bi bi-cloud-upload me-1"></i>Upload Photo
-                                                </button>
-                                            </form>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <!-- Maintenance History -->
-                                <div class="maintenance-section mt-auto">
-                                    <div class="maintenance-header">
-                                        <i class="bi bi-tools"></i>
-                                        <h6>Maintenance History</h6>
-                                    </div>
-                                    
-                                    <?php if (isset($maintenance_history[$rent['Space_ID']])): ?>
-                                        <ul class="maintenance-list">
-                                            <?php foreach (array_slice($maintenance_history[$rent['Space_ID']], 0, 3) as $mh): ?>
-                                                <li class="maintenance-item">
-                                                    <div>
-                                                        <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate']) ?></div>
-                                                        <small class="text-muted">Maintenance Request</small>
-                                                    </div>
-                                                    <span class="maintenance-status <?= strtolower(str_replace([' ', '-'], ['', ''], $mh['Status'])) ?>">
-                                                        <?= htmlspecialchars($mh['Status']) ?>
-                                                    </span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                        <?php if (count($maintenance_history[$rent['Space_ID']]) > 3): ?>
-                                            <small class="text-muted">
-                                                <i class="bi bi-three-dots me-1"></i>
-                                                +<?= count($maintenance_history[$rent['Space_ID']]) - 3 ?> more records
-                                            </small>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <div class="no-maintenance">
-                                            <i class="bi bi-check-circle text-success me-1"></i>
-                                            No maintenance requests yet
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php else: ?>
-            <div class="empty-state">
-                <i class="bi bi-house-x"></i>
-                <h5>No Active Rentals</h5>
-                <p class="text-muted">You currently have no active rental units. Contact our team to explore available properties.</p>
-                <a href="contact.php" class="btn btn-primary">
-                    <i class="bi bi-envelope me-1"></i>Contact Us
-                </a>
-            </div>
-        <?php endif; ?>
-
-        <!-- Quick Actions -->
-        <div class="row mt-5">
-            <div class="col-md-4 mb-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <div class="text-primary mb-3">
-                            <i class="bi bi-credit-card-2-back fs-1"></i>
-                        </div>
-                        <h5>Payment Center</h5>
-                        <p class="text-muted">View invoices and payment history</p>
-                        <a href="invoice_history.php" class="btn btn-primary">
-                            <i class="bi bi-arrow-right me-1"></i>Go to Payment
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <div class="text-success mb-3">
-                            <i class="bi bi-tools fs-1"></i>
-                        </div>
-                        <h5>Handyman Services</h5>
-                        <p class="text-muted">Request maintenance and repairs</p>
-                        <a href="handyman_type.php" class="btn btn-success">
-                            <i class="bi bi-arrow-right me-1"></i>Request Service
-                        </a>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4 mb-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <div class="text-warning mb-3">
-                            <i class="bi bi-gear fs-1"></i>
-                        </div>
-                        <h5>Maintenance</h5>
-                        <p class="text-muted">Track your maintenance requests</p>
-                        <a href="maintenance.php" class="btn btn-warning text-white">
-                            <i class="bi bi-arrow-right me-1"></i>View Status
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Image Modal -->
-    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg">
-            <div class="modal-content" style="border-radius: var(--border-radius); border: none; box-shadow: var(--shadow-xl);">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="imageModalLabel">
-                        <i class="bi bi-image me-2"></i>Unit Photo
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body text-center p-0">
-                    <img id="modalImage" src="" alt="Unit photo" class="img-fluid" style="max-height: 70vh;">
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
-
-    <script>
-        // Image modal functionality
-        function showImageModal(imageSrc) {
-            const modalImage = document.getElementById('modalImage');
-            modalImage.src = imageSrc;
-            const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
-            imageModal.show();
-        }
-
-        // Photo upload validation
-        function validatePhotoUpload(form) {
-            const fileInput = form.querySelector('input[type="file"]');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No File Selected',
-                    text: 'Please select a photo to upload.',
-                    confirmButtonColor: '#2563eb'
-                });
-                return false;
-            }
-
-            // Check file size (2MB = 2 * 1024 * 1024 bytes)
-            if (file.size > 2 * 1024 * 1024) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'File Too Large',
-                    text: 'Please select an image smaller than 2MB.',
-                    confirmButtonColor: '#2563eb'
-                });
-                return false;
-            }
-
-            // Check file type
-            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(file.type)) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Invalid File Type',
-                    text: 'Please select a JPEG, PNG, or GIF image.',
-                    confirmButtonColor: '#2563eb'
-                });
-                return false;
-            }
-
-            // Show loading
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.innerHTML = '<span class="spinner me-1"></span>Uploading...';
-            submitBtn.disabled = true;
-
-            return true;
-        }
-
-        // Photo deletion confirmation
-        function confirmPhotoDelete(event) {
-            event.preventDefault();
-            
-            Swal.fire({
-                title: 'Delete Photo?',
-                text: 'This action cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Yes, delete it!',
-                cancelButtonText: 'Cancel'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Show loading
-                    const btn = event.target.closest('button');
-                    btn.innerHTML = '<span class="spinner"></span>';
-                    btn.disabled = true;
-                    
-                    // Submit the form
-                    event.target.closest('form').submit();
-                }
-            });
-            
-            return false;
-        }
-
-        // Feedback validation
-        function validateFeedback(form) {
-            const rating = form.querySelector('select[name="rating"]').value;
-            if (!rating) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Rating Required',
-                    text: 'Please select a rating before submitting.',
-                    confirmButtonColor: '#2563eb'
-                });
-                return false;
-            }
-            
-            // Show loading
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.innerHTML = '<span class="spinner me-1"></span>Submitting...';
-            submitBtn.disabled = true;
-            
-            return true;
-        }
-
-        // Close navbar on mobile when clicking nav links
-        document.addEventListener('DOMContentLoaded', function() {
-            const navbarCollapse = document.getElementById('navbarNav');
-            if (navbarCollapse) {
-                navbarCollapse.addEventListener('click', function(e) {
-                    let target = e.target;
-                    while (target && target !== navbarCollapse) {
-                        if (target.classList && (target.classList.contains('nav-link') || target.type === 'submit')) {
-                            if (window.innerWidth < 992) {
-                                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
-                                bsCollapse.hide();
-                            }
-                            break;
-                        }
-                        target = target.parentElement;
-                    }
-                });
-            }
-
-            // Animate cards on scroll
-            const observerOptions = {
-                threshold: 0.1,
-                rootMargin: '0px 0px -50px 0px'
-            };
-
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('fade-in');
-                    }
-                });
-            }, observerOptions);
-
-            document.querySelectorAll('.card').forEach((card) => {
-                observer.observe(card);
-            });
-        });
-    </script>
-
-    <?php if ($show_login_success): ?>
-    <script>
-        Swal.fire({
-            icon: 'success',
-            title: 'Welcome Back!',
-            text: 'Login successful. Good to see you again!',
-            confirmButtonColor: '#2563eb',
-            timer: 3000,
-            timerProgressBar: true
-        });
-    </script>
+    <!-- Alerts -->
+    <?php if ($photo_upload_success): ?>
+      <div class="alert alert-success">
+        <i class="bi bi-check-circle me-2"></i>
+        <?= htmlspecialchars($photo_upload_success) ?>
+      </div>
     <?php endif; ?>
-</body>
-</html>
+
+    <?php if ($photo_upload_error): ?>
+      <div class="alert alert-danger">
+        <i class="bi bi-exclamation-circle me-2"></i>
+        <?= htmlspecialchars($photo_upload_error) ?>
+      </div>
+    <?php endif; ?>
+
+    <!-- Feedback Section -->
+    <?php if ($feedback_prompts): ?>
+      <div class="alert alert-warning">
+        <i class="fa-solid fa-comment-dots"></i> We value your experience! Please provide feedback for your recently ended rental(s):
+      </div>
+      <?php foreach ($feedback_prompts as $prompt): ?>
+        <div class="card mb-3">
+          <div class="card-header">
+            Feedback for <?= htmlspecialchars($prompt['SpaceName']) ?> (Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate']) ?>)
+          </div>
+          <div class="card-body">
+            <form method="post" action="">
+              <input type="hidden" name="invoice_id" value="<?= $prompt['Invoice_ID'] ?>">
+              <div class="mb-2">
+                <label class="form-label">Rating</label>
+                <select name="rating" class="form-select" required>
+                  <option value="">Select</option>
+                  <?php for ($i = 5; $i >= 1; $i--): ?>
+                    <option value="<?= $i ?>"><?= $i ?></option>
+                  <?php endfor; ?>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-label">Comments</label>
+                <textarea name="comments" class="form-control"></textarea>
+              </div>
+              <button class="btn btn-primary" type="submit" name="submit_feedback">Submit Feedback</button>
+            </form>
+          </div>
+        </div>
+      <?php endforeach; ?>
+      <?php if (!empty($feedback_success)): ?>
+        <div class="alert alert-success"><?= htmlspecialchars($feedback_success) ?></div>
+      <?php endif; ?>
+    <?php endif; ?>
+
+    <!-- Rented Units Section -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <h2 class="h3 mb-0 fw-bold">
+        <i class="bi bi-buildings me-2 text-primary"></i>
+        Your Rented Properties
