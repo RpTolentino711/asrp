@@ -674,7 +674,7 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-      <div class="row g-4">
+<div id="available-units-list" class="row g-4">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -1282,7 +1282,43 @@ if (isset($_SESSION['login_error'])) {
         this.style.transform = 'translateY(0)';
       });
     });
-  </script>
+
+let latestUnitId = 0;
+// On initial page load, set latestUnitId to the highest data-unit-id on the page.
+document.addEventListener("DOMContentLoaded", function() {
+    const ids = Array.from(document.querySelectorAll('#available-units-list [data-unit-id]'))
+        .map(el => parseInt(el.getAttribute('data-unit-id')))
+        .filter(id => !isNaN(id));
+    if (ids.length) latestUnitId = Math.max(...ids);
+});
+
+function fetchNewUnits() {
+    fetch('AJAX/get_new_units.php?after_id=' + latestUnitId)
+      .then(res => res.text())
+      .then(html => {
+        if (html.trim()) {
+          const container = document.getElementById('available-units-list');
+          container.insertAdjacentHTML('afterbegin', html);
+
+          // Update latestUnitId
+          const unitIds = Array.from(container.querySelectorAll('.animate-on-scroll[data-unit-id]'))
+              .map(div => parseInt(div.getAttribute('data-unit-id')))
+              .filter(id => !isNaN(id));
+          if (unitIds.length) latestUnitId = Math.max(...unitIds, latestUnitId);
+
+          // Re-apply observer/animation if needed
+          if (window.observer) {
+              document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+                  observer.observe(el);
+              });
+          }
+        }
+      });
+}
+
+setInterval(fetchNewUnits, 10000); // Poll every 10 seconds
+
+  </scr>
 </body>
 </html>
 
