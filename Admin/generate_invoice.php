@@ -696,7 +696,7 @@ async function loadAdminChatMessages() {
     const invoiceId = <?= json_encode($chat_invoice_id) ?>;
     if (!invoiceId) return;
     try {
-        const response = await fetch('AJAX/admin_invoice_chat_messages.php?invoice_id=' + invoiceId);
+        const response = await fetch('../AJAX/admin_invoice_chat_messages.php?invoice_id=' + invoiceId);
         const data = await response.json();
         chatMessages.innerHTML = '';
         if (data.error) {
