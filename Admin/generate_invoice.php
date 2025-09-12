@@ -689,7 +689,9 @@ function renderCountdown($due_date) {
                     <!-- Chat messages will be loaded here by JavaScript -->
                 </div>
 <script>
-// Live admin chat message loader
+// Live admin chat message loader with client typing bubble
+let clientTyping = false;
+
 async function loadAdminChatMessages() {
     const chatMessages = document.getElementById('adminChatMessages');
     if (!chatMessages) return;
@@ -724,14 +726,40 @@ async function loadAdminChatMessages() {
             html += `</div>`;
             chatMessages.innerHTML += html;
         });
+        // Add typing bubble if client is typing
+        if (clientTyping) {
+            let typingHtml = `<div class='chat-message client'>` +
+                `<div class='message-sender'>Client</div>` +
+                `<div class='message-text' style='opacity:0.7;'><span class='me-2'><i class='bi bi-three-dots'></i></span>Client is typing...</div>` +
+                `<div class='message-time'></div></div>`;
+            chatMessages.innerHTML += typingHtml;
+        }
         // Optional: auto-scroll to bottom
         chatMessages.scrollTop = chatMessages.scrollHeight;
     } catch (err) {
         chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
     }
 }
+
+// Poll client typing status
+async function pollClientTyping() {
+    const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+    if (!invoiceId) return;
+    try {
+        const response = await fetch('../AJAX/invoice_client_typing.php?invoice_id=' + invoiceId);
+        const data = await response.json();
+        clientTyping = !!data.typing;
+    } catch (e) {
+        clientTyping = false;
+    }
+}
+
 loadAdminChatMessages();
-setInterval(loadAdminChatMessages, 5000); // Refresh every 5 seconds
+pollClientTyping();
+setInterval(() => {
+    pollClientTyping();
+    loadAdminChatMessages();
+}, 5000); // Refresh every 5 seconds
 </script>
                 
                 <form method="post" enctype="multipart/form-data" class="chat-form">

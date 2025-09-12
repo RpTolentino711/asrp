@@ -932,7 +932,7 @@ setInterval(() => {
                     <form method="post" enctype="multipart/form-data" class="message-form">
                         <textarea 
                             name="message_text" 
-                            class="message-textarea" 
+                            class="message-textarea client-chat-textarea" 
                             placeholder="Type your message about this invoice..."
                             rows="3"></textarea>
                         <input 
@@ -1116,6 +1116,40 @@ setInterval(() => {
                 }, 3000);
             }
         });
+    </script>
+    <script>
+    // Client typing indicator AJAX
+    document.addEventListener('DOMContentLoaded', function() {
+        const textarea = document.querySelector('.client-chat-textarea');
+        const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+        let typing = false;
+        let typingTimeout = null;
+        if (textarea && invoiceId) {
+            textarea.addEventListener('input', function() {
+                if (!typing) {
+                    typing = true;
+                    sendTypingStatus(1);
+                }
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    typing = false;
+                    sendTypingStatus(0);
+                }, 3000); // 3 seconds after last input
+            });
+            // On blur, clear typing
+            textarea.addEventListener('blur', function() {
+                typing = false;
+                sendTypingStatus(0);
+            });
+        }
+        function sendTypingStatus(isTyping) {
+            fetch('AJAX/invoice_client_typing.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
+            });
+        }
+    });
     </script>
 </body>
 </html>
