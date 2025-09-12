@@ -829,54 +829,54 @@ $show_kicked_message_in_chat = $is_kicked;
         <div class="chat-container animate-on-scroll">
             <!-- Chat Messages -->
             <div class="chat-messages" id="chatMessages">
-                <?php if (empty($chat_messages)): ?>
-                    <div class="text-center text-muted py-4">
-                        <i class="bi bi-chat-dots fs-1 mb-3 d-block"></i>
-                        <h5>No messages yet</h5>
-                        <p>Start a conversation about your invoice or payment inquiry.</p>
-                    </div>
-                <?php else: ?>
-                    <?php foreach ($chat_messages as $msg): 
-                        $is_client = $msg['Sender_Type'] === 'client';
-                        $is_admin = $msg['Sender_Type'] === 'admin';
-                        $is_system = $msg['Sender_Type'] === 'system';
-                    ?>
-                        <div class="chat-message <?= $is_client ? 'client' : ($is_admin ? 'admin' : 'system') ?>">
-                            <div class="message-bubble <?= $is_client ? 'client' : ($is_admin ? 'admin' : 'system') ?>">
-                                <?= nl2br(htmlspecialchars($msg['Message'])) ?>
-                                <?php if (!empty($msg['Image_Path'])): ?>
-                                    <img src="<?= htmlspecialchars($msg['Image_Path']) ?>" 
-                                         class="message-image" 
-                                         alt="Chat attachment"
-                                         onclick="showImageModal('<?= htmlspecialchars($msg['Image_Path']) ?>')">
-                                <?php endif; ?>
-                            </div>
-                            <?php if (!$is_system): ?>
-                                <div class="message-meta">
-                                    <strong><?= htmlspecialchars($msg['SenderName'] ?? '') ?></strong>
-                                    <span class="text-muted ms-2"><?= htmlspecialchars($msg['Created_At'] ?? '') ?></span>
-                                </div>
-                            <?php else: ?>
-                                <div class="message-meta text-center">
-                                    <span class="text-muted"><?= htmlspecialchars($msg['Created_At'] ?? '') ?></span>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-
-                <?php if ($show_kicked_message_in_chat): ?>
-                    <div class="chat-message system">
-                        <div class="message-bubble system">
-                            <i class="bi bi-lock me-2"></i>
-                            This conversation is locked. Please rent a unit or contact the owner/admin for further assistance.
-                        </div>
-                        <div class="message-meta text-center">
-                            <span class="text-muted"><?= date('Y-m-d H:i:s') ?></span>
-                        </div>
-                    </div>
-                <?php endif; ?>
+                <!-- Chat messages will be loaded here by JavaScript -->
             </div>
+<script>
+// Live chat message loader
+async function loadChatMessages() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+    if (!invoiceId) return;
+    try {
+        const response = await fetch('ajax/invoice_chat_messages.php?invoice_id=' + invoiceId);
+        const data = await response.json();
+        chatMessages.innerHTML = '';
+        if (data.error) {
+            chatMessages.innerHTML = `<div class='text-center text-danger py-4'>${data.error}</div>`;
+            return;
+        }
+        if (data.length === 0) {
+            chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='bi bi-chat-dots fs-1 mb-3 d-block'></i><h5>No messages yet</h5><p>Start a conversation about your invoice or payment inquiry.</p></div>`;
+            return;
+        }
+        data.forEach(msg => {
+            const is_client = msg.Sender_Type === 'client';
+            const is_admin = msg.Sender_Type === 'admin';
+            const is_system = msg.Sender_Type === 'system';
+            let bubbleClass = is_client ? 'client' : (is_admin ? 'admin' : 'system');
+            let html = `<div class='chat-message ${bubbleClass}'>`;
+            html += `<div class='message-bubble ${bubbleClass}'>${msg.Message.replace(/\n/g, '<br>')}`;
+            if (msg.Image_Path) {
+                html += `<img src='${msg.Image_Path}' class='message-image' alt='Chat attachment' onclick='showImageModal("${msg.Image_Path}")'>`;
+            }
+            html += `</div>`;
+            if (!is_system) {
+                html += `<div class='message-meta'><strong>${msg.SenderName || ''}</strong> <span class='text-muted ms-2'>${msg.Created_At || ''}</span></div>`;
+            } else {
+                html += `<div class='message-meta text-center'><span class='text-muted'>${msg.Created_At || ''}</span></div>`;
+            }
+            html += `</div>`;
+            chatMessages.innerHTML += html;
+        });
+        scrollToBottom();
+    } catch (err) {
+        chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
+    }
+}
+loadChatMessages();
+setInterval(loadChatMessages, 5000); // Refresh every 5 seconds
+</script>
 
             <!-- Status Alerts -->
             <?php if ($is_kicked): ?>
