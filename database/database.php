@@ -62,7 +62,7 @@ public function executeStatement($sql, $params = []) {
 
    
 
-        public function getUnitPhotosForClient($client_id, $active_only = true) {
+     public function getUnitPhotosForClient($client_id, $active_only = true) {
         if (empty($client_id)) {
             return [];
         }
