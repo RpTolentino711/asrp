@@ -674,7 +674,7 @@ if (isset($_SESSION['login_error'])) {
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
 
-<div id="available-units-list" class="row g-4">
+      <div class="row g-4">
         <?php
         if (!empty($available_units)) {
             $modal_counter = 0;
@@ -1283,29 +1283,6 @@ if (isset($_SESSION['login_error'])) {
       });
     });
   </script>
-
-  <script>
-function loadAvailableUnitsAuto() {
-    fetch('AJAX/get_available_units.php')
-        .then(res => res.text())
-        .then(html => {
-            const container = document.getElementById('available-units-list');
-            // Only update if changed, to avoid flicker
-            if (container.innerHTML !== html) {
-                container.innerHTML = html;
-                // Re-apply scroll animation observer if you use one
-                if (window.observer) {
-                    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
-                        observer.observe(el);
-                    });
-                }
-            }
-        });
-}
-
-// Initial load (optional, since server already rendered)
-setInterval(loadAvailableUnitsAuto, 10000); // every 10 seconds
-</script>
 </body>
 </html>
 
