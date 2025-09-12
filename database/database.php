@@ -60,75 +60,87 @@ public function executeStatement($sql, $params = []) {
         return (bool)$result;
     }
 
-    // Get all photos for a client from clientspace_photos
     public function getUnitPhotosForClient($client_id) {
-        $sql = "SELECT CS_ID, Space_ID FROM clientspace WHERE Client_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$client_id]);
-        $spaces = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $photos = [];
-        foreach ($spaces as $space) {
-            $cs_id = $space['CS_ID'];
-            $space_id = $space['Space_ID'];
-            $sql2 = "SELECT photo_path FROM clientspace_photos WHERE CS_ID = ? AND Client_ID = ? ORDER BY uploaded_at ASC";
-            $stmt2 = $this->pdo->prepare($sql2);
-            $stmt2->execute([$cs_id, $client_id]);
-            $photos[$space_id] = array_column($stmt2->fetchAll(PDO::FETCH_ASSOC), 'photo_path');
-        }
-        return $photos;
+    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+            FROM clientspace 
+            WHERE Client_ID = ?";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$client_id]);
+    $photos = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $photos[$row['Space_ID']] = array_values(array_filter([
+            $row['BusinessPhoto1'],
+            $row['BusinessPhoto2'],
+            $row['BusinessPhoto3'],
+            $row['BusinessPhoto4'],
+            $row['BusinessPhoto5'],
+        ]));
     }
+    return $photos;
+}
 
-    // Get all photos for a list of units from clientspace_photos
-    public function getAllUnitPhotosForUnits($unit_ids) {
-        if (empty($unit_ids)) return [];
-        $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-        $sql = "SELECT CS_ID, Space_ID FROM clientspace WHERE Space_ID IN ($placeholders)";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($unit_ids);
-        $spaces = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $photos = [];
-        foreach ($spaces as $space) {
-            $cs_id = $space['CS_ID'];
-            $space_id = $space['Space_ID'];
-            $sql2 = "SELECT photo_path FROM clientspace_photos WHERE CS_ID = ? ORDER BY uploaded_at ASC";
-            $stmt2 = $this->pdo->prepare($sql2);
-            $stmt2->execute([$cs_id]);
-            $photos[$space_id] = array_column($stmt2->fetchAll(PDO::FETCH_ASSOC), 'photo_path');
-        }
-        return $photos;
+public function getAllUnitPhotosForUnits($unit_ids) {
+    if (empty($unit_ids)) return [];
+    // Prepare placeholders for array of unit IDs
+    $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
+    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+            FROM clientspace 
+            WHERE Space_ID IN ($placeholders)";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute($unit_ids);
+    $photos = [];
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $photos[$row['Space_ID']] = array_values(array_filter([
+            $row['BusinessPhoto1'],
+            $row['BusinessPhoto2'],
+            $row['BusinessPhoto3'],
+            $row['BusinessPhoto4'],
+            $row['BusinessPhoto5'],
+        ]));
     }
+    return $photos;
+}
 
-    // Add a photo to clientspace_photos
-    public function addUnitPhoto($space_id, $client_id, $filename) {
-        // Get CS_ID for this space/client
-        $sql = "SELECT CS_ID FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+public function addUnitPhoto($space_id, $client_id, $filename) {
+    try {
+        $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$space_id, $client_id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$row) return false;
-        $cs_id = $row['CS_ID'];
-        // Enforce 6-photo limit
-        $sql2 = "SELECT COUNT(*) as cnt FROM clientspace_photos WHERE CS_ID = ? AND Client_ID = ?";
-        $stmt2 = $this->pdo->prepare($sql2);
-        $stmt2->execute([$cs_id, $client_id]);
-        $count = $stmt2->fetch(PDO::FETCH_ASSOC)['cnt'];
-        if ($count >= 6) return false;
-        // Insert photo
-        $sql3 = "INSERT INTO clientspace_photos (CS_ID, Client_ID, photo_path, uploaded_at) VALUES (?, ?, ?, NOW())";
-        return $this->executeStatement($sql3, [$cs_id, $client_id, $filename]);
+        for ($i = 1; $i <= 5; $i++) {
+            if (empty($row["BusinessPhoto$i"])) {
+                $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
+                $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
+                if (!$result) {
+                    error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
+                }
+                return $result;
+            }
+        }
+        return false;
+    } catch (PDOException $e) {
+        error_log("addUnitPhoto PDOException: " . $e->getMessage());
+        return false;
     }
+}
 
-    // Delete a photo from clientspace_photos
-    public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
-        $sql = "SELECT CS_ID FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$space_id, $client_id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) return false;
-        $cs_id = $row['CS_ID'];
-        $sql2 = "DELETE FROM clientspace_photos WHERE CS_ID = ? AND Client_ID = ? AND photo_path = ?";
-        return $this->executeStatement($sql2, [$cs_id, $client_id, $photo_filename]);
+public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
+    $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+            FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$space_id, $client_id]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) return false;
+    for ($i = 1; $i <= 5; $i++) {
+        if ($row["BusinessPhoto$i"] === $photo_filename) {
+            $update = "UPDATE clientspace SET BusinessPhoto$i = NULL WHERE Space_ID = ? AND Client_ID = ?";
+            return $this->executeStatement($update, [$space_id, $client_id]);
+        }
     }
+    return false;
+}
 
 
 
