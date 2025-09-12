@@ -101,60 +101,56 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID.";
     } else {
-        // Fetch current photos to enforce limit
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
-        $current_photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
-        
-        if (count($current_photos) >= 5) {
-            $photo_upload_error = "You can upload up to 5 photos only.";
-        } elseif ($file['error'] === UPLOAD_ERR_OK) {
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-            $max_size = 2 * 1024 * 1024; // 2MB
-            
-            // Get actual file type using finfo
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $actual_type = $finfo->file($file['tmp_name']);
-            
-            if (in_array($actual_type, $allowed_types) && $file['size'] <= $max_size) {
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
-                
-                if (in_array($ext, $allowed_extensions)) {
-                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                    if (!is_dir($upload_dir)) {
-                        mkdir($upload_dir, 0755, true);
-                    }
-                    
-                    $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
-                    $filepath = $upload_dir . $filename;
-                    
-                    if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                        if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
-                            $photo_upload_success = "Photo uploaded for this unit!";
+        // Fetch CS_ID for this space/client
+        $cs_id = $db->getClientspaceId($space_id, $client_id); // You may need to implement this helper if not present
+        if (!$cs_id) {
+            $photo_upload_error = "Could not find clientspace record.";
+        } else {
+            // Count current photos for this CS_ID/Client_ID
+            $photo_count = $db->countClientspacePhotos($cs_id, $client_id);
+            if ($photo_count >= 6) {
+                $photo_upload_error = "You can upload up to 6 photos only.";
+            } elseif ($file['error'] === UPLOAD_ERR_OK) {
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+                $max_size = 2 * 1024 * 1024; // 2MB
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $actual_type = $finfo->file($file['tmp_name']);
+                if (in_array($actual_type, $allowed_types) && $file['size'] <= $max_size) {
+                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+                    if (in_array($ext, $allowed_extensions)) {
+                        $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                        if (!is_dir($upload_dir)) {
+                            mkdir($upload_dir, 0755, true);
+                        }
+                        $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
+                        $filepath = $upload_dir . $filename;
+                        if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                            if ($db->addClientspacePhoto($cs_id, $client_id, $filename)) {
+                                $photo_upload_success = "Photo uploaded for this unit!";
+                            } else {
+                                unlink($filepath);
+                                $photo_upload_error = "Database error occurred.";
+                            }
                         } else {
-                            // Delete uploaded file if database insert failed
-                            unlink($filepath);
-                            $photo_upload_error = "Database error occurred.";
+                            $photo_upload_error = "Failed to move uploaded file.";
                         }
                     } else {
-                        $photo_upload_error = "Failed to move uploaded file.";
+                        $photo_upload_error = "Invalid file extension.";
                     }
                 } else {
-                    $photo_upload_error = "Invalid file extension.";
+                    if ($file['size'] > $max_size) {
+                        $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+                    } else {
+                        $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF allowed.";
+                    }
                 }
             } else {
-                if ($file['size'] > $max_size) {
-                    $photo_upload_error = "File size too large. Maximum 2MB allowed.";
-                } else {
-                    $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF allowed.";
-                }
-            }
-        } else {
-            switch($file['error']) {
-                case UPLOAD_ERR_INI_SIZE:
-                case UPLOAD_ERR_FORM_SIZE:
-                    $photo_upload_error = "File size too large.";
-                    break;
+                switch($file['error']) {
+                    case UPLOAD_ERR_INI_SIZE:
+                    case UPLOAD_ERR_FORM_SIZE:
+                        $photo_upload_error = "File size too large.";
+                        break;
                 case UPLOAD_ERR_PARTIAL:
                     $photo_upload_error = "File upload was interrupted.";
                     break;
@@ -171,15 +167,14 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
 if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
-    
     // Validate space_id belongs to client
     $rented_units = $db->getRentedUnits($client_id);
     $valid_space_ids = array_column($rented_units, 'Space_ID');
-    
     if (in_array($space_id, $valid_space_ids) && !empty($photo_filename)) {
-        // Validate filename to prevent directory traversal
-        if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
-            if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
+        // Fetch CS_ID for this space/client
+        $cs_id = $db->getClientspaceId($space_id, $client_id); // You may need to implement this helper if not present
+        if ($cs_id && preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+            if ($db->deleteClientspacePhoto($cs_id, $client_id, $photo_filename)) {
                 $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
                 if (file_exists($file_to_delete)) {
                     unlink($file_to_delete);
@@ -189,7 +184,7 @@ if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_P
                 $photo_upload_error = "Failed to delete photo from database.";
             }
         } else {
-            $photo_upload_error = "Invalid photo filename.";
+            $photo_upload_error = "Invalid photo filename or clientspace.";
         }
     } else {
         $photo_upload_error = "Invalid request.";
@@ -225,9 +220,17 @@ try {
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
-        
-        // Ensure arrays are returned
+        // Fetch photos for each rented unit from clientspace_photos
+        $unit_photos = [];
+        foreach ($rented_units as $unit) {
+            $space_id = $unit['Space_ID'];
+            $cs_id = $db->getClientspaceId($space_id, $client_id);
+            if ($cs_id) {
+                $unit_photos[$space_id] = $db->getClientspacePhotos($cs_id, $client_id);
+            } else {
+                $unit_photos[$space_id] = [];
+            }
+        }
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }

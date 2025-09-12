@@ -1,4 +1,4 @@
- 
+
 <?php
 
 class Database {
@@ -1449,6 +1449,42 @@ public function getAdminMonthChartData($startDate, $endDate) {
     }
 
 }
+
+    // --- New methods for clientspace_photos table ---
+    // Get CS_ID for a given space and client
+    public function getClientspaceId($space_id, $client_id) {
+        $sql = "SELECT CS_ID FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+        $row = $this->getRow($sql, [$space_id, $client_id]);
+        return $row ? $row['CS_ID'] : false;
+    }
+
+    // Count photos for a clientspace/client
+    public function countClientspacePhotos($cs_id, $client_id) {
+        $sql = "SELECT COUNT(*) as cnt FROM clientspace_photos WHERE CS_ID = ? AND Client_ID = ?";
+        $row = $this->getRow($sql, [$cs_id, $client_id]);
+        return $row ? intval($row['cnt']) : 0;
+    }
+
+    // Add a photo record
+    public function addClientspacePhoto($cs_id, $client_id, $filename) {
+        $sql = "INSERT INTO clientspace_photos (CS_ID, Client_ID, photo_path) VALUES (?, ?, ?)";
+        return $this->executeStatement($sql, [$cs_id, $client_id, $filename]);
+    }
+
+    // Delete a photo record
+    public function deleteClientspacePhoto($cs_id, $client_id, $photo_filename) {
+        $sql = "DELETE FROM clientspace_photos WHERE CS_ID = ? AND Client_ID = ? AND photo_path = ?";
+        return $this->executeStatement($sql, [$cs_id, $client_id, $photo_filename]);
+    }
+
+    // Get all photos for a clientspace/client (for display)
+    public function getClientspacePhotos($cs_id, $client_id) {
+        $sql = "SELECT photo_path FROM clientspace_photos WHERE CS_ID = ? AND Client_ID = ? ORDER BY uploaded_at ASC";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$cs_id, $client_id]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
+    }
+ 
 
    
 
