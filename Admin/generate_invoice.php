@@ -685,28 +685,54 @@ function renderCountdown($due_date) {
                     </div>
                 </div>
                 
-                <div class="chat-messages">
-                    <?php foreach ($chat_messages as $msg):
-                        $is_admin = $msg['Sender_Type'] === 'admin';
-                        $is_system = $msg['Sender_Type'] === 'system';
-                        $is_client = $msg['Sender_Type'] === 'client';
-                    ?>
-                        <div class="chat-message <?= $is_admin ? 'admin' : ($is_system ? 'system' : ($is_client ? 'client' : '')) ?>">
-                            <div class="message-sender">
-                                <?= htmlspecialchars($msg['SenderName'] ?? ($is_system ? 'System' : ($is_admin ? 'Admin' : 'Client'))) ?>
-                            </div>
-                            <div class="message-text">
-                                <?= nl2br(htmlspecialchars($msg['Message'])) ?>
-                                <?php if (!empty($msg['Image_Path'])): ?>
-                                    <img src="../<?= htmlspecialchars($msg['Image_Path']) ?>" class="chat-image mt-2" alt="chat photo">
-                                <?php endif; ?>
-                            </div>
-                            <div class="message-time">
-                                <?= htmlspecialchars($msg['Created_At'] ?? '') ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                <div class="chat-messages" id="adminChatMessages">
+                    <!-- Chat messages will be loaded here by JavaScript -->
                 </div>
+<script>
+// Live admin chat message loader
+async function loadAdminChatMessages() {
+    const chatMessages = document.getElementById('adminChatMessages');
+    if (!chatMessages) return;
+    const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+    if (!invoiceId) return;
+    try {
+        const response = await fetch('../AJAX/admin_invoice_chat_messages.php?invoice_id=' + invoiceId);
+        const data = await response.json();
+        chatMessages.innerHTML = '';
+        if (data.error) {
+            chatMessages.innerHTML = `<div class='text-center text-danger py-4'>${data.error}</div>`;
+            return;
+        }
+        if (data.length === 0) {
+            chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='bi bi-chat-dots fs-1 mb-3 d-block'></i><h5>No messages yet</h5><p>Start a conversation about this invoice.</p></div>`;
+            return;
+        }
+        data.forEach(msg => {
+            const is_admin = msg.Sender_Type === 'admin';
+            const is_system = msg.Sender_Type === 'system';
+            const is_client = msg.Sender_Type === 'client';
+            let bubbleClass = is_admin ? 'admin' : (is_system ? 'system' : (is_client ? 'client' : ''));
+            let sender = msg.SenderName || (is_system ? 'System' : (is_admin ? 'Admin' : 'Client'));
+            let html = `<div class='chat-message ${bubbleClass}'>`;
+            html += `<div class='message-sender'>${sender}</div>`;
+            html += `<div class='message-text'>${msg.Message.replace(/\n/g, '<br>')}`;
+            if (msg.Image_Path) {
+                html += `<img src='../${msg.Image_Path}' class='chat-image mt-2' alt='chat photo'>`;
+            }
+            html += `</div>`;
+            html += `<div class='message-time'>${msg.Created_At || ''}</div>`;
+            html += `</div>`;
+            chatMessages.innerHTML += html;
+        });
+        // Optional: auto-scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    } catch (err) {
+        chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
+    }
+}
+loadAdminChatMessages();
+setInterval(loadAdminChatMessages, 5000); // Refresh every 5 seconds
+</script>
                 
                 <form method="post" enctype="multipart/form-data" class="chat-form">
                     <div class="row g-2 align-items-end">
