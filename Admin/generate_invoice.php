@@ -737,7 +737,7 @@ setInterval(loadAdminChatMessages, 5000); // Refresh every 5 seconds
                 <form method="post" enctype="multipart/form-data" class="chat-form">
                     <div class="row g-2 align-items-end">
                         <div class="col-md-8">
-                            <textarea name="message_text" class="form-control" rows="2" placeholder="Type your message..."></textarea>
+                            <textarea name="message_text" class="form-control admin-chat-textarea" rows="2" placeholder="Type your message..."></textarea>
                         </div>
                         <div class="col-md-2">
                             <input type="file" name="image_file" accept="image/*" class="form-control">
@@ -852,6 +852,40 @@ setInterval(loadAdminChatMessages, 5000); // Refresh every 5 seconds
                 }
             });
         }
+    </script>
+    <script>
+    // Admin typing indicator AJAX
+    document.addEventListener('DOMContentLoaded', function() {
+        const textarea = document.querySelector('.admin-chat-textarea');
+        const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+        let typing = false;
+        let typingTimeout = null;
+        if (textarea && invoiceId) {
+            textarea.addEventListener('input', function() {
+                if (!typing) {
+                    typing = true;
+                    sendTypingStatus(1);
+                }
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    typing = false;
+                    sendTypingStatus(0);
+                }, 3000); // 3 seconds after last input
+            });
+            // On blur, clear typing
+            textarea.addEventListener('blur', function() {
+                typing = false;
+                sendTypingStatus(0);
+            });
+        }
+        function sendTypingStatus(isTyping) {
+            fetch('../AJAX/invoice_admin_typing.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
+            });
+        }
+    });
     </script>
 </body>
 </html>

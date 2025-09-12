@@ -832,7 +832,10 @@ $show_kicked_message_in_chat = $is_kicked;
                 <!-- Chat messages will be loaded here by JavaScript -->
             </div>
 <script>
-// Live chat message loader
+// Live chat message loader with admin typing bubble
+let adminTyping = false;
+let lastTypingBubble = null;
+
 async function loadChatMessages() {
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return;
@@ -869,13 +872,39 @@ async function loadChatMessages() {
             html += `</div>`;
             chatMessages.innerHTML += html;
         });
+        // Add typing bubble if admin is typing
+        if (adminTyping) {
+            let typingHtml = `<div class='chat-message admin'>` +
+                `<div class='message-bubble admin' style='opacity:0.7;'>` +
+                `<span class='me-2'><i class='bi bi-three-dots'></i></span>Admin is typing...` +
+                `</div></div>`;
+            chatMessages.innerHTML += typingHtml;
+        }
         scrollToBottom();
     } catch (err) {
         chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
     }
 }
+
+// Poll admin typing status
+async function pollAdminTyping() {
+    const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+    if (!invoiceId) return;
+    try {
+        const response = await fetch('AJAX/invoice_admin_typing.php?invoice_id=' + invoiceId);
+        const data = await response.json();
+        adminTyping = !!data.typing;
+    } catch (e) {
+        adminTyping = false;
+    }
+}
+
 loadChatMessages();
-setInterval(loadChatMessages, 5000); // Refresh every 5 seconds
+pollAdminTyping();
+setInterval(() => {
+    pollAdminTyping();
+    loadChatMessages();
+}, 5000); // Refresh every 5 seconds
 </script>
 
             <!-- Status Alerts -->
