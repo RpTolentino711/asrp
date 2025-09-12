@@ -101,12 +101,11 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID.";
     } else {
-        // Fetch current photos to enforce limit
+        // Fetch current photos to enforce limit (now from clientspace_photos)
         $unit_photos = $db->getUnitPhotosForClient($client_id);
         $current_photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
-        
-        if (count($current_photos) >= 5) {
-            $photo_upload_error = "You can upload up to 5 photos only.";
+        if (count($current_photos) >= 6) {
+            $photo_upload_error = "You can upload up to 6 photos only.";
         } elseif ($file['error'] === UPLOAD_ERR_OK) {
             $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
             $max_size = 2 * 1024 * 1024; // 2MB
@@ -168,33 +167,31 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
     }
 }
 
-if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
-    $space_id = intval($_POST['space_id']);
-    $photo_filename = trim($_POST['photo_filename']);
-    
-    // Validate space_id belongs to client
-    $rented_units = $db->getRentedUnits($client_id);
-    $valid_space_ids = array_column($rented_units, 'Space_ID');
-    
-    if (in_array($space_id, $valid_space_ids) && !empty($photo_filename)) {
-        // Validate filename to prevent directory traversal
-        if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
-            if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
-                $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
-                if (file_exists($file_to_delete)) {
-                    unlink($file_to_delete);
+    if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
+        $space_id = intval($_POST['space_id']);
+        $photo_filename = trim($_POST['photo_filename']);
+        // Validate space_id belongs to client
+        $rented_units = $db->getRentedUnits($client_id);
+        $valid_space_ids = array_column($rented_units, 'Space_ID');
+        if (in_array($space_id, $valid_space_ids) && !empty($photo_filename)) {
+            // Validate filename to prevent directory traversal
+            if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+                if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
+                    $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
+                    if (file_exists($file_to_delete)) {
+                        unlink($file_to_delete);
+                    }
+                    $photo_upload_success = "Photo deleted!";
+                } else {
+                    $photo_upload_error = "Failed to delete photo from database.";
                 }
-                $photo_upload_success = "Photo deleted!";
             } else {
-                $photo_upload_error = "Failed to delete photo from database.";
+                $photo_upload_error = "Invalid photo filename.";
             }
         } else {
-            $photo_upload_error = "Invalid photo filename.";
+            $photo_upload_error = "Invalid request.";
         }
-    } else {
-        $photo_upload_error = "Invalid request.";
     }
-}
 
 // --- SAFELY GET CLIENT DETAILS ---
 $client_details = $db->getClientDetails($client_id);
@@ -225,9 +222,7 @@ try {
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
-        
-        // Ensure arrays are returned
+        $unit_photos = $db->getUnitPhotosForClient($client_id); // Now from clientspace_photos
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }
@@ -1037,7 +1032,7 @@ try {
                                         <h6 class="mb-0">
                                             <i class="bi bi-images me-1"></i>Unit Photos
                                         </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/5</small>
+                                        <small class="text-muted"><?= count($photos) ?>/6</small>
                                     </div>
 
                                     <?php if (!empty($photos)): ?>
@@ -1053,7 +1048,6 @@ try {
                                                         <button type="submit" 
                                                                 name="delete_unit_photo" 
                                                                 class="delete-photo-btn"
-                                                                onclick="return confirm('Delete this photo?');"
                                                                 title="Delete photo">
                                                             <i class="bi bi-x"></i>
                                                         </button>
@@ -1069,7 +1063,7 @@ try {
                                     <?php endif; ?>
 
                                     <!-- Upload Form -->
-                                    <?php if (count($photos) < 5): ?>
+                                    <?php if (count($photos) < 6): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">

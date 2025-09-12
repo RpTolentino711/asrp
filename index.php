@@ -851,11 +851,11 @@ if (isset($_SESSION['login_error'])) {
       $rented_modal_counter = 0;
       // Get all rented unit photos for the units being displayed
       $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
-      $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
+      $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids); // Now from clientspace_photos
       foreach ($rented_units_display as $rent) {
         $rented_modal_counter++;
         $rented_modal_id = "rentedModal" . $rented_modal_counter;
-        // Multi-photo display logic for rented units (BusinessPhoto1-5 from clientspace)
+        // Multi-photo display logic for rented units (from clientspace_photos)
         $rented_photo_urls = [];
         if (!empty($rented_unit_photos[$rent['Space_ID']])) {
           foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
