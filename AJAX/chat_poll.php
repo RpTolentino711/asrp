@@ -1,5 +1,5 @@
 <?php
-require 'database/database.php';
+require '../database/database.php';
 session_start();
 
 // Set JSON header
