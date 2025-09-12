@@ -184,218 +184,6 @@ if (!isset($_SESSION['client_id'])): ?>
 <?php
 $client_id = $_SESSION['client_id'];
 
-// Check if client has any active rental units
-$hasActiveUnit = $db->checkClientHasActiveUnit($client_id);
-
-if (!$hasActiveUnit): ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Payment Center - ASRT Commercial Spaces</title>
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <?php require('links.php'); ?>
-    
-    <style>
-    :root {
-        --primary: #1e40af;
-        --primary-light: #3b82f6;
-        --accent: #ef4444;
-        --warning: #f59e0b;
-        --light: #f8fafc;
-        --lighter: #ffffff;
-        --gray: #64748b;
-        --gray-light: #e2e8f0;
-        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-        --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.15);
-        --border-radius: 16px;
-        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    body {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        background: var(--light);
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        padding-top: 100px;
-    }
-
-    .main-content {
-        flex: 1 0 auto;
-    }
-
-    .footer {
-        flex-shrink: 0;
-        margin-top: auto;
-    }
-
-    .no-unit-section {
-        max-width: 700px;
-        margin: 0 auto;
-        padding: 3rem 0;
-    }
-
-    .no-unit-card {
-        background: var(--lighter);
-        border-radius: var(--border-radius);
-        box-shadow: var(--shadow-xl);
-        padding: 3rem 2rem;
-        text-align: center;
-        border: none;
-        border-top: 4px solid var(--warning);
-    }
-
-    .warning-icon {
-        width: 80px;
-        height: 80px;
-        background: linear-gradient(135deg, var(--warning) 0%, #fbbf24 100%);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 2rem;
-        color: white;
-        font-size: 2rem;
-    }
-
-    .no-unit-title {
-        font-family: 'Playfair Display', serif;
-        font-size: 2rem;
-        font-weight: 700;
-        color: var(--primary);
-        margin-bottom: 1rem;
-    }
-
-    .no-unit-description {
-        color: var(--gray);
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
-        line-height: 1.6;
-    }
-
-    .contact-info {
-        background: #fff3cd;
-        border: 1px solid #fbbf24;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-top: 2rem;
-    }
-
-    .contact-info h5 {
-        color: #92400e;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-
-    .contact-info p {
-        color: #92400e;
-        margin-bottom: 0.5rem;
-    }
-
-    .modern-btn {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.875rem 2rem;
-        font-weight: 600;
-        font-size: 1rem;
-        transition: var(--transition);
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0.5rem;
-    }
-
-    .modern-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-        color: white;
-    }
-
-    .modern-btn i {
-        margin-right: 0.5rem;
-    }
-
-    .btn-warning {
-        background: linear-gradient(135deg, var(--warning) 0%, #fbbf24 100%);
-    }
-
-    @media (max-width: 768px) {
-        body {
-            padding-top: 80px;
-        }
-        
-        .no-unit-card {
-            padding: 2rem 1.5rem;
-        }
-        
-        .no-unit-title {
-            font-size: 1.5rem;
-        }
-    }
-    </style>
-</head>
-<body>
-    <?php require('header.php'); ?>
-    
-    <div class="main-content">
-        <div class="container">
-            <div class="no-unit-section">
-                <div class="no-unit-card">
-                    <div class="warning-icon">
-                        <i class="bi bi-exclamation-triangle"></i>
-                    </div>
-                    <h1 class="no-unit-title">No Active Rental</h1>
-                    <p class="no-unit-description">
-                        You currently don't have any active rental units. To access the Payment Center and communicate 
-                        with our billing team, you need to have an active rental agreement with us.
-                    </p>
-                    
-                    <div class="d-flex flex-wrap justify-content-center">
-                        <a href="units.php" class="modern-btn">
-                            <i class="bi bi-building"></i>Browse Units
-                        </a>
-                        <a href="contact.php" class="modern-btn btn-warning">
-                            <i class="bi bi-telephone"></i>Contact Us
-                        </a>
-                    </div>
-                    
-                    <div class="contact-info">
-                        <h5><i class="bi bi-info-circle me-2"></i>Need Help?</h5>
-                        <p><strong>Phone:</strong> +63 912 345 6789</p>
-                        <p><strong>Email:</strong> info@asrt.com</p>
-                        <p><strong>Office Hours:</strong> Monday - Friday, 9:00 AM - 6:00 PM</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <?php require('footer.php'); ?>
-    
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-<?php exit; endif; ?>
-
-<?php
 // Fetch all invoices for this client (paid, unpaid, kicked, etc.)
 $invoices = $db->getClientInvoiceHistory($client_id);
 $invoice_ids = array_column($invoices, 'Invoice_ID');
@@ -472,15 +260,8 @@ if (isset($_POST['send_message']) && $selected_invoice_id && !$is_paid && !$is_k
             });
         </script>";
     } else {
-        // Return JSON response for AJAX
-        if (isset($_POST['ajax'])) {
-            header('Content-Type: application/json');
-            echo json_encode(['success' => true]);
-            exit();
-        } else {
-            header("Location: invoice_history.php?invoice_id=$selected_invoice_id");
-            exit();
-        }
+        header("Location: invoice_history.php?invoice_id=$selected_invoice_id");
+        exit();
     }
 }
 
@@ -602,34 +383,6 @@ $show_kicked_message_in_chat = $is_kicked;
             color: #d97706;
         }
 
-        .online-indicator {
-            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-            color: #14532d;
-            border: 1px solid #16a34a;
-            border-radius: var(--border-radius-sm);
-            padding: 1rem 1.5rem;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            animation: pulse 2s infinite;
-        }
-
-        .online-indicator i {
-            color: #16a34a;
-            margin-right: 1rem;
-            animation: blink 1.5s linear infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.01); }
-        }
-
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.5; }
-        }
-
         .invoice-selector {
             background: var(--light);
             border-radius: var(--border-radius-sm);
@@ -680,9 +433,6 @@ $show_kicked_message_in_chat = $is_kicked;
             margin-bottom: 1.5rem;
             display: flex;
             flex-direction: column;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: slideUp 0.3s ease-out forwards;
         }
 
         .chat-message.client {
@@ -886,57 +636,10 @@ $show_kicked_message_in_chat = $is_kicked;
             animation: spin 1s linear infinite;
         }
 
-        @keyframes slideUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
         @keyframes spin {
             to {
                 transform: rotate(360deg);
             }
-        }
-
-        /* New message notification */
-        .new-message-indicator {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: linear-gradient(135deg, var(--success) 0%, #10b981 100%);
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: var(--border-radius-sm);
-            box-shadow: var(--shadow-lg);
-            z-index: 1000;
-            cursor: pointer;
-            transform: translateX(400px);
-            transition: var(--transition);
-        }
-
-        .new-message-indicator.show {
-            transform: translateX(0);
-        }
-
-        .typing-indicator {
-            display: none;
-            padding: 1rem;
-            font-style: italic;
-            color: var(--gray);
-            background: var(--light);
-            border-radius: var(--border-radius-sm);
-            margin: 0.5rem 0;
-        }
-
-        .typing-indicator.show {
-            display: block;
-            animation: fadeInOut 1.5s infinite;
-        }
-
-        @keyframes fadeInOut {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
         }
 
         /* Responsive Design */
@@ -992,13 +695,6 @@ $show_kicked_message_in_chat = $is_kicked;
             .message-bubble {
                 max-width: 85%;
             }
-
-            .new-message-indicator {
-                right: 10px;
-                bottom: 10px;
-                padding: 0.75rem 1rem;
-                font-size: 0.9rem;
-            }
         }
 
         @media (max-width: 576px) {
@@ -1052,7 +748,7 @@ $show_kicked_message_in_chat = $is_kicked;
                         <i class="bi bi-credit-card fs-1 me-3"></i>
                         <div>
                             <div class="fw-bold">Invoice Chat</div>
-                            <small class="opacity-75">Live Support</small>
+                            <small class="opacity-75">Real-time Support</small>
                         </div>
                     </div>
                 </div>
@@ -1061,14 +757,6 @@ $show_kicked_message_in_chat = $is_kicked;
     </section>
 
     <div class="container">
-        <!-- Online Indicator -->
-        <div class="online-indicator animate-on-scroll">
-            <i class="bi bi-circle-fill"></i>
-            <div>
-                <strong>Live Chat Active:</strong> Our team is online and ready to assist you with your billing inquiries in real-time.
-            </div>
-        </div>
-
         <!-- Business Notice -->
         <div class="business-notice animate-on-scroll">
             <i class="bi bi-exclamation-triangle"></i>
@@ -1153,7 +841,7 @@ $show_kicked_message_in_chat = $is_kicked;
                         $is_admin = $msg['Sender_Type'] === 'admin';
                         $is_system = $msg['Sender_Type'] === 'system';
                     ?>
-                        <div class="chat-message <?= $is_client ? 'client' : ($is_admin ? 'admin' : 'system') ?>" data-message-id="<?= $msg['ID'] ?>">
+                        <div class="chat-message <?= $is_client ? 'client' : ($is_admin ? 'admin' : 'system') ?>">
                             <div class="message-bubble <?= $is_client ? 'client' : ($is_admin ? 'admin' : 'system') ?>">
                                 <?= nl2br(htmlspecialchars($msg['Message'])) ?>
                                 <?php if (!empty($msg['Image_Path'])): ?>
@@ -1176,11 +864,6 @@ $show_kicked_message_in_chat = $is_kicked;
                         </div>
                     <?php endforeach; ?>
                 <?php endif; ?>
-
-                <!-- Typing Indicator -->
-                <div class="typing-indicator" id="typingIndicator">
-                    <i class="bi bi-three-dots"></i> Admin is typing...
-                </div>
 
                 <?php if ($show_kicked_message_in_chat): ?>
                     <div class="chat-message system">
@@ -1217,23 +900,20 @@ $show_kicked_message_in_chat = $is_kicked;
             <!-- Chat Input Section -->
             <?php if (!$is_paid && !$is_kicked): ?>
                 <div class="chat-input-section">
-                    <form id="messageForm" class="message-form">
+                    <form method="post" enctype="multipart/form-data" class="message-form">
                         <textarea 
                             name="message_text" 
-                            id="messageText"
                             class="message-textarea" 
                             placeholder="Type your message about this invoice..."
                             rows="3"></textarea>
                         <input 
                             type="file" 
                             name="image_file" 
-                            id="imageFile"
                             accept="image/*" 
                             class="file-input"
                             title="Attach image">
                         <input type="hidden" name="invoice_id" value="<?= $selected_invoice_id ?>">
-                        <input type="hidden" name="ajax" value="1">
-                        <button type="submit" id="sendButton" class="send-button">
+                        <button type="submit" name="send_message" class="send-button">
                             <i class="bi bi-send"></i>
                             Send
                         </button>
@@ -1290,12 +970,6 @@ $show_kicked_message_in_chat = $is_kicked;
         </div>
     </div>
 
-    <!-- New Message Notification -->
-    <div class="new-message-indicator" id="newMessageNotification">
-        <i class="bi bi-chat-dots me-2"></i>
-        <span>New message from admin</span>
-    </div>
-
     <!-- Image Modal -->
     <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -1313,15 +987,9 @@ $show_kicked_message_in_chat = $is_kicked;
 
     <?php require('footer.php'); ?>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // Global variables
-        let lastMessageId = <?= !empty($chat_messages) ? max(array_column($chat_messages, 'ID')) : 0 ?>;
-        let selectedInvoiceId = <?= $selected_invoice_id ?>;
-        let isTyping = false;
-        let typingTimeout;
-        let pollInterval;
+    <!-- Bootstrap JS -->
 
+    <script>
         // Scroll animations
         const observerOptions = {
             threshold: 0.1,
@@ -1341,13 +1009,10 @@ $show_kicked_message_in_chat = $is_kicked;
         });
 
         // Auto-scroll to bottom of chat
-        function scrollToBottom(smooth = false) {
+        function scrollToBottom() {
             const chatMessages = document.getElementById('chatMessages');
             if (chatMessages) {
-                chatMessages.scrollTo({
-                    top: chatMessages.scrollHeight,
-                    behavior: smooth ? 'smooth' : 'auto'
-                });
+                chatMessages.scrollTop = chatMessages.scrollHeight;
             }
         }
 
@@ -1359,146 +1024,15 @@ $show_kicked_message_in_chat = $is_kicked;
             imageModal.show();
         }
 
-        // Show new message notification
-        function showNewMessageNotification() {
-            const notification = document.getElementById('newMessageNotification');
-            notification.classList.add('show');
-            
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                hideNewMessageNotification();
-            }, 5000);
+        // Form submission with loading state
+        function handleFormSubmit(form) {
+            const submitButton = form.querySelector('button[type="submit"]');
+            const messageTextarea = form.querySelector('textarea[name="message_text"]');
+            const fileInput = form.querySelector('input[type="file"]');
+            const hasImage = fileInput && fileInput.files.length > 0;
+            const hasMessage = messageTextarea.value.trim().length > 0;
 
-            // Hide when clicked
-            notification.onclick = () => {
-                hideNewMessageNotification();
-                scrollToBottom(true);
-            };
-        }
-
-        function hideNewMessageNotification() {
-            const notification = document.getElementById('newMessageNotification');
-            notification.classList.remove('show');
-        }
-
-        // Show typing indicator
-        function showTypingIndicator() {
-            const indicator = document.getElementById('typingIndicator');
-            indicator.classList.add('show');
-            scrollToBottom(true);
-        }
-
-        function hideTypingIndicator() {
-            const indicator = document.getElementById('typingIndicator');
-            indicator.classList.remove('show');
-        }
-
-        // Add new message to chat
-        function addMessageToChat(message) {
-            const chatMessages = document.getElementById('chatMessages');
-            const emptyState = chatMessages.querySelector('.text-center.text-muted');
-            
-            if (emptyState) {
-                emptyState.remove();
-            }
-
-            const messageDiv = document.createElement('div');
-            const isClient = message.Sender_Type === 'client';
-            const isAdmin = message.Sender_Type === 'admin';
-            const isSystem = message.Sender_Type === 'system';
-            
-            messageDiv.className = `chat-message ${isClient ? 'client' : (isAdmin ? 'admin' : 'system')}`;
-            messageDiv.setAttribute('data-message-id', message.ID);
-            
-            let imageHtml = '';
-            if (message.Image_Path) {
-                imageHtml = `<img src="${message.Image_Path}" class="message-image" alt="Chat attachment" onclick="showImageModal('${message.Image_Path}')">`;
-            }
-            
-            messageDiv.innerHTML = `
-                <div class="message-bubble ${isClient ? 'client' : (isAdmin ? 'admin' : 'system')}">
-                    ${message.Message.replace(/\n/g, '<br>')}
-                    ${imageHtml}
-                </div>
-                ${!isSystem ? `
-                    <div class="message-meta">
-                        <strong>${message.SenderName || ''}</strong>
-                        <span class="text-muted ms-2">${message.Created_At || ''}</span>
-                    </div>
-                ` : `
-                    <div class="message-meta text-center">
-                        <span class="text-muted">${message.Created_At || ''}</span>
-                    </div>
-                `}
-            `;
-            
-            // Insert before typing indicator or kicked message
-            const typingIndicator = document.getElementById('typingIndicator');
-            const kickedMessage = chatMessages.querySelector('.chat-message.system:last-child');
-            
-            if (typingIndicator && typingIndicator.previousElementSibling) {
-                chatMessages.insertBefore(messageDiv, typingIndicator);
-            } else if (kickedMessage && kickedMessage.querySelector('.bi-lock')) {
-                chatMessages.insertBefore(messageDiv, kickedMessage);
-            } else {
-                chatMessages.appendChild(messageDiv);
-            }
-            
-            scrollToBottom(true);
-            
-            // Show notification for admin messages
-            if (isAdmin) {
-                showNewMessageNotification();
-            }
-        }
-
-        // Poll for new messages
-        function pollMessages() {
-            if (!selectedInvoiceId) return;
-            
-            fetch(`AJAX/chat_poll.php?invoice_id=${selectedInvoiceId}&last_message_id=${lastMessageId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.messages) {
-                        data.messages.forEach(message => {
-                            addMessageToChat(message);
-                            lastMessageId = Math.max(lastMessageId, message.ID);
-                        });
-                    }
-                    
-                    // Handle typing indicator
-                    if (data.typing && !isTyping) {
-                        showTypingIndicator();
-                        isTyping = true;
-                        
-                        // Clear typing after 5 seconds of inactivity
-                        clearTimeout(typingTimeout);
-                        typingTimeout = setTimeout(() => {
-                            hideTypingIndicator();
-                            isTyping = false;
-                        }, 5000);
-                    } else if (!data.typing && isTyping) {
-                        hideTypingIndicator();
-                        isTyping = false;
-                    }
-                })
-                .catch(error => {
-                    console.error('Polling error:', error);
-                });
-        }
-
-        // Handle form submission
-        document.getElementById('messageForm')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData(this);
-            const submitButton = document.getElementById('sendButton');
-            const messageText = document.getElementById('messageText');
-            const imageFile = document.getElementById('imageFile');
-            
-            const hasMessage = messageText.value.trim().length > 0;
-            const hasImage = imageFile.files.length > 0;
-            
+            // Allow empty message if image is attached
             if (!hasMessage && !hasImage) {
                 Swal.fire({
                     icon: 'warning',
@@ -1506,52 +1040,17 @@ $show_kicked_message_in_chat = $is_kicked;
                     text: 'Please enter a message or attach an image before sending.',
                     confirmButtonColor: '#1e40af'
                 });
-                return;
+                return false;
             }
-            
+
             // Add loading state
             submitButton.classList.add('loading');
             submitButton.disabled = true;
             submitButton.innerHTML = '<i class="bi bi-hourglass-split"></i>Sending...';
-            
-            fetch('invoice_history.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    messageText.value = '';
-                    imageFile.value = '';
-                    messageText.style.height = 'auto';
-                    
-                    // Poll immediately for the sent message
-                    pollMessages();
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Message Failed',
-                        text: 'Failed to send message. Please try again.',
-                        confirmButtonColor: '#1e40af'
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Send error:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Network Error',
-                    text: 'Please check your connection and try again.',
-                    confirmButtonColor: '#1e40af'
-                });
-            })
-            .finally(() => {
-                // Remove loading state
-                submitButton.classList.remove('loading');
-                submitButton.disabled = false;
-                submitButton.innerHTML = '<i class="bi bi-send"></i>Send';
-            });
-        });
+
+            // Allow form to submit normally
+            return true;
+        }
 
         // Auto-resize textarea
         document.addEventListener('DOMContentLoaded', function() {
@@ -1565,17 +1064,13 @@ $show_kicked_message_in_chat = $is_kicked;
             
             // Scroll to bottom on page load
             scrollToBottom();
-            
-            // Start polling for new messages
-            if (selectedInvoiceId && <?= !$is_paid && !$is_kicked ? 'true' : 'false' ?>) {
-                pollInterval = setInterval(pollMessages, 3000); // Poll every 3 seconds
-            }
         });
 
         // Enhanced file input feedback
         document.querySelector('.file-input')?.addEventListener('change', function() {
             const fileName = this.files[0]?.name;
             if (fileName) {
+                // Show file selected feedback
                 const toast = document.createElement('div');
                 toast.className = 'position-fixed top-0 end-0 m-3 alert alert-info alert-dismissible fade show';
                 toast.style.zIndex = '9999';
@@ -1592,32 +1087,7 @@ $show_kicked_message_in_chat = $is_kicked;
                 }, 3000);
             }
         });
-
-        // Page visibility handling
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                // Page is hidden, reduce polling frequency
-                if (pollInterval) {
-                    clearInterval(pollInterval);
-                    pollInterval = setInterval(pollMessages, 10000); // Poll every 10 seconds
-                }
-            } else {
-                // Page is visible, resume normal polling
-                if (pollInterval) {
-                    clearInterval(pollInterval);
-                    pollInterval = setInterval(pollMessages, 3000); // Poll every 3 seconds
-                }
-                // Hide notification when page becomes visible
-                hideNewMessageNotification();
-            }
-        });
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', function() {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
-        });
     </script>
 </body>
 </html>
+
