@@ -1,4 +1,19 @@
 <?php
+// Enable error reporting for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Debug output for POST and FILES
+if (!empty($_POST) || !empty($_FILES)) {
+    echo '<pre style="background:#fffbe6;color:#b91c1c;padding:1em;border:1px solid #fde68a;max-width:700px;margin:2em auto;overflow:auto;">';
+    echo "<strong>POST:</strong>\n";
+    print_r($_POST);
+    echo "<strong>FILES:</strong>\n";
+    print_r($_FILES);
+    echo '</pre>';
+}
+
 require 'database/database.php'; 
 session_start();
 
@@ -969,13 +984,13 @@ try {
                     $rental_start = isset($rent['StartDate']) ? htmlspecialchars($rent['StartDate']) : 'N/A';
                     $rental_end = isset($rent['EndDate']) ? htmlspecialchars($rent['EndDate']) : 'N/A';
                     $due_date = $rental_end;
-                    
-                    // Try to get latest invoice data if method exists
+
+                    // Use InvoiceDate from the latest invoice with Flow_Status 'new'
                     if (method_exists($db, 'getLatestNewInvoiceForUnit')) {
                         try {
                             $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $space_id);
-                            if ($latest_invoice && is_array($latest_invoice)) {
-                                $rental_start = isset($latest_invoice['StartDate']) ? htmlspecialchars($latest_invoice['StartDate']) : $rental_start;
+                            if ($latest_invoice && is_array($latest_invoice) && isset($latest_invoice['Flow_Status']) && strtolower($latest_invoice['Flow_Status']) === 'new') {
+                                $rental_start = isset($latest_invoice['InvoiceDate']) ? htmlspecialchars($latest_invoice['InvoiceDate']) : $rental_start;
                                 $rental_end = isset($latest_invoice['EndDate']) ? htmlspecialchars($latest_invoice['EndDate']) : $rental_end;
                                 $due_date = $rental_end;
                             }
