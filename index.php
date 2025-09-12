@@ -685,7 +685,7 @@ if (isset($_SESSION['login_error'])) {
   <script>
   async function loadAvailableUnits() {
     try {
-      const response = await fetch('ajax/available_units.php');
+      const response = await fetch('AJAX/available_units.php');
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       const unitsRow = document.getElementById('units-row');
@@ -785,7 +785,7 @@ if (isset($_SESSION['login_error'])) {
   <script>
   async function loadRentedUnits() {
     try {
-      const response = await fetch('ajax/rented_units.php');
+      const response = await fetch('AJAX/rented_units.php');
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       const rentedRow = document.getElementById('rented-units-row');
@@ -937,7 +937,7 @@ if (isset($_SESSION['login_error'])) {
   <script>
   async function loadTestimonials() {
     try {
-      const response = await fetch('ajax/testimonials.php');
+      const response = await fetch('AJAX/testimonials.php');
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       const wrapper = document.getElementById('testimonials-wrapper');
