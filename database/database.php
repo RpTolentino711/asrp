@@ -108,17 +108,29 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$space_id, $client_id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) return false;
+        if (!$row) {
+            error_log("addUnitPhoto: No row found for Space_ID=$space_id, Client_ID=$client_id");
+            return false;
+        }
         for ($i = 1; $i <= 5; $i++) {
             if (empty($row["BusinessPhoto$i"])) {
                 $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
                 $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
                 if (!$result) {
-                    error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
+                    error_log("addUnitPhoto failed: " . print_r([
+                        'sql' => $update,
+                        'params' => [$filename, $space_id, $client_id],
+                        'row' => $row,
+                        'space_id' => $space_id,
+                        'client_id' => $client_id
+                    ], true));
+                } else {
+                    error_log("addUnitPhoto success: set BusinessPhoto$i for Space_ID=$space_id, Client_ID=$client_id, filename=$filename");
                 }
                 return $result;
             }
         }
+        error_log("addUnitPhoto: All BusinessPhoto slots full for Space_ID=$space_id, Client_ID=$client_id");
         return false;
     } catch (PDOException $e) {
         error_log("addUnitPhoto PDOException: " . $e->getMessage());
