@@ -60,7 +60,6 @@ public function executeStatement($sql, $params = []) {
         return (bool)$result;
     }
 
-
     public function getUnitPhotosForClient($client_id) {
     $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
             FROM clientspace 
@@ -142,7 +141,6 @@ public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
     }
     return false;
 }
-
 
 
 
@@ -238,7 +236,6 @@ public function nukeClient($client_id) {
 
 
 
-
 public function setUnitAvailable($space_id) {
     $this->executeStatement(
         "UPDATE space SET Flow_Status = 'new' WHERE Space_ID = ?", 
@@ -293,7 +290,6 @@ public function getInvoiceHistoryForClient($client_id) {
     $sql = "SELECT * FROM invoice WHERE Client_ID = ?";
     return $this->runQuery($sql, [$client_id], true);
 }
-
 
 
 public function runQueryAll($query, $params = []) {
@@ -401,8 +397,9 @@ public function runQueryAll($query, $params = []) {
             return [];
         }
     }
+
 public function getHomepageAvailableUnits($limit = 6, $after_id = 0) {
-    // Only show units that are available to rent (Flow_Status = 'new')
+    // Only show units that are available to rent (Flow_Status = 'new') and with Space_ID > $after_id
     $sql = "SELECT s.*, st.SpaceTypeName
             FROM space s
             LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
@@ -462,7 +459,6 @@ public function getHomepageRentedUnits($limit = 12) {
             return false;
         }
     }
-
 
 
     public function getFeedbackPrompts($client_id) {
@@ -718,7 +714,6 @@ public function removeSpacePhoto($space_id) {
             WHERE Space_ID = ?";
     return $this->executeStatement($sql, [$space_id]);
 }
-
 
 
     public function updateHandyman($id, $fn, $ln, $phone, $jobtype_id) {
@@ -1063,7 +1058,6 @@ public function insertFreeMessage($name, $email, $phone, $message) {
     return $this->executeStatement($sql, [$name, $email, $phone, $message]);
 }
 
-
 public function getSingleInvoiceForDisplay($invoice_id) {
     $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name AS UnitName
             FROM invoice i
@@ -1303,7 +1297,6 @@ public function acceptRentalRequest($request_id) {
         }
     }
 
-
 public function markRentalRequestDone($client_id, $space_id) {
     // Get the latest accepted rentalrequest for this client/space
     $latest = $this->runQuery(
@@ -1321,13 +1314,11 @@ public function markRentalRequestDone($client_id, $space_id) {
 }
 
 
-
 public function getSpacePhoto($space_id) {
     // Return all photo fields (Photo, Photo1, Photo2, Photo3, Photo4, Photo5) for compatibility and multi-photo support
     $sql = "SELECT Photo, Photo1, Photo2, Photo3, Photo4, Photo5 FROM space WHERE Space_ID = ?";
     return $this->runQuery($sql, [$space_id]);
 }
-
 
 
 public function updateSpacePhotoField($space_id, $photo_field, $photo_filename) {
@@ -1348,7 +1339,6 @@ public function updateSpacePhotoField($space_id, $photo_field, $photo_filename) 
         $sql = "UPDATE rentalrequest SET Status = 'Rejected' WHERE Request_ID = ? AND Status = 'Pending'";
         return $this->executeStatement($sql, [$request_id]);
     }
-
 
 
 
@@ -1381,7 +1371,6 @@ public function getAllUnitsWithRenterStatus() {
         return [];
     }
 }
-
 
 
 // Add this method to your Database class for chart data (daily breakdown for the month)
@@ -1454,6 +1443,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
    
 
 
-
 ?>
+
 

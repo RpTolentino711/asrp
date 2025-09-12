@@ -695,7 +695,7 @@ if (isset($_SESSION['login_error'])) {
     }
         ?>
 <div class="col-lg-4 col-md-6 animate-on-scroll" data-unit-id="<?= $space['Space_ID'] ?>">
-          <div class="card unit-card">
+<div class="card unit-card">
             <?php if (!empty($photo_urls)): ?>
               <div style="position:relative;">
                 <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
@@ -1284,12 +1284,31 @@ if (isset($_SESSION['login_error'])) {
     });
 
 
-    function getLatestUnitId() {
-  const ids = Array.from(document.querySelectorAll('#available-units-list [data-unit-id]'))
-    .map(el => parseInt(el.getAttribute('data-unit-id')))
-    .filter(id => !isNaN(id));
-  return ids.length ? Math.max(...ids) : 0;
+
+    async function loadNewUnits() {
+    try {
+        // Get all currently displayed unit IDs
+        const ids = Array.from(document.querySelectorAll('#available-units-list [data-unit-id]'))
+            .map(el => parseInt(el.getAttribute('data-unit-id')))
+            .filter(id => !isNaN(id));
+        const afterId = ids.length ? Math.max(...ids) : 0;
+
+        // Fetch new units from your PHP endpoint
+        const response = await fetch('AJAX/get_new_units.php?after_id=' + afterId);
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        const html = await response.text();
+
+        // Insert new units at the top if any
+        if (html.trim()) {
+            document.getElementById('available-units-list').insertAdjacentHTML('afterbegin', html);
+        }
+    } catch (error) {
+        console.error("Fetch error:", error);
+    }
 }
+
+// Call periodically for live updates (every 10 seconds)
+setInterval(loadNewUnits, 10000);
   </script>
 </body>
 </html>
