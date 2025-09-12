@@ -673,131 +673,63 @@ if (isset($_SESSION['login_error'])) {
         <h2>Available Units</h2>
         <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
       </div>
+      <div id="units-row" class="row g-4">
+        <!-- Units will be loaded here by JavaScript -->
+      </div>
+      <div class="text-center mt-5">
+        <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
+      </div>
+    </div>
+  </section>
 
-      <div class="row g-4">
-        <?php
-        if (!empty($available_units)) {
-            $modal_counter = 0;
-            $modals = '';
-            foreach ($available_units as $space) {
-                if (in_array($space['Space_ID'], $hide_client_rented_unit_ids)) continue;
-                $modal_counter++;
-                $modal_id = "unitModal" . $modal_counter;
-                $photo_modal_id = "photoModal" . $modal_counter;
-
-    // Multi-photo display logic for available units
-  $photo_urls = [];
-  $photo_fields = ['Photo', 'Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-    foreach ($photo_fields as $photo_field) {
-      if (!empty($space[$photo_field])) {
-        $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
+  <script>
+  async function loadAvailableUnits() {
+    try {
+      const response = await fetch('ajax/available_units.php');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      const unitsRow = document.getElementById('units-row');
+      unitsRow.innerHTML = '';
+      if (data.length === 0) {
+        unitsRow.innerHTML = '<div class="col-12 text-center"><div class="alert alert-info">No units currently available.</div></div>';
+        return;
       }
-    }
-        ?>
+      data.forEach(unit => {
+        let photos = '';
+        if (unit.photo_urls.length > 0) {
+          photos = `<div style="position:relative;">
+            <img src="${unit.photo_urls[0]}" class="card-img-top" alt="${unit.Name}" style="height:250px;object-fit:cover;">
+            <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> ${unit.photo_urls.length}/6 </span>
+          </div>`;
+        } else {
+          photos = `<div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+            <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
+          </div>`;
+        }
+        unitsRow.innerHTML += `
         <div class="col-lg-4 col-md-6 animate-on-scroll">
           <div class="card unit-card">
-            <?php if (!empty($photo_urls)): ?>
-              <div style="position:relative;">
-                <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
-                <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($photo_urls) ?>/6 </span>
-              </div>
-            <?php else: ?>
-              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-                <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
-              </div>
-            <?php endif; ?>
-
+            ${photos}
             <div class="card-body">
-              <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
-              <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
+              <h5 class="card-title fw-bold">${unit.Name}</h5>
+              <p class="unit-price">₱${Number(unit.Price).toLocaleString()} / month</p>
               <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
-                <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
+                <span class="unit-type">${unit.SpaceTypeName}</span>
+                <small class="unit-location">${unit.City}</small>
               </div>
-              
-              <?php if ($is_logged_in && !$client_is_inactive): ?>
-                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">
-                  <i class="bi bi-key me-2"></i>Rent Now
-                </button>
-              <?php elseif ($is_logged_in && $client_is_inactive): ?>
-                <button class="btn btn-secondary w-100" disabled>
-                  Account Inactive
-                </button>
-              <?php else: ?>
-                <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
-                  <i class="bi bi-key me-2"></i>Login to Rent
-                </button>
-              <?php endif; ?>
+              <button class="btn btn-accent w-100" disabled>Contact Admin to Rent</button>
             </div>
           </div>
-        </div>
-
-        <!-- Photo Modal -->
-        <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-xl">
-            <div class="modal-content bg-dark">
-              <div class="modal-header border-0">
-                <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
-                  Photo Gallery: <?= htmlspecialchars($space['Name']) ?>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body text-center">
-                <?php if (count($photo_urls) === 1): ?>
-                  <img src="<?= $photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
-                <?php elseif (count($photo_urls) > 1): ?>
-                  <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner">
-                      <?php foreach ($photo_urls as $idx => $url): ?>
-                        <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
-                          <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
-                        </div>
-                      <?php endforeach; ?>
-                    </div>
-                    <button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Previous</span>
-                    </button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Next</span>
-                    </button>
-                  </div>
-                <?php else: ?>
-                  <div class="text-center mb-3" style="font-size:56px;color:#2563eb;">
-                    <i class="fa-solid fa-house"></i>
-                  </div>
-                <?php endif; ?>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <?php
-                // Build rental modal
-                if ($is_logged_in && !$client_is_inactive) {
-                    $modals .= '
-                    <div class="modal fade" id="' . $modal_id . '" tabindex="-1" aria-labelledby="' . $modal_id . 'Label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="' . $modal_id . 'Label">Contact Admin to Rent: ' . htmlspecialchars($space['Name']) . '</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-info-circle me-2"></i>
-                                        To rent this unit and receive an invoice, please contact our admin team for rental approval.
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="fw-bold">Admin Contact:</h6>
-                                            <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:rom_telents@asrt.com">rom_telents@asrt.com</a></p>
-                                            <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+639171234567">+63 917 123 4567</a></p>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="alert alert-warning">
+        </div>`;
+      });
+    } catch (err) {
+      document.getElementById('units-row').innerHTML = '<div class="col-12 text-center"><div class="alert alert-danger">Failed to load units.</div></div>';
+    }
+  }
+  loadAvailableUnits();
+  setInterval(loadAvailableUnits, 10000); // Refresh every 10 seconds
+  </script>
                                                 <strong>Invoice Required:</strong><br>
                                                 Please request your invoice from the admin for the rental process.
                                             </div>
@@ -844,101 +776,61 @@ if (isset($_SESSION['login_error'])) {
         <h2>Currently Rented</h2>
         <p>See our successful partnerships with businesses across various industries.</p>
       </div>
+      <div id="rented-units-row" class="row g-4">
+        <!-- Rented units will be loaded here by JavaScript -->
+      </div>
+    </div>
+  </section>
 
-      <div class="row g-4">
-        <?php
-        if (!empty($rented_units_display)) {
-      $rented_modal_counter = 0;
-      // Get all rented unit photos for the units being displayed
-      $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
-      $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
-      foreach ($rented_units_display as $rent) {
-        $rented_modal_counter++;
-        $rented_modal_id = "rentedModal" . $rented_modal_counter;
-        // Multi-photo display logic for rented units (BusinessPhoto1-5 from clientspace)
-        $rented_photo_urls = [];
-        if (!empty($rented_unit_photos[$rent['Space_ID']])) {
-          foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
-            if (!empty($photo)) {
-              $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo);
-            }
-          }
+  <script>
+  async function loadRentedUnits() {
+    try {
+      const response = await fetch('ajax/rented_units.php');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      const rentedRow = document.getElementById('rented-units-row');
+      rentedRow.innerHTML = '';
+      if (data.length === 0) {
+        rentedRow.innerHTML = '<div class="col-12 text-center"><div class="alert alert-info">No units currently rented.</div></div>';
+        return;
+      }
+      data.forEach(unit => {
+        let photos = '';
+        if (unit.photo_urls.length > 0) {
+          photos = `<div style=\"position:relative;\">
+            <img src=\"${unit.photo_urls[0]}\" class=\"card-img-top\" alt=\"${unit.Name}\" style=\"height:250px;object-fit:cover;\">
+            <span class=\"badge bg-success position-absolute top-0 end-0 m-2\" style=\"z-index:2;\"> ${unit.photo_urls.length}/6 </span>
+          </div>`;
+        } else {
+          photos = `<div class=\"card-img-top d-flex align-items-center justify-content-center bg-light\" style=\"height: 250px;\">
+            <i class=\"fa-solid fa-house-user text-success\" style=\"font-size: 4rem;\"></i>
+          </div>`;
         }
-        ?>
-        <div class="col-lg-4 col-md-6 animate-on-scroll">
-          <div class="card unit-card">
-            <div class="rented-badge">
-              <i class="bi bi-check-circle me-1"></i>Rented
-            </div>
-            <?php if (!empty($rented_photo_urls)): ?>
-              <div style="position:relative;">
-                <img src="<?= $rented_photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
-                <span class="badge bg-success position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($rented_photo_urls) ?>/6 </span>
+        rentedRow.innerHTML += `
+        <div class=\"col-lg-4 col-md-6 animate-on-scroll\">
+          <div class=\"card unit-card\">
+            <div class=\"rented-badge\"><i class=\"bi bi-check-circle me-1\"></i>Rented</div>
+            ${photos}
+            <div class=\"card-body\">
+              <h5 class=\"card-title fw-bold\">${unit.Name}</h5>
+              <p class=\"unit-price\">₱${Number(unit.Price).toLocaleString()} / month</p>
+              <p class=\"card-text text-muted\">Currently occupied commercial space.</p>
+              <div class=\"d-flex justify-content-between align-items-center mb-3\">
+                <span class=\"unit-type\">${unit.SpaceTypeName}</span>
+                <small class=\"unit-location\">${unit.City}</small>
               </div>
-            <?php else: ?>
-              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
-                <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
-              </div>
-            <?php endif; ?>
-            <div class="card-body">
-              <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
-              <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p>
-              <p class="card-text text-muted">Currently occupied commercial space.</p>
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
-                <small class="unit-location"><?= htmlspecialchars($rent['City']) ?></small>
-              </div>
-              <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
-                <i class="bi bi-eye me-2"></i>View Details
-              </button>
+              <button class=\"btn btn-outline-success w-100\" disabled><i class=\"bi bi-eye me-2\"></i>View Details</button>
             </div>
           </div>
-        </div>
-
-        <!-- Rented Unit Photo Modal -->
-        <div class="modal fade" id="<?= $rented_modal_id ?>_photo" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>_photoLabel" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered modal-xl">
-            <div class="modal-content bg-dark">
-              <div class="modal-header border-0">
-                <h5 class="modal-title text-white" id="<?= $rented_modal_id ?>_photoLabel">
-                  Photo Gallery: <?= htmlspecialchars($rent['Name']) ?>
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-              </div>
-              <div class="modal-body text-center">
-                <?php if (count($rented_photo_urls) === 1): ?>
-                  <img src="<?= $rented_photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
-                <?php elseif (count($rented_photo_urls) > 1): ?>
-                  <div id="rentedZoomCarousel<?= $rented_modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
-                    <div class="carousel-inner">
-                      <?php foreach ($rented_photo_urls as $idx => $url): ?>
-                        <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
-                          <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
-                        </div>
-                      <?php endforeach; ?>
-                    </div>
-                    <button class="carousel-control-prev" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="prev">
-                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Previous</span>
-                    </button>
-                    <button class="carousel-control-next" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="next">
-                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                        <span class="visually-hidden">Next</span>
-                    </button>
-                  </div>
-                <?php else: ?>
-                  <div class="text-center mb-3" style="font-size:56px;color:#059669;">
-                    <i class="fa-solid fa-house-user"></i>
-                  </div>
-                <?php endif; ?>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rented Unit Modal -->
-        <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered">
+        </div>`;
+      });
+    } catch (err) {
+      document.getElementById('rented-units-row').innerHTML = '<div class="col-12 text-center"><div class="alert alert-danger">Failed to load rented units.</div></div>';
+    }
+  }
+  loadRentedUnits();
+  setInterval(loadRentedUnits, 10000); // Refresh every 10 seconds
+  </script>
             <div class="modal-content">
               <div class="modal-header bg-success text-white">
                 <h5 class="modal-title fw-bold" id="<?= $rented_modal_id ?>Label">
@@ -1033,39 +925,51 @@ if (isset($_SESSION['login_error'])) {
         <h2>What Our Clients Say</h2>
         <p>Hear from businesses that have found their perfect space with us.</p>
       </div>
-
       <div class="swiper testimonials-swiper">
-        <div class="swiper-wrapper">
-          <?php
-          if (!empty($testimonials)) {
-            foreach ($testimonials as $fb) {
-              $stars = str_repeat('<i class="bi bi-star-fill"></i>', $fb['Rating']);
-              $stars .= str_repeat('<i class="bi bi-star text-muted"></i>', 5 - $fb['Rating']);
-          ?>
-          <div class="swiper-slide">
-            <div class="testimonial-card">
-              <div class="testimonial-stars">
-                <?= $stars ?>
-              </div>
-              <p class="testimonial-text"><?= htmlspecialchars($fb['Comments']) ?></p>
-              <div class="testimonial-author"><?= htmlspecialchars($fb['Client_fn'] . ' ' . $fb['Client_ln']) ?></div>
-            </div>
-          </div>
-          <?php
-            }
-          } else {
-            echo '<div class="swiper-slide">
-                    <div class="testimonial-card">
-                      <p class="testimonial-text">No testimonials available yet.</p>
-                    </div>
-                  </div>';
-          }
-          ?>
+        <div id="testimonials-wrapper" class="swiper-wrapper">
+          <!-- Testimonials will be loaded here by JavaScript -->
         </div>
         <div class="swiper-pagination"></div>
       </div>
     </div>
   </section>
+
+  <script>
+  async function loadTestimonials() {
+    try {
+      const response = await fetch('ajax/testimonials.php');
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      const wrapper = document.getElementById('testimonials-wrapper');
+      wrapper.innerHTML = '';
+      if (data.length === 0) {
+        wrapper.innerHTML = `<div class=\"swiper-slide\"><div class=\"testimonial-card\"><p class=\"testimonial-text\">No testimonials available yet.</p></div></div>`;
+        return;
+      }
+      data.forEach(fb => {
+        let stars = '';
+        for (let i = 0; i < fb.Rating; i++) stars += '<i class="bi bi-star-fill"></i>';
+        for (let i = fb.Rating; i < 5; i++) stars += '<i class="bi bi-star text-muted"></i>';
+        wrapper.innerHTML += `
+          <div class=\"swiper-slide\">
+            <div class=\"testimonial-card\">
+              <div class=\"testimonial-stars\">${stars}</div>
+              <p class=\"testimonial-text\">${fb.Comments.replace(/</g, '&lt;')}</p>
+              <div class=\"testimonial-author\">${fb.Client_fn} ${fb.Client_ln}</div>
+            </div>
+          </div>
+        `;
+      });
+      if (window.testimonialSwiper && window.testimonialSwiper.update) {
+        window.testimonialSwiper.update();
+      }
+    } catch (err) {
+      document.getElementById('testimonials-wrapper').innerHTML = `<div class=\"swiper-slide\"><div class=\"testimonial-card\"><p class=\"testimonial-text text-danger\">Failed to load testimonials.</p></div></div>`;
+    }
+  }
+  loadTestimonials();
+  setInterval(loadTestimonials, 10000); // Refresh every 10 seconds
+  </script>
 
   <!-- Contact Section -->
   <section id="contact" class="contact-section">
