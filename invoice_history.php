@@ -839,7 +839,7 @@ async function loadChatMessages() {
     const invoiceId = <?= json_encode($selected_invoice_id) ?>;
     if (!invoiceId) return;
     try {
-        const response = await fetch('ajax/invoice_chat_messages.php?invoice_id=' + invoiceId);
+        const response = await fetch('AJAX/invoice_chat_messages.php?invoice_id=' + invoiceId);
         const data = await response.json();
         chatMessages.innerHTML = '';
         if (data.error) {
