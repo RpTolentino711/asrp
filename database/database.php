@@ -60,89 +60,332 @@ public function executeStatement($sql, $params = []) {
         return (bool)$result;
     }
 
-    public function getUnitPhotosForClient($client_id) {
-    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
-            FROM clientspace 
-            WHERE Client_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$client_id]);
-    $photos = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $photos[$row['Space_ID']] = array_values(array_filter([
-            $row['BusinessPhoto1'],
-            $row['BusinessPhoto2'],
-            $row['BusinessPhoto3'],
-            $row['BusinessPhoto4'],
-            $row['BusinessPhoto5'],
-        ]));
-    }
-    return $photos;
-}
+   
 
-public function getAllUnitPhotosForUnits($unit_ids) {
-    if (empty($unit_ids)) return [];
-    // Prepare placeholders for array of unit IDs
-    $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
-            FROM clientspace 
-            WHERE Space_ID IN ($placeholders)";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute($unit_ids);
-    $photos = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $photos[$row['Space_ID']] = array_values(array_filter([
-            $row['BusinessPhoto1'],
-            $row['BusinessPhoto2'],
-            $row['BusinessPhoto3'],
-            $row['BusinessPhoto4'],
-            $row['BusinessPhoto5'],
-        ]));
-    }
-    return $photos;
-}
-
-public function addUnitPhoto($space_id, $client_id, $filename) {
-    try {
-        $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-                FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$space_id, $client_id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) return false;
-        for ($i = 1; $i <= 5; $i++) {
-            if (empty($row["BusinessPhoto$i"])) {
-                $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
-                $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
-                if (!$result) {
-                    error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
-                }
-                return $result;
+        public function getUnitPhotosForClient($client_id, $active_only = true) {
+        if (empty($client_id)) {
+            return [];
+        }
+        
+        try {
+            $activeClause = $active_only ? "AND active = 1" : "";
+            $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+                    FROM clientspace 
+                    WHERE Client_ID = ? $activeClause";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            
+            $photos = [];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $photos[$row['Space_ID']] = $this->extractPhotosFromRow($row);
             }
-        }
-        return false;
-    } catch (PDOException $e) {
-        error_log("addUnitPhoto PDOException: " . $e->getMessage());
-        return false;
-    }
-}
-
-public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
-    $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-            FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$space_id, $client_id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) return false;
-    for ($i = 1; $i <= 5; $i++) {
-        if ($row["BusinessPhoto$i"] === $photo_filename) {
-            $update = "UPDATE clientspace SET BusinessPhoto$i = NULL WHERE Space_ID = ? AND Client_ID = ?";
-            return $this->executeStatement($update, [$space_id, $client_id]);
+            
+            return $photos;
+        } catch (PDOException $e) {
+            error_log("getUnitPhotosForClient PDOException: " . $e->getMessage());
+            return [];
         }
     }
-    return false;
+    
+    /**
+     * Get photos for multiple units
+     * @param array $unit_ids Array of Space IDs
+     * @param bool $active_only Whether to include only active records
+     * @return array Array of photos grouped by Space_ID
+     */
+    public function getAllUnitPhotosForUnits($unit_ids, $active_only = true) {
+        if (empty($unit_ids) || !is_array($unit_ids)) {
+            return [];
+        }
+        
+        try {
+            // Sanitize unit_ids to ensure they're integers
+            $unit_ids = array_map('intval', array_filter($unit_ids, 'is_numeric'));
+            if (empty($unit_ids)) {
+                return [];
+            }
+            
+            $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
+            $activeClause = $active_only ? "AND active = 1" : "";
+            
+            $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+                    FROM clientspace 
+                    WHERE Space_ID IN ($placeholders) $activeClause";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($unit_ids);
+            
+            $photos = [];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $photos[$row['Space_ID']] = $this->extractPhotosFromRow($row);
+            }
+            
+            return $photos;
+        } catch (PDOException $e) {
+            error_log("getAllUnitPhotosForUnits PDOException: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Add a photo to a unit (finds first available slot)
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @param string $filename Photo filename
+     * @return bool Success status
+     */
+    public function addUnitPhoto($space_id, $client_id, $filename) {
+        if (empty($space_id) || empty($client_id) || empty($filename)) {
+            error_log("addUnitPhoto: Invalid parameters provided");
+            return false;
+        }
+        
+        try {
+            // First check if the record exists and is active
+            $checkSql = "SELECT CS_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                         FROM clientspace 
+                         WHERE Space_ID = ? AND Client_ID = ? AND active = 1";
+            $stmt = $this->pdo->prepare($checkSql);
+            $stmt->execute([$space_id, $client_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$row) {
+                error_log("addUnitPhoto: No active record found for Space_ID: $space_id, Client_ID: $client_id");
+                return false;
+            }
+            
+            // Check if photo already exists
+            for ($i = 1; $i <= 5; $i++) {
+                if ($row["BusinessPhoto$i"] === $filename) {
+                    error_log("addUnitPhoto: Photo already exists: $filename");
+                    return false;
+                }
+            }
+            
+            // Find first available slot
+            for ($i = 1; $i <= 5; $i++) {
+                if (empty($row["BusinessPhoto$i"])) {
+                    $updateSql = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE CS_ID = ?";
+                    $result = $this->executeStatement($updateSql, [$filename, $row['CS_ID']]);
+                    
+                    if (!$result) {
+                        error_log("addUnitPhoto failed: " . print_r([$updateSql, $filename, $row['CS_ID']], true));
+                    }
+                    
+                    return $result;
+                }
+            }
+            
+            // No available slots
+            error_log("addUnitPhoto: No available photo slots for Space_ID: $space_id, Client_ID: $client_id");
+            return false;
+            
+        } catch (PDOException $e) {
+            error_log("addUnitPhoto PDOException: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Delete a specific photo from a unit
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @param string $photo_filename Photo filename to delete
+     * @return bool Success status
+     */
+    public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
+        if (empty($space_id) || empty($client_id) || empty($photo_filename)) {
+            error_log("deleteUnitPhoto: Invalid parameters provided");
+            return false;
+        }
+        
+        try {
+            $sql = "SELECT CS_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                    FROM clientspace 
+                    WHERE Space_ID = ? AND Client_ID = ? AND active = 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id, $client_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$row) {
+                error_log("deleteUnitPhoto: No active record found for Space_ID: $space_id, Client_ID: $client_id");
+                return false;
+            }
+            
+            // Find the photo and remove it
+            for ($i = 1; $i <= 5; $i++) {
+                if ($row["BusinessPhoto$i"] === $photo_filename) {
+                    $updateSql = "UPDATE clientspace SET BusinessPhoto$i = NULL WHERE CS_ID = ?";
+                    $result = $this->executeStatement($updateSql, [$row['CS_ID']]);
+                    
+                    if (!$result) {
+                        error_log("deleteUnitPhoto failed: " . print_r([$updateSql, $row['CS_ID']], true));
+                    }
+                    
+                    return $result;
+                }
+            }
+            
+            // Photo not found
+            error_log("deleteUnitPhoto: Photo not found: $photo_filename for Space_ID: $space_id, Client_ID: $client_id");
+            return false;
+            
+        } catch (PDOException $e) {
+            error_log("deleteUnitPhoto PDOException: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Update/replace a specific photo in a unit
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @param string $old_filename Old photo filename
+     * @param string $new_filename New photo filename
+     * @return bool Success status
+     */
+    public function updateUnitPhoto($space_id, $client_id, $old_filename, $new_filename) {
+        if (empty($space_id) || empty($client_id) || empty($old_filename) || empty($new_filename)) {
+            error_log("updateUnitPhoto: Invalid parameters provided");
+            return false;
+        }
+        
+        try {
+            $sql = "SELECT CS_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                    FROM clientspace 
+                    WHERE Space_ID = ? AND Client_ID = ? AND active = 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id, $client_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$row) {
+                error_log("updateUnitPhoto: No active record found for Space_ID: $space_id, Client_ID: $client_id");
+                return false;
+            }
+            
+            // Find the old photo and replace it
+            for ($i = 1; $i <= 5; $i++) {
+                if ($row["BusinessPhoto$i"] === $old_filename) {
+                    $updateSql = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE CS_ID = ?";
+                    $result = $this->executeStatement($updateSql, [$new_filename, $row['CS_ID']]);
+                    
+                    if (!$result) {
+                        error_log("updateUnitPhoto failed: " . print_r([$updateSql, $new_filename, $row['CS_ID']], true));
+                    }
+                    
+                    return $result;
+                }
+            }
+            
+            // Old photo not found
+            error_log("updateUnitPhoto: Old photo not found: $old_filename for Space_ID: $space_id, Client_ID: $client_id");
+            return false;
+            
+        } catch (PDOException $e) {
+            error_log("updateUnitPhoto PDOException: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get photo count for a specific unit
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @return int Number of photos
+     */
+    public function getUnitPhotoCount($space_id, $client_id) {
+        if (empty($space_id) || empty($client_id)) {
+            return 0;
+        }
+        
+        try {
+            $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                    FROM clientspace 
+                    WHERE Space_ID = ? AND Client_ID = ? AND active = 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id, $client_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$row) {
+                return 0;
+            }
+            
+            return count($this->extractPhotosFromRow($row));
+            
+        } catch (PDOException $e) {
+            error_log("getUnitPhotoCount PDOException: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    /**
+     * Check if a unit has reached maximum photo capacity
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @return bool True if at capacity
+     */
+    public function isUnitAtPhotoCapacity($space_id, $client_id) {
+        return $this->getUnitPhotoCount($space_id, $client_id) >= 5;
+    }
+    
+    /**
+     * Get all photos for a specific unit
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @return array Array of photo filenames
+     */
+    public function getUnitPhotos($space_id, $client_id) {
+        if (empty($space_id) || empty($client_id)) {
+            return [];
+        }
+        
+        try {
+            $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                    FROM clientspace 
+                    WHERE Space_ID = ? AND Client_ID = ? AND active = 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id, $client_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$row) {
+                return [];
+            }
+            
+            return $this->extractPhotosFromRow($row);
+            
+        } catch (PDOException $e) {
+            error_log("getUnitPhotos PDOException: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Remove all photos from a unit
+     * @param int $space_id Space ID
+     * @param int $client_id Client ID
+     * @return bool Success status
+     */
+    public function clearAllUnitPhotos($space_id, $client_id) {
+        if (empty($space_id) || empty($client_id)) {
+            error_log("clearAllUnitPhotos: Invalid parameters provided");
+            return false;
+        }
+        
+        try {
+            $sql = "UPDATE clientspace 
+                    SET BusinessPhoto1 = NULL, BusinessPhoto2 = NULL, BusinessPhoto3 = NULL, 
+                        BusinessPhoto4 = NULL, BusinessPhoto5 = NULL 
+                    WHERE Space_ID = ? AND Client_ID = ? AND active = 1";
+            
+            return $this->executeStatement($sql, [$space_id, $client_id]);
+            
+        } catch (PDOException $e) {
+            error_log("clearAllUnitPhotos PDOException: " . $e->getMessage());
+            return false;
+        }
+    }
 }
-
-
 
 
 
