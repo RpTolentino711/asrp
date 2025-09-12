@@ -398,8 +398,8 @@ public function runQueryAll($query, $params = []) {
         }
     }
 
-public function getHomepageAvailableUnits($limit = 6, $after_id = 0) {
-    // Only show units that are available to rent (Flow_Status = 'new') and with Space_ID > $after_id
+  public function getHomepageAvailableUnits($limit = 6) {
+    // Only show units that are available to rent (Flow_Status = 'new')
     $sql = "SELECT s.*, st.SpaceTypeName
             FROM space s
             LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
@@ -408,13 +408,11 @@ public function getHomepageAvailableUnits($limit = 6, $after_id = 0) {
                 WHERE LOWER(Status) = 'occupied' AND EndDate >= CURDATE()
             ) sa ON s.Space_ID = sa.Space_ID
             WHERE sa.Space_ID IS NULL
-              AND s.Flow_Status = 'new'
-              AND s.Space_ID > :after_id
+              AND s.Flow_Status = 'new' -- Only available units
             ORDER BY s.Space_ID DESC
             LIMIT :limit";
     try {
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':after_id', (int)$after_id, PDO::PARAM_INT);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll();
