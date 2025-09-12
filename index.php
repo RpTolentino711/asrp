@@ -1282,6 +1282,30 @@ if (isset($_SESSION['login_error'])) {
         this.style.transform = 'translateY(0)';
       });
     });
+
+function loadAvailableUnitsAuto() {
+    fetch('AJAX/get_available_units.php')
+        .then(res => res.text())
+        .then(html => {
+            const container = document.getElementById('available-units-list');
+            if (container.innerHTML !== html) {
+                container.innerHTML = html;
+                // Re-apply scroll animation observer if you use it
+                if (window.observer) {
+                    document.querySelectorAll('.animate-on-scroll').forEach((el) => {
+                        observer.observe(el);
+                    });
+                }
+            }
+        });
+}
+
+// Initial call (optional, if you want to sync with server once loaded)
+// loadAvailableUnitsAuto();
+
+// Auto-refresh every 10 seconds
+setInterval(loadAvailableUnitsAuto, 10000);
+
   </script>
 </body>
 </html>
