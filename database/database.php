@@ -61,7 +61,7 @@ public function executeStatement($sql, $params = []) {
     }
 
     public function getUnitPhotosForClient($client_id) {
-    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+    $sql = "SELECT Space_ID, BusinessPhoto,BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
             FROM clientspace 
             WHERE Client_ID = ?";
     $stmt = $this->pdo->prepare($sql);
@@ -69,7 +69,9 @@ public function executeStatement($sql, $params = []) {
     $photos = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $photos[$row['Space_ID']] = array_values(array_filter([
+            $row['BusinessPhoto'],
             $row['BusinessPhoto1'],
+
             $row['BusinessPhoto2'],
             $row['BusinessPhoto3'],
             $row['BusinessPhoto4'],
@@ -83,7 +85,7 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
     // Prepare placeholders for array of unit IDs
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+    $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
             FROM clientspace 
             WHERE Space_ID IN ($placeholders)";
     $stmt = $this->pdo->prepare($sql);
@@ -91,6 +93,7 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     $photos = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $photos[$row['Space_ID']] = array_values(array_filter([
+            $row['BusinessPhoto'],
             $row['BusinessPhoto1'],
             $row['BusinessPhoto2'],
             $row['BusinessPhoto3'],
@@ -103,7 +106,7 @@ public function getAllUnitPhotosForUnits($unit_ids) {
 
 public function addUnitPhoto($space_id, $client_id, $filename) {
     try {
-        $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+        $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
                 FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$space_id, $client_id]);
@@ -127,7 +130,7 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
 }
 
 public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
-    $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+    $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
             FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute([$space_id, $client_id]);
