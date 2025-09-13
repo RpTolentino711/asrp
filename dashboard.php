@@ -1,18 +1,6 @@
 <?php
 // Enable error reporting for debugging
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
-// Debug output for POST and FILES
-if (!empty($_POST) || !empty($_FILES)) {
-    echo '<pre style="background:#fffbe6;color:#b91c1c;padding:1em;border:1px solid #fde68a;max-width:700px;margin:2em auto;overflow:auto;">';
-    echo "<strong>POST:</strong>\n";
-    print_r($_POST);
-    echo "<strong>FILES:</strong>\n";
-    print_r($_FILES);
-    echo '</pre>';
-}
 
 require 'database/database.php'; 
 session_start();

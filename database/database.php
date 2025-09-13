@@ -60,61 +60,75 @@ public function executeStatement($sql, $params = []) {
         return (bool)$result;
     }
 
-    public function getUnitPhotosForClient($client_id) {
-    $sql = "SELECT Space_ID, BusinessPhoto,BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+public function getUnitPhotosForClient($client_id) {
+    $columns = $this->getPhotoColumns();
+    $columnNames = implode(', ', $columns);
+    
+    $sql = "SELECT Space_ID, {$columnNames} 
             FROM clientspace 
             WHERE Client_ID = ?";
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute([$client_id]);
     $photos = [];
+    
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $photos[$row['Space_ID']] = array_values(array_filter([
-            $row['BusinessPhoto'],
-            $row['BusinessPhoto1'],
-
-            $row['BusinessPhoto2'],
-            $row['BusinessPhoto3'],
-            $row['BusinessPhoto4'],
-            $row['BusinessPhoto5'],
-        ]));
+        $photoValues = [];
+        foreach ($columns as $column) {
+            if (!empty($row[$column])) {
+                $photoValues[] = $row[$column];
+            }
+        }
+        $photos[$row['Space_ID']] = $photoValues;
     }
     return $photos;
 }
 
 public function getAllUnitPhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
-    // Prepare placeholders for array of unit IDs
+    
+    $columns = $this->getPhotoColumns();
+    $columnNames = implode(', ', $columns);
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+    
+    $sql = "SELECT Space_ID, {$columnNames} 
             FROM clientspace 
             WHERE Space_ID IN ($placeholders)";
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute($unit_ids);
     $photos = [];
+    
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $photos[$row['Space_ID']] = array_values(array_filter([
-            $row['BusinessPhoto'],
-            $row['BusinessPhoto1'],
-            $row['BusinessPhoto2'],
-            $row['BusinessPhoto3'],
-            $row['BusinessPhoto4'],
-            $row['BusinessPhoto5'],
-        ]));
+        $photoValues = [];
+        foreach ($columns as $column) {
+            if (!empty($row[$column])) {
+                $photoValues[] = $row[$column];
+            }
+        }
+        $photos[$row['Space_ID']] = $photoValues;
     }
     return $photos;
 }
 
+private function getPhotoColumns() {
+    return ['BusinessPhoto', 'BusinessPhoto1', 'BusinessPhoto2', 'BusinessPhoto3', 'BusinessPhoto4', 'BusinessPhoto5'];
+}
+
 public function addUnitPhoto($space_id, $client_id, $filename) {
     try {
-        $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-                FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+        $columns = $this->getPhotoColumns();
+        $columnNames = implode(', ', $columns);
+        
+        $sql = "SELECT {$columnNames} FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$space_id, $client_id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         if (!$row) return false;
-        for ($i = 1; $i <= 5; $i++) {
-            if (empty($row["BusinessPhoto$i"])) {
-                $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
+        
+        // Find first empty slot
+        foreach ($columns as $column) {
+            if (empty($row[$column])) {
+                $update = "UPDATE clientspace SET {$column} = ? WHERE Space_ID = ? AND Client_ID = ?";
                 $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
                 if (!$result) {
                     error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
@@ -122,7 +136,7 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
                 return $result;
             }
         }
-        return false;
+        return false; // All photo slots are full
     } catch (PDOException $e) {
         error_log("addUnitPhoto PDOException: " . $e->getMessage());
         return false;
@@ -130,25 +144,58 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
 }
 
 public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
-    $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-            FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+    try {
+        $columns = $this->getPhotoColumns();
+        $columnNames = implode(', ', $columns);
+        
+        $sql = "SELECT {$columnNames} FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$space_id, $client_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) return false;
+        
+        foreach ($columns as $column) {
+            if ($row[$column] === $photo_filename) {
+                $update = "UPDATE clientspace SET {$column} = NULL WHERE Space_ID = ? AND Client_ID = ?";
+                return $this->executeStatement($update, [$space_id, $client_id]);
+            }
+        }
+        return false;
+    } catch (PDOException $e) {
+        error_log("deleteUnitPhoto PDOException: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Additional helper methods you might find useful
+public function getPhotoCount($space_id, $client_id) {
+    $columns = $this->getPhotoColumns();
+    $columnNames = implode(', ', $columns);
+    
+    $sql = "SELECT {$columnNames} FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute([$space_id, $client_id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) return false;
-    for ($i = 1; $i <= 5; $i++) {
-        if ($row["BusinessPhoto$i"] === $photo_filename) {
-            $update = "UPDATE clientspace SET BusinessPhoto$i = NULL WHERE Space_ID = ? AND Client_ID = ?";
-            return $this->executeStatement($update, [$space_id, $client_id]);
+    
+    if (!$row) return 0;
+    
+    $count = 0;
+    foreach ($columns as $column) {
+        if (!empty($row[$column])) {
+            $count++;
         }
     }
-    return false;
+    return $count;
 }
 
+public function hasPhotoSlotAvailable($space_id, $client_id) {
+    return $this->getPhotoCount($space_id, $client_id) < count($this->getPhotoColumns());
+}
 
-
-
-
+public function isPhotoSlotFull($space_id, $client_id) {
+    return $this->getPhotoCount($space_id, $client_id) >= count($this->getPhotoColumns());
+}
 
 
 
