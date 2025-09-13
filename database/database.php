@@ -899,38 +899,37 @@ public function getAllSpacesWithDetails() {
     
 // --- Overdue Rentals For Kicking ---
 public function getOverdueRentalsForKicking() {
-    $sql = " SELECT DISTINCT
-            i.Invoice_ID, 
-            i.Client_ID, 
-            i.Space_ID, 
-            i.InvoiceDate, 
-            i.EndDate, 
-            i.Status, 
-            c.Client_fn, 
-            c.Client_ln, 
-            s.Name AS SpaceName, 
+    $sql = "SELECT DISTINCT
+            i.Invoice_ID,
+            i.Client_ID,
+            i.Space_ID,
+            i.InvoiceDate,
+            i.EndDate,
+            i.Status,
+            c.Client_fn,
+            c.Client_ln,
+            s.Name AS SpaceName,
             r.Request_ID
         FROM invoice i
-        JOIN client c 
-            ON i.Client_ID = c.Client_ID
-        JOIN space s 
-            ON i.Space_ID = s.Space_ID
+        JOIN client c ON i.Client_ID = c.Client_ID
+        JOIN space s ON i.Space_ID = s.Space_ID
         JOIN rentalrequest r 
-            ON i.Client_ID = r.Client_ID 
+            ON i.Client_ID = r.Client_ID
            AND i.Space_ID = r.Space_ID
-        WHERE i.Status = 'unpaid'
+        WHERE LOWER(i.Status) = 'unpaid'
           AND i.EndDate < CURDATE()
           AND r.Status = 'Accepted'
-        ORDER BY i.EndDate ASC";
+        ORDER BY i.EndDate ASC
+    ";
 
     try {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Debugging output (remove in production)
+        // Debugging: log if no rows
         if (empty($rows)) {
-            error_log("No overdue rentals found");
+            error_log("No overdue rentals found.");
         }
 
         return $rows;
@@ -939,7 +938,6 @@ public function getOverdueRentalsForKicking() {
         return [];
     }
 }
-
 
 
 public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_id) {
