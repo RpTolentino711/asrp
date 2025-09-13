@@ -21,7 +21,7 @@ class Database {
             die("Database connection failed: " . $e->getMessage());
         }
     }
-R
+
        public function getRow($sql, $params = []) {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
@@ -862,10 +862,8 @@ public function getAllSpacesWithDetails() {
     
     
     
-
-
-
-public function getAllActiveRenters() {
+    // --- Overdue Rentals For Kicking ---
+    public function getAllActiveRenters() {
         $sql = "SELECT DISTINCT 
                     i.Invoice_ID,
                     i.Client_ID,
@@ -1023,6 +1021,10 @@ public function getAllActiveRenters() {
             return [];
         }
     }
+}
+
+
+
 
 
     public function getMaintenanceRequestStatus($request_id) {
