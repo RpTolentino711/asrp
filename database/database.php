@@ -916,6 +916,7 @@ public function getAllSpacesWithDetails() {
             return [];
         }
     }
+    
 
 public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_id) {
     $this->pdo->beginTransaction();
