@@ -895,8 +895,134 @@ public function getAllSpacesWithDetails() {
     }
 }
     
+
+
+
+    
+ public function getAllActiveRenters() {
+        $sql = "SELECT DISTINCT 
+                    i.Invoice_ID,
+                    i.Client_ID,
+                    i.Space_ID,
+                    i.InvoiceDate,
+                    i.EndDate,
+                    i.InvoiceTotal,
+                    i.Status,
+                    i.Flow_Status,
+                    c.Client_fn,
+                    c.Client_ln,
+                    c.Client_Email,
+                    c.Client_Phone,
+                    s.Name as SpaceName,
+                    s.Street,
+                    s.Brgy,
+                    s.City,
+                    r.Request_ID,
+                    cs.CS_ID,
+                    DATEDIFF(CURDATE(), i.EndDate) as DaysOverdue,
+                    CASE 
+                        WHEN DATEDIFF(CURDATE(), i.EndDate) > 0 THEN 'overdue'
+                        WHEN DATEDIFF(CURDATE(), i.EndDate) = 0 THEN 'due_today' 
+                        ELSE 'current'
+                    END as RentalStatus
+                FROM invoice i
+                JOIN client c ON i.Client_ID = c.Client_ID
+                JOIN space s ON i.Space_ID = s.Space_ID
+                JOIN clientspace cs ON i.Client_ID = cs.Client_ID 
+                    AND i.Space_ID = cs.Space_ID 
+                    AND cs.active = 1
+                LEFT JOIN rentalrequest r ON i.Client_ID = r.Client_ID 
+                    AND i.Space_ID = r.Space_ID 
+                    AND r.Status = 'Accepted'
+                WHERE i.Flow_Status = 'new'
+                    AND c.Status = 'Active'
+                ORDER BY 
+                    CASE 
+                        WHEN i.Status = 'unpaid' AND DATEDIFF(CURDATE(), i.EndDate) > 0 THEN 1
+                        WHEN i.Status = 'unpaid' AND DATEDIFF(CURDATE(), i.EndDate) = 0 THEN 2
+                        WHEN i.Status = 'unpaid' THEN 3
+                        ELSE 4
+                    END,
+                    DATEDIFF(CURDATE(), i.EndDate) DESC,
+                    i.EndDate ASC";
+        
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching all active renters: " . $e->getMessage());
+            return [];
+        }
+    }
     
     
+    public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_id) {
+        // Validate input parameters
+        if (!is_numeric($invoice_id) || !is_numeric($client_id) || !is_numeric($space_id)) {
+            error_log("Invalid parameters for kickOverdueClient");
+            return false;
+        }
+        
+        $this->pdo->beginTransaction();
+        try {
+            // 1. Deactivate client-space relationship (soft delete instead of hard delete)
+            $stmt1 = $this->pdo->prepare("UPDATE clientspace SET active = 0 WHERE Client_ID = ? AND Space_ID = ? AND active = 1");
+            $stmt1->execute([$client_id, $space_id]);
+
+            // 2. Set spaceavailability to 'Available' and set EndDate to today
+            $stmt2 = $this->pdo->prepare("UPDATE spaceavailability 
+                         SET Status = 'Available', EndDate = CURDATE() 
+                         WHERE Space_ID = ? AND Status = 'Occupied'");
+            $stmt2->execute([$space_id]);
+
+            // 3. Mark the invoice as 'kicked' and set Flow_Status to 'done'
+            $stmt3 = $this->pdo->prepare("UPDATE invoice 
+                         SET Status = 'kicked', Flow_Status = 'done' 
+                         WHERE Invoice_ID = ? AND Client_ID = ?");
+            $stmt3->execute([$invoice_id, $client_id]);
+
+            // 4. Mark the rental request as 'Rejected' (with null check)
+            if ($request_id && is_numeric($request_id)) {
+                $stmt4 = $this->pdo->prepare("UPDATE rentalrequest 
+                             SET Status = 'Rejected' 
+                             WHERE Request_ID = ? AND Client_ID = ? AND Space_ID = ?");
+                $stmt4->execute([$request_id, $client_id, $space_id]);
+            }
+
+            // 5. Set the space as available in the flow (Flow_Status: 'new')
+            $stmt5 = $this->pdo->prepare("UPDATE space SET Flow_Status = 'new' WHERE Space_ID = ?");
+            $stmt5->execute([$space_id]);
+
+            // 6. Ensure there is an 'Available' record in spaceavailability for this space (avoid duplicates)
+            $existsStmt = $this->pdo->prepare("SELECT COUNT(*) FROM spaceavailability WHERE Space_ID = ? AND Status = 'Available'");
+            $existsStmt->execute([$space_id]);
+            
+            if ($existsStmt->fetchColumn() == 0) {
+                $insertStmt = $this->pdo->prepare("INSERT INTO spaceavailability (Space_ID, Status) VALUES (?, 'Available')");
+                $insertStmt->execute([$space_id]);
+            }
+
+            // 7. Log the eviction for audit trail
+            try {
+                $message = "Client evicted due to overdue payment. Invoice: #{$invoice_id}";
+                $logStmt = $this->pdo->prepare("INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Message, Created_At) 
+                             VALUES (?, 'system', ?, NOW())");
+                $logStmt->execute([$invoice_id, $message]);
+            } catch (PDOException $e) {
+                // Don't fail transaction for logging issues
+                error_log("Failed to log eviction: " . $e->getMessage());
+            }
+
+            $this->pdo->commit();
+            return true;
+            
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("Failed to kick client (Invoice #{$invoice_id}): " . $e->getMessage());
+            return false;
+        }
+    }
 
 
 
