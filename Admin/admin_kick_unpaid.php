@@ -29,15 +29,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kick_invoice_id'])) {
     }
 }
 
-// --- Fetch Data for Display ---
-$overdue_rentals = $db->getOverdueRentalsForKicking();
+// --- Fetch All Active Renters ---
+$all_renters = $db->getAllActiveRenters();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Kick Unpaid Clients</title>
+    <title>Admin - Rental Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -219,13 +219,36 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
             background-color: #f9fafb;
         }
 
-        .badge-overdue {
-            background-color: rgba(239, 68, 68, 0.1);
-            color: #ef4444;
+        .status-badge {
             padding: 0.35rem 0.75rem;
             border-radius: 20px;
             font-weight: 600;
             font-size: 0.75rem;
+        }
+
+        .status-overdue {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .status-due-today {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .status-current {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .status-unpaid {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+        }
+
+        .status-paid {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: #10b981;
         }
 
         .animate-fade-in {
@@ -270,6 +293,55 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
             font-size: 0.8rem;
         }
 
+        .filter-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-tab {
+            padding: 0.5rem 1rem;
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .filter-tab.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -293,7 +365,9 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
     </style>
 </head>
 <body>
-    <div class="toggle-btn"><i class="fas fa-bars"></i></div>
+    <div class="toggle-btn" style="position: fixed; top: 20px; left: 20px; z-index: 1001; background: var(--primary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: none;">
+        <i class="fas fa-bars"></i>
+    </div>
 
     <div class="sidebar">
         <div class="sidebar-header">
@@ -355,7 +429,7 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
         <div class="nav-item">
             <a href="admin_kick_unpaid.php" class="nav-link active">
                 <i class="fas fa-user-slash"></i>
-                <span>Overdue Accounts</span>
+                <span>Rental Management</span>
             </a>
         </div>
 
@@ -370,8 +444,8 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
     <div class="content">
         <div class="dashboard-header">
             <div class="welcome-text">
-                <h1>Overdue Accounts Management</h1>
-                <p>Manage clients with overdue payments</p>
+                <h1>Rental Management</h1>
+                <p>View all active renters and manage overdue accounts</p>
             </div>
             <div class="header-actions">
                 <a href="dashboard.php" class="btn btn-primary">
@@ -395,30 +469,75 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
             </div>
         <?php endif; ?>
 
+        <!-- Statistics Row -->
+        <div class="stats-row animate-fade-in">
+            <?php
+            $total_renters = count($all_renters);
+            $overdue_count = 0;
+            $due_today_count = 0;
+            $current_count = 0;
+            
+            foreach($all_renters as $renter) {
+                if ($renter['DaysOverdue'] > 0) {
+                    $overdue_count++;
+                } elseif ($renter['DaysOverdue'] == 0) {
+                    $due_today_count++;
+                } else {
+                    $current_count++;
+                }
+            }
+            ?>
+            <div class="stat-card">
+                <div class="stat-number text-primary"><?= $total_renters ?></div>
+                <div class="stat-label">Total Renters</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number text-danger"><?= $overdue_count ?></div>
+                <div class="stat-label">Overdue</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number text-warning"><?= $due_today_count ?></div>
+                <div class="stat-label">Due Today</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number text-success"><?= $current_count ?></div>
+                <div class="stat-label">Current</div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs animate-fade-in">
+            <div class="filter-tab active" onclick="filterTable('all')">All Renters</div>
+            <div class="filter-tab" onclick="filterTable('overdue')">Overdue Only</div>
+            <div class="filter-tab" onclick="filterTable('due_today')">Due Today</div>
+            <div class="filter-tab" onclick="filterTable('current')">Current</div>
+        </div>
+
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
-                <i class="fas fa-exclamation-triangle text-warning"></i>
-                <span>Overdue Accounts</span>
-                <?php if (!empty($overdue_rentals)): ?>
-                    <span class="badge bg-danger ms-2"><?= count($overdue_rentals) ?> Unpaid</span>
-                <?php endif; ?>
+                <i class="fas fa-users"></i>
+                <span>All Active Renters</span>
+                <span class="badge bg-primary ms-2"><?= $total_renters ?> Total</span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($overdue_rentals)): ?>
+                <?php if (!empty($all_renters)): ?>
                     <div class="table-container">
-                        <table class="custom-table">
+                        <table class="custom-table" id="rentersTable">
                             <thead>
                                 <tr>
                                     <th>Client</th>
                                     <th>Unit</th>
                                     <th>Invoice Date</th>
-                                    <th>Rental End</th>
+                                    <th>Due Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Days Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach($overdue_rentals as $row): ?>
-                                    <tr>
+                                <?php foreach($all_renters as $row): ?>
+                                    <tr class="renter-row" data-status="<?= $row['DaysOverdue'] > 0 ? 'overdue' : ($row['DaysOverdue'] == 0 ? 'due_today' : 'current') ?>">
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="bg-primary-light rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
@@ -427,22 +546,56 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
                                                 <div>
                                                     <div class="fw-semibold"><?= htmlspecialchars($row['Client_fn'] . ' ' . $row['Client_ln']) ?></div>
                                                     <div class="text-muted small">ID: <?= $row['Client_ID'] ?></div>
+                                                    <?php if (!empty($row['Client_Email'])): ?>
+                                                        <div class="text-muted small"><?= htmlspecialchars($row['Client_Email']) ?></div>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td><?= htmlspecialchars($row['SpaceName']) ?> (ID: <?= $row['Space_ID'] ?>)</td>
+                                        <td>
+                                            <div class="fw-semibold"><?= htmlspecialchars($row['SpaceName']) ?></div>
+                                            <div class="text-muted small">ID: <?= $row['Space_ID'] ?></div>
+                                            <?php if (!empty($row['Street'])): ?>
+                                                <div class="text-muted small"><?= htmlspecialchars($row['Street'] . ', ' . $row['Brgy']) ?></div>
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?= htmlspecialchars($row['InvoiceDate']) ?></td>
                                         <td><?= htmlspecialchars($row['EndDate']) ?></td>
                                         <td>
-                                            <form method="post" onsubmit="return confirmAction(this);">
-                                                <input type="hidden" name="kick_invoice_id" value="<?= $row['Invoice_ID'] ?>">
-                                                <input type="hidden" name="kick_client_id" value="<?= $row['Client_ID'] ?>">
-                                                <input type="hidden" name="kick_space_id" value="<?= $row['Space_ID'] ?>">
-                                                <input type="hidden" name="kick_request_id" value="<?= $row['Request_ID'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-danger">
-                                                    <i class="fas fa-user-slash me-1"></i>Kick & Free Unit
+                                            <div class="fw-semibold">₱<?= number_format($row['InvoiceTotal'], 2) ?></div>
+                                        </td>
+                                        <td>
+                                            <?php if ($row['Status'] == 'unpaid'): ?>
+                                                <span class="status-badge status-unpaid">Unpaid</span>
+                                            <?php else: ?>
+                                                <span class="status-badge status-paid">Paid</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($row['DaysOverdue'] > 0): ?>
+                                                <span class="status-badge status-overdue"><?= $row['DaysOverdue'] ?> days overdue</span>
+                                            <?php elseif ($row['DaysOverdue'] == 0): ?>
+                                                <span class="status-badge status-due-today">Due today</span>
+                                            <?php else: ?>
+                                                <span class="status-badge status-current"><?= abs($row['DaysOverdue']) ?> days remaining</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($row['Status'] == 'unpaid' && $row['DaysOverdue'] >= 0): ?>
+                                                <form method="post" onsubmit="return confirmAction(this);">
+                                                    <input type="hidden" name="kick_invoice_id" value="<?= $row['Invoice_ID'] ?>">
+                                                    <input type="hidden" name="kick_client_id" value="<?= $row['Client_ID'] ?>">
+                                                    <input type="hidden" name="kick_space_id" value="<?= $row['Space_ID'] ?>">
+                                                    <input type="hidden" name="kick_request_id" value="<?= $row['Request_ID'] ?? '' ?>">
+                                                    <button type="submit" class="btn btn-sm btn-danger">
+                                                        <i class="fas fa-user-slash me-1"></i>Kick & Free Unit
+                                                    </button>
+                                                </form>
+                                            <?php else: ?>
+                                                <button class="btn btn-sm btn-secondary" disabled>
+                                                    <i class="fas fa-check me-1"></i>Current
                                                 </button>
-                                            </form>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -451,11 +604,11 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
                     </div>
                 <?php else: ?>
                     <div class="text-center py-5">
-                        <div class="bg-success-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
-                            <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
+                        <div class="bg-info-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
+                            <i class="fas fa-users text-info" style="font-size: 2rem;"></i>
                         </div>
-                        <h4 class="text-success mb-2">No Overdue Accounts</h4>
-                        <p class="text-muted">All clients are up to date with their payments.</p>
+                        <h4 class="text-info mb-2">No Active Renters</h4>
+                        <p class="text-muted">No active rental agreements found.</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -463,10 +616,36 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
     </div>
 
     <script>
+        // Toggle sidebar for mobile
         document.querySelector('.toggle-btn').addEventListener('click', () => {
-            document.querySelector('.sidebar').classList.toggle('collapsed');
-            document.querySelector('.content').classList.toggle('collapsed');
+            document.querySelector('.sidebar').classList.toggle('active');
         });
+
+        // Show toggle button on mobile
+        if (window.innerWidth <= 992) {
+            document.querySelector('.toggle-btn').style.display = 'block';
+        }
+
+        // Filter table functionality
+        function filterTable(status) {
+            // Update active tab
+            document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const rows = document.querySelectorAll('.renter-row');
+            
+            rows.forEach(row => {
+                if (status === 'all') {
+                    row.style.display = '';
+                } else {
+                    if (row.dataset.status === status) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                }
+            });
+        }
 
         function confirmAction(form) {
             Swal.fire({
@@ -474,7 +653,8 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
                 html: "This will:<br><ul class='text-start'>" +
                       "<li>Terminate the client's rental agreement</li>" +
                       "<li>Make the unit available for new rentals</li>" +
-                      "<li>Send a notification to the client</li></ul>" +
+                      "<li>Mark the invoice as 'kicked'</li>" +
+                      "<li>Log the eviction for audit purposes</li></ul>" +
                       "This action cannot be undone.",
                 icon: 'warning',
                 showCancelButton: true,
@@ -493,9 +673,18 @@ $overdue_rentals = $db->getOverdueRentalsForKicking();
                 }
             });
 
-            // Prevent the default form submission, wait for SweetAlert
             return false;
         }
+
+        // Responsive handling
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 992) {
+                document.querySelector('.toggle-btn').style.display = 'block';
+            } else {
+                document.querySelector('.toggle-btn').style.display = 'none';
+                document.querySelector('.sidebar').classList.remove('active');
+            }
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
