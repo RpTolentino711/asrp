@@ -896,7 +896,9 @@ public function getAllSpacesWithDetails() {
 }
     
 
- public function getAllActiveRenters() {
+ 
+
+public function getAllActiveRenters() {
         $sql = "SELECT DISTINCT 
                     i.Invoice_ID,
                     i.Client_ID,
@@ -953,7 +955,84 @@ public function getAllSpacesWithDetails() {
         }
     }
     
+    // Debug method to check space information directly
+    public function debugSpaceInfo($space_id) {
+        $sql = "SELECT Space_ID, Name, Price, Flow_Status, SpaceType_ID, UA_ID 
+                FROM space 
+                WHERE Space_ID = ?";
+        
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error in debugSpaceInfo: " . $e->getMessage());
+            return false;
+        }
+    }
     
+    // Alternative method that forces fresh data from space table
+    public function getAllActiveRentersWithFreshSpaceData() {
+        $sql = "SELECT 
+                    i.Invoice_ID,
+                    i.Client_ID,
+                    i.Space_ID,
+                    i.InvoiceDate,
+                    i.EndDate,
+                    i.InvoiceTotal,
+                    i.Status,
+                    i.Flow_Status,
+                    c.Client_fn,
+                    c.Client_ln,
+                    c.Client_Email,
+                    c.Client_Phone,
+                    (SELECT s.Name FROM space s WHERE s.Space_ID = i.Space_ID LIMIT 1) as SpaceName,
+                    (SELECT s.Street FROM space s WHERE s.Space_ID = i.Space_ID LIMIT 1) as Street,
+                    (SELECT s.Brgy FROM space s WHERE s.Space_ID = i.Space_ID LIMIT 1) as Brgy,
+                    (SELECT s.City FROM space s WHERE s.Space_ID = i.Space_ID LIMIT 1) as City,
+                    (SELECT s.Price FROM space s WHERE s.Space_ID = i.Space_ID LIMIT 1) as CurrentUnitPrice,
+                    r.Request_ID,
+                    cs.CS_ID,
+                    DATEDIFF(CURDATE(), i.EndDate) as DaysOverdue,
+                    CASE 
+                        WHEN DATEDIFF(CURDATE(), i.EndDate) > 0 THEN 'overdue'
+                        WHEN DATEDIFF(CURDATE(), i.EndDate) = 0 THEN 'due_today' 
+                        ELSE 'current'
+                    END as RentalStatus
+                FROM invoice i
+                JOIN client c ON i.Client_ID = c.Client_ID
+                JOIN clientspace cs ON i.Client_ID = cs.Client_ID 
+                    AND i.Space_ID = cs.Space_ID 
+                    AND cs.active = 1
+                LEFT JOIN rentalrequest r ON i.Client_ID = r.Client_ID 
+                    AND i.Space_ID = r.Space_ID 
+                    AND r.Status = 'Accepted'
+                WHERE i.Flow_Status = 'new'
+                    AND c.Status = 'Active'
+                    AND cs.active = 1
+                    AND EXISTS (SELECT 1 FROM space s WHERE s.Space_ID = i.Space_ID)
+                ORDER BY 
+                    CASE 
+                        WHEN i.Status = 'unpaid' AND DATEDIFF(CURDATE(), i.EndDate) > 0 THEN 1
+                        WHEN i.Status = 'unpaid' AND DATEDIFF(CURDATE(), i.EndDate) = 0 THEN 2
+                        WHEN i.Status = 'unpaid' THEN 3
+                        ELSE 4
+                    END,
+                    DATEDIFF(CURDATE(), i.EndDate) DESC,
+                    i.InvoiceDate DESC,
+                    i.Invoice_ID DESC";
+        
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching renters with fresh space data: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    // Updated kick overdue client method with full admin control
     public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_id) {
         // Validate input parameters
         if (!is_numeric($invoice_id) || !is_numeric($client_id) || !is_numeric($space_id)) {
@@ -1000,9 +1079,9 @@ public function getAllSpacesWithDetails() {
                 $insertStmt->execute([$space_id]);
             }
 
-            // 7. Log the eviction for audit trail
+            // 7. Log the eviction for audit trail with admin context
             try {
-                $message = "Client evicted due to overdue payment. Invoice: #{$invoice_id}";
+                $message = "Client evicted by admin. Invoice: #{$invoice_id}, Admin User: " . ($_SESSION['username'] ?? 'Unknown');
                 $logStmt = $this->pdo->prepare("INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Message, Created_At) 
                              VALUES (?, 'system', ?, NOW())");
                 $logStmt->execute([$invoice_id, $message]);
@@ -1020,6 +1099,41 @@ public function getAllSpacesWithDetails() {
             return false;
         }
     }
+    
+    // Get overdue rentals for kicking (original method - kept for compatibility)
+    public function getOverdueRentalsForKicking() {
+        $sql = "SELECT DISTINCT 
+                    i.Invoice_ID, 
+                    i.Client_ID, 
+                    i.Space_ID, 
+                    i.InvoiceDate, 
+                    i.EndDate,
+                    i.Status, 
+                    c.Client_fn, 
+                    c.Client_ln, 
+                    s.Name as SpaceName, 
+                    r.Request_ID,
+                    DATEDIFF(CURDATE(), i.EndDate) as DaysOverdue
+                FROM invoice i
+                JOIN client c ON i.Client_ID = c.Client_ID
+                JOIN space s ON i.Space_ID = s.Space_ID
+                LEFT JOIN rentalrequest r ON i.Client_ID = r.Client_ID 
+                    AND i.Space_ID = r.Space_ID 
+                    AND r.Status = 'Accepted'
+                WHERE i.Status = 'unpaid'
+                    AND i.Flow_Status = 'new'
+                    AND i.EndDate <= CURDATE()
+                    AND c.Status = 'Active'
+                ORDER BY i.EndDate ASC";
+        
+        try {
+            return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error fetching overdue rentals: " . $e->getMessage());
+            return [];
+        }
+    }
+}
 
 
 

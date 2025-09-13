@@ -342,6 +342,19 @@ $all_renters = $db->getAllActiveRenters();
             font-size: 0.9rem;
         }
 
+        .toggle-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--primary);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+        }
+
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -355,6 +368,10 @@ $all_renters = $db->getAllActiveRenters();
             .content {
                 margin-left: 0;
             }
+
+            .toggle-btn {
+                display: block;
+            }
         }
 
         @media (max-width: 768px) {
@@ -365,7 +382,7 @@ $all_renters = $db->getAllActiveRenters();
     </style>
 </head>
 <body>
-    <div class="toggle-btn" style="position: fixed; top: 20px; left: 20px; z-index: 1001; background: var(--primary); color: white; padding: 10px; border-radius: 5px; cursor: pointer; display: none;">
+    <div class="toggle-btn">
         <i class="fas fa-bars"></i>
     </div>
 
@@ -445,7 +462,7 @@ $all_renters = $db->getAllActiveRenters();
         <div class="dashboard-header">
             <div class="welcome-text">
                 <h1>Rental Management</h1>
-                <p>View all active renters and manage overdue accounts</p>
+                <p>View all active renters and manage accounts with full administrative control</p>
             </div>
             <div class="header-actions">
                 <a href="dashboard.php" class="btn btn-primary">
@@ -516,7 +533,7 @@ $all_renters = $db->getAllActiveRenters();
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-users"></i>
-                <span>All Active Renters</span>
+                <span>All Active Renters - Full Control</span>
                 <span class="badge bg-primary ms-2"><?= $total_renters ?> Total</span>
             </div>
             <div class="card-body p-0">
@@ -530,9 +547,9 @@ $all_renters = $db->getAllActiveRenters();
                                     <th>Invoice Date</th>
                                     <th>Due Date</th>
                                     <th>Amount</th>
-                                    <th>Status</th>
+                                    <th>Payment Status</th>
                                     <th>Days Status</th>
-                                    <th>Action</th>
+                                    <th>Admin Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -581,21 +598,25 @@ $all_renters = $db->getAllActiveRenters();
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <?php if ($row['Status'] == 'unpaid' && $row['DaysOverdue'] >= 0): ?>
-                                                <form method="post" onsubmit="return confirmAction(this);">
-                                                    <input type="hidden" name="kick_invoice_id" value="<?= $row['Invoice_ID'] ?>">
-                                                    <input type="hidden" name="kick_client_id" value="<?= $row['Client_ID'] ?>">
-                                                    <input type="hidden" name="kick_space_id" value="<?= $row['Space_ID'] ?>">
-                                                    <input type="hidden" name="kick_request_id" value="<?= $row['Request_ID'] ?? '' ?>">
+                                            <form method="post" onsubmit="return confirmAction(this, '<?= htmlspecialchars($row['Client_fn'] . ' ' . $row['Client_ln']) ?>', '<?= $row['DaysOverdue'] ?>', '<?= $row['Status'] ?>');">
+                                                <input type="hidden" name="kick_invoice_id" value="<?= $row['Invoice_ID'] ?>">
+                                                <input type="hidden" name="kick_client_id" value="<?= $row['Client_ID'] ?>">
+                                                <input type="hidden" name="kick_space_id" value="<?= $row['Space_ID'] ?>">
+                                                <input type="hidden" name="kick_request_id" value="<?= $row['Request_ID'] ?? '' ?>">
+                                                <?php if ($row['Status'] == 'unpaid' && $row['DaysOverdue'] >= 0): ?>
                                                     <button type="submit" class="btn btn-sm btn-danger">
                                                         <i class="fas fa-user-slash me-1"></i>Kick & Free Unit
                                                     </button>
-                                                </form>
-                                            <?php else: ?>
-                                                <button class="btn btn-sm btn-secondary" disabled>
-                                                    <i class="fas fa-check me-1"></i>Current
-                                                </button>
-                                            <?php endif; ?>
+                                                <?php elseif ($row['Status'] == 'unpaid'): ?>
+                                                    <button type="submit" class="btn btn-sm btn-warning">
+                                                        <i class="fas fa-exclamation-triangle me-1"></i>Force Kick
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                        <i class="fas fa-user-times me-1"></i>Admin Kick
+                                                    </button>
+                                                <?php endif; ?>
+                                            </form>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -621,11 +642,6 @@ $all_renters = $db->getAllActiveRenters();
             document.querySelector('.sidebar').classList.toggle('active');
         });
 
-        // Show toggle button on mobile
-        if (window.innerWidth <= 992) {
-            document.querySelector('.toggle-btn').style.display = 'block';
-        }
-
         // Filter table functionality
         function filterTable(status) {
             // Update active tab
@@ -647,26 +663,84 @@ $all_renters = $db->getAllActiveRenters();
             });
         }
 
-        function confirmAction(form) {
+        function confirmAction(form, clientName, daysOverdue, status) {
+            let title, html, confirmButtonText, warningLevel;
+            
+            // Determine the type of kick and set appropriate warnings
+            if (status === 'unpaid' && parseInt(daysOverdue) >= 0) {
+                // Standard overdue kick
+                title = 'Kick Overdue Client?';
+                html = `<strong>${clientName}</strong> is ${daysOverdue} days overdue.<br><br>This will:
+                        <ul class='text-start'>
+                        <li>Terminate the client's rental agreement</li>
+                        <li>Make the unit available for new rentals</li>
+                        <li>Mark the invoice as 'kicked'</li>
+                        <li>Log the eviction for audit purposes</li>
+                        </ul>This action cannot be undone.`;
+                confirmButtonText = 'Yes, kick this client';
+                warningLevel = 'warning';
+            } else if (status === 'unpaid') {
+                // Force kick for early/future due dates
+                title = 'Force Kick Client Early?';
+                html = `<strong>⚠️ WARNING: ${clientName} is NOT overdue yet!</strong><br>
+                        Payment is due in ${Math.abs(parseInt(daysOverdue))} days.<br><br>
+                        <div class="alert alert-warning">
+                        <strong>This is an early termination!</strong><br>
+                        Consider sending a payment reminder first.
+                        </div>
+                        This will:
+                        <ul class='text-start'>
+                        <li>Terminate the rental agreement early</li>
+                        <li>Make the unit available immediately</li>
+                        <li>Mark the invoice as 'kicked'</li>
+                        <li>Log the early eviction</li>
+                        </ul>This action cannot be undone.`;
+                confirmButtonText = 'Yes, force kick early';
+                warningLevel = 'error';
+            } else {
+                // Admin kick for paid clients
+                title = 'Admin Override Kick?';
+                html = `<strong>⚠️ CRITICAL WARNING: ${clientName} has PAID their rent!</strong><br><br>
+                        <div class="alert alert-danger">
+                        <strong>This client is current with payments!</strong><br>
+                        This action may have legal implications.
+                        </div>
+                        Admin override will:
+                        <ul class='text-start'>
+                        <li>Terminate a paid rental agreement</li>
+                        <li>Make the unit available immediately</li>
+                        <li>Mark the invoice as 'kicked' (admin override)</li>
+                        <li>Create an audit log of admin action</li>
+                        </ul>
+                        <strong>Are you absolutely certain this is necessary?</strong>`;
+                confirmButtonText = 'Yes, admin override kick';
+                warningLevel = 'error';
+            }
+
             Swal.fire({
-                title: 'Are you absolutely sure?',
-                html: "This will:<br><ul class='text-start'>" +
-                      "<li>Terminate the client's rental agreement</li>" +
-                      "<li>Make the unit available for new rentals</li>" +
-                      "<li>Mark the invoice as 'kicked'</li>" +
-                      "<li>Log the eviction for audit purposes</li></ul>" +
-                      "This action cannot be undone.",
-                icon: 'warning',
+                title: title,
+                html: html,
+                icon: warningLevel,
                 showCancelButton: true,
-                confirmButtonColor: '#d33',
+                confirmButtonColor: warningLevel === 'error' ? '#dc2626' : '#d33',
                 cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, kick this client',
+                confirmButtonText: confirmButtonText,
                 cancelButtonText: 'Cancel',
                 reverseButtons: true,
                 customClass: {
                     confirmButton: 'me-2',
                     cancelButton: 'ms-2'
-                }
+                },
+                // Extra confirmation for admin overrides
+                ...(status === 'paid' && {
+                    input: 'text',
+                    inputPlaceholder: 'Type "CONFIRM OVERRIDE" to proceed',
+                    inputValidator: (value) => {
+                        if (value !== 'CONFIRM OVERRIDE') {
+                            return 'You must type "CONFIRM OVERRIDE" exactly to proceed with admin override';
+                        }
+                    }
+                })
             }).then((result) => {
                 if (result.isConfirmed) {
                     form.submit();
