@@ -896,9 +896,6 @@ public function getAllSpacesWithDetails() {
 }
     
 
-
-
-    
  public function getAllActiveRenters() {
         $sql = "SELECT DISTINCT 
                     i.Invoice_ID,
