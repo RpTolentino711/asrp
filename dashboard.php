@@ -1,4 +1,6 @@
 <?php
+// Enable error reporting for debugging
+
 
 require 'database/database.php'; 
 session_start();
@@ -87,19 +89,12 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID.";
     } else {
-        // Get used photo slots count (fixed to use all 6 slots)
-        $used_slots = 0;
-        if (method_exists($db, 'getUsedPhotoSlots')) {
-            $used_slots = $db->getUsedPhotoSlots($space_id, $client_id);
-        } else {
-            // Fallback: count current photos
-            $unit_photos = $db->getUnitPhotosForClient($client_id);
-            $current_photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
-            $used_slots = count($current_photos);
-        }
+        // Fetch current photos to enforce limit
+        $unit_photos = $db->getUnitPhotosForClient($client_id);
+        $current_photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
         
-        if ($used_slots >= 6) {
-            $photo_upload_error = "You can upload up to 6 photos only.";
+        if (count($current_photos) >= 5) {
+            $photo_upload_error = "You can upload up to 5 photos only.";
         } elseif ($file['error'] === UPLOAD_ERR_OK) {
             $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
             $max_size = 2 * 1024 * 1024; // 2MB
@@ -109,39 +104,31 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
             $actual_type = $finfo->file($file['tmp_name']);
             
             if (in_array($actual_type, $allowed_types) && $file['size'] <= $max_size) {
-                // Validate image dimensions
-                $image_info = getimagesize($file['tmp_name']);
-                if ($image_info === false) {
-                    $photo_upload_error = "Invalid image file.";
-                } elseif ($image_info[0] > 2048 || $image_info[1] > 2048) {
-                    $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels.";
-                } else {
-                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
+                
+                if (in_array($ext, $allowed_extensions)) {
+                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                    if (!is_dir($upload_dir)) {
+                        mkdir($upload_dir, 0755, true);
+                    }
                     
-                    if (in_array($ext, $allowed_extensions)) {
-                        $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                        if (!is_dir($upload_dir)) {
-                            mkdir($upload_dir, 0755, true);
-                        }
-                        
-                        $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
-                        $filepath = $upload_dir . $filename;
-                        
-                        if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                            if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
-                                $photo_upload_success = "Photo uploaded for this unit!";
-                            } else {
-                                // Delete uploaded file if database insert failed
-                                unlink($filepath);
-                                $photo_upload_error = "Database error occurred.";
-                            }
+                    $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
+                    $filepath = $upload_dir . $filename;
+                    
+                    if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                        if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
+                            $photo_upload_success = "Photo uploaded for this unit!";
                         } else {
-                            $photo_upload_error = "Failed to move uploaded file.";
+                            // Delete uploaded file if database insert failed
+                            unlink($filepath);
+                            $photo_upload_error = "Database error occurred.";
                         }
                     } else {
-                        $photo_upload_error = "Invalid file extension.";
+                        $photo_upload_error = "Failed to move uploaded file.";
                     }
+                } else {
+                    $photo_upload_error = "Invalid file extension.";
                 }
             } else {
                 if ($file['size'] > $max_size) {
@@ -510,7 +497,6 @@ try {
             height: 100%;
             object-fit: cover;
             transition: var(--transition);
-            cursor: pointer;
         }
 
         .photo-item:hover img {
@@ -572,14 +558,6 @@ try {
             border-color: var(--primary);
         }
 
-        /* Image Preview */
-        .image-preview {
-            display: block;
-            margin-top: 10px;
-            border-radius: var(--border-radius-sm);
-            box-shadow: var(--shadow-sm);
-        }
-
         /* Maintenance History */
         .maintenance-section {
             background: var(--light);
@@ -614,7 +592,7 @@ try {
             border-radius: var(--border-radius-sm);
             margin-bottom: 0.5rem;
             display: flex;
-            justify-content: space-between;
+            justify-content: between;
             align-items: center;
             border: 1px solid var(--gray-light);
         }
@@ -1047,7 +1025,7 @@ try {
                                         <h6 class="mb-0">
                                             <i class="bi bi-images me-1"></i>Unit Photos
                                         </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/6</small>
+                                        <small class="text-muted"><?= count($photos) ?>/5</small>
                                     </div>
 
                                     <?php if (!empty($photos)): ?>
@@ -1063,7 +1041,7 @@ try {
                                                         <button type="submit" 
                                                                 name="delete_unit_photo" 
                                                                 class="delete-photo-btn"
-                                                                onclick="return false;"
+                                                                onclick="return confirm('Delete this photo?');"
                                                                 title="Delete photo">
                                                             <i class="bi bi-x"></i>
                                                         </button>
@@ -1079,7 +1057,7 @@ try {
                                     <?php endif; ?>
 
                                     <!-- Upload Form -->
-                                    <?php if (count($photos) < 6): ?>
+                                    <?php if (count($photos) < 5): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">
@@ -1089,7 +1067,7 @@ try {
                                                            accept="image/jpeg,image/jpg,image/png,image/gif" 
                                                            class="form-control" 
                                                            required>
-                                                    <small class="text-muted">Max 2MB. JPG, PNG, GIF only. Max dimensions 2048x2048px.</small>
+                                                    <small class="text-muted">Max 2MB. JPG, PNG, GIF only.</small>
                                                 </div>
                                                 <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100">
                                                     <i class="bi bi-cloud-upload me-1"></i>Upload Photo
@@ -1256,7 +1234,7 @@ try {
                 });
             });
 
-            // Enhanced file input with preview
+            // Enhanced file input
             const fileInputs = document.querySelectorAll('input[type="file"]');
             fileInputs.forEach(input => {
                 input.addEventListener('change', function() {
@@ -1285,32 +1263,6 @@ try {
                             });
                             this.value = '';
                             return;
-                        }
-
-                        // Create image preview
-                        if (file.type.startsWith('image/')) {
-                            const reader = new FileReader();
-                            reader.onload = function(e) {
-                                // Remove existing preview
-                                const existingPreview = input.parentNode.querySelector('.image-preview');
-                                if (existingPreview) {
-                                    existingPreview.remove();
-                                }
-                                
-                                // Create preview
-                                const preview = document.createElement('img');
-                                preview.src = e.target.result;
-                                preview.className = 'image-preview';
-                                preview.style.maxWidth = '100px';
-                                preview.style.maxHeight = '100px';
-                                preview.style.objectFit = 'cover';
-                                preview.style.borderRadius = '8px';
-                                preview.style.marginTop = '10px';
-                                preview.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-                                
-                                input.parentNode.appendChild(preview);
-                            };
-                            reader.readAsDataURL(file);
                         }
                     }
                 });
@@ -1375,3 +1327,4 @@ try {
     <?php endif; ?>
 </body>
 </html>
+
