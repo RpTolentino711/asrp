@@ -109,7 +109,6 @@ public function getAllUnitPhotosForUnits($unit_ids) {
 
 
 
-
  public function getAllActiveRenters() {
         $sql = "SELECT DISTINCT 
                     i.Invoice_ID,
@@ -312,6 +311,8 @@ public function getAllUnitPhotosForUnits($unit_ids) {
         }
     }
     
+
+
     // Get overdue rentals for kicking (original method - kept for compatibility)
     public function getOverdueRentalsForKicking() {
         $sql = "SELECT DISTINCT 
@@ -469,42 +470,7 @@ public function getAllUnitPhotosForUnits($unit_ids) {
         }
     }
     
-    // Get overdue rentals for kicking (original method - kept for compatibility)
-    public function getOverdueRentalsForKicking() {
-        $sql = "SELECT DISTINCT 
-                    i.Invoice_ID, 
-                    i.Client_ID, 
-                    i.Space_ID, 
-                    i.InvoiceDate, 
-                    i.EndDate,
-                    i.Status, 
-                    c.Client_fn, 
-                    c.Client_ln, 
-                    s.Name as SpaceName, 
-                    r.Request_ID,
-                    DATEDIFF(CURDATE(), i.EndDate) as DaysOverdue
-                FROM invoice i
-                JOIN client c ON i.Client_ID = c.Client_ID
-                JOIN space s ON i.Space_ID = s.Space_ID
-                LEFT JOIN rentalrequest r ON i.Client_ID = r.Client_ID 
-                    AND i.Space_ID = r.Space_ID 
-                    AND r.Status = 'Accepted'
-                WHERE i.Status = 'unpaid'
-                    AND i.Flow_Status = 'new'
-                    AND i.EndDate <= CURDATE()
-                    AND c.Status = 'Active'
-                ORDER BY i.EndDate ASC";
-        
-        try {
-            return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Error fetching overdue rentals: " . $e->getMessage());
-            return [];
-        }
-    }
-
-
-
+ 
 
 
 private function getPhotoColumns() {
