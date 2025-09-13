@@ -65,6 +65,7 @@ public function executeStatement($sql, $params = []) {
     
 
     public function getUnitPhotosForClient($client_id) {
+
     $columns = $this->getPhotoColumns();
     $columnNames = implode(', ', $columns);
     
@@ -113,7 +114,7 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     return $photos;
 }
 
-private function getPhotoColumns() {
+protected function getPhotoColumns() {
     return ['BusinessPhoto', 'BusinessPhoto1', 'BusinessPhoto2', 'BusinessPhoto3', 'BusinessPhoto4', 'BusinessPhoto5'];
 }
 
