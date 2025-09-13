@@ -31,6 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kick_invoice_id'])) {
 
 // --- Fetch All Active Renters ---
 $all_renters = $db->getAllActiveRenters();
+
+// Helper: Get current price from space table for each unit
+function getCurrentUnitPrice($db, $space_id) {
+    $sql = "SELECT Price FROM space WHERE Space_ID = ? LIMIT 1";
+    $row = $db->getRow($sql, [$space_id]);
+    return $row ? $row['Price'] : null;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -579,7 +586,8 @@ $all_renters = $db->getAllActiveRenters();
                                         <td><?= htmlspecialchars($row['InvoiceDate']) ?></td>
                                         <td><?= htmlspecialchars($row['EndDate']) ?></td>
                                         <td>
-                                            <div class="fw-semibold">₱<?= number_format($row['InvoiceTotal'], 2) ?></div>
+                                            <?php $currentPrice = getCurrentUnitPrice($db, $row['Space_ID']); ?>
+                                            <div class="fw-semibold">₱<?= $currentPrice !== null ? number_format($currentPrice, 2) : 'N/A' ?></div>
                                         </td>
                                         <td>
                                             <?php if ($row['Status'] == 'unpaid'): ?>
