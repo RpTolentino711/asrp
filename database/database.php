@@ -899,8 +899,7 @@ public function getAllSpacesWithDetails() {
     
 // --- Overdue Rentals For Kicking ---
 public function getOverdueRentalsForKicking() {
-    $sql = "
-        SELECT DISTINCT
+    $sql = " SELECT DISTINCT
             i.Invoice_ID, 
             i.Client_ID, 
             i.Space_ID, 
@@ -922,8 +921,7 @@ public function getOverdueRentalsForKicking() {
         WHERE i.Status = 'unpaid'
           AND i.EndDate < CURDATE()
           AND r.Status = 'Accepted'
-        ORDER BY i.EndDate ASC
-    ";
+        ORDER BY i.EndDate ASC";
 
     try {
         $stmt = $this->pdo->prepare($sql);
@@ -941,6 +939,7 @@ public function getOverdueRentalsForKicking() {
         return [];
     }
 }
+
 
 
 public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_id) {
