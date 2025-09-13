@@ -898,49 +898,38 @@ public function getAllSpacesWithDetails() {
     
     
 // --- Overdue Rentals For Kicking ---
-public function getOverdueRentalsForKicking() {
-    $sql = "SELECT 
-                i.Invoice_ID, i.Client_ID, i.Space_ID, i.InvoiceDate, i.EndDate,
-                i.Status, c.Client_fn, c.Client_ln, s.Name as SpaceName, r.Request_ID
-            FROM invoice i
-            JOIN client c ON i.Client_ID = c.Client_ID
-            JOIN space s ON i.Space_ID = s.Space_ID
-            JOIN rentalrequest r ON r.Client_ID = i.Client_ID 
-                                 AND r.Space_ID = i.Space_ID
-                                 AND r.Status = 'Accepted'
-                                 AND r.Requested_At = (
-                                     SELECT MAX(r2.Requested_At) 
-                                     FROM rentalrequest r2
-                                     WHERE r2.Client_ID = i.Client_ID 
-                                       AND r2.Space_ID = i.Space_ID
-                                       AND r2.Status = 'Accepted'
-                                 )
-            WHERE i.Status = 'unpaid'
-              AND i.Flow_Status = 'new'
-              AND i.InvoiceDate IS NOT NULL
-              AND i.EndDate IS NOT NULL
-              AND i.InvoiceDate <= CURDATE()
-              AND i.EndDate <= CURDATE()
-            ORDER BY i.EndDate ASC";
-    try {
-        return $this->pdo->query($sql)->fetchAll();
-    } catch (PDOException $e) {
-        return [];
+    public function getOverdueRentalsForKicking() {
+                $sql = "SELECT i.Invoice_ID, i.Client_ID, i.Space_ID, i.InvoiceDate, i.EndDate,
+                                             i.Status, c.Client_fn, c.Client_ln, s.Name as SpaceName, r.Request_ID
+                                FROM invoice i
+                                JOIN client c ON i.Client_ID = c.Client_ID
+                                JOIN space s ON i.Space_ID = s.Space_ID
+                                JOIN rentalrequest r ON i.Client_ID = r.Client_ID AND i.Space_ID = r.Space_ID
+                                WHERE i.Status = 'unpaid'
+                                    AND i.Flow_Status = 'new'
+                                    AND i.InvoiceDate <= CURDATE()
+                                    AND i.EndDate <= CURDATE()
+                                    AND r.Status = 'Accepted'
+                                ORDER BY i.EndDate ASC";
+        try {
+            return $this->pdo->query($sql)->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
 
 
 
 public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_id) {
     $this->pdo->beginTransaction();
     try {
-        // 1. Soft-delete clientspace (set active=0) instead of DELETE for record-keeping
+        // 1. Remove the client-space relationship (client is no longer renting the space)
         $this->executeStatement(
-            "UPDATE clientspace SET active = 0 WHERE Client_ID = ? AND Space_ID = ?", 
+            "DELETE FROM clientspace WHERE Client_ID = ? AND Space_ID = ?", 
             [$client_id, $space_id]
         );
 
-        // 2. Update spaceavailability: set EndDate to today, Status to 'Available' if currently 'Occupied'
+        // 2. Set spaceavailability to 'Available' and set EndDate to today
         $this->executeStatement(
             "UPDATE spaceavailability 
              SET Status = 'Available', EndDate = CURDATE() 
@@ -948,7 +937,7 @@ public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_i
             [$space_id]
         );
 
-        // 3. Update invoice status
+        // 3. Mark the invoice as 'kicked' and set Flow_Status to 'done'
         $this->executeStatement(
             "UPDATE invoice SET Status = 'kicked', Flow_Status = 'done' WHERE Invoice_ID = ?", 
             [$invoice_id]
@@ -960,15 +949,15 @@ public function kickOverdueClient($invoice_id, $client_id, $space_id, $request_i
             [$request_id]
         );
 
-        // 5. Mark the space as available (Flow_Status: 'new')
+        // 5. Set the space as available in the flow (Flow_Status: 'new')
         $this->executeStatement(
             "UPDATE space SET Flow_Status = 'new' WHERE Space_ID = ?", 
             [$space_id]
         );
 
-        // 6. Insert 'Available' record into spaceavailability if not exists
+        // 6. Ensure there is an 'Available' record in spaceavailability for this space (avoid duplicates)
         $exists = $this->runQuery(
-            "SELECT 1 FROM spaceavailability WHERE Space_ID = ? AND Status = 'Available' AND EndDate IS NULL", 
+            "SELECT 1 FROM spaceavailability WHERE Space_ID = ? AND Status = 'Available'", 
             [$space_id]
         );
         if (!$exists) {
