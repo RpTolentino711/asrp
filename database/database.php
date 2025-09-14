@@ -59,24 +59,31 @@ public function executeStatement($sql, $params = []) {
         return (bool)$result;
     }
 
-    public function getUnitPhotosForClient($client_id) {
-    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
-            FROM clientspace 
-            WHERE Client_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$client_id]);
-    $photos = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $photos[$row['Space_ID']] = array_values(array_filter([
-            $row['BusinessPhoto1'],
-            $row['BusinessPhoto2'],
-            $row['BusinessPhoto3'],
-            $row['BusinessPhoto4'],
-            $row['BusinessPhoto5'],
-        ]));
+public function getUnitPhotosForClient($client_id) {
+    try {
+        $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                FROM clientspace
+                WHERE Client_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$client_id]);
+        $photos = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $photos[$row['Space_ID']] = array_values(array_filter([
+                $row['BusinessPhoto'],    // Include the main BusinessPhoto
+                $row['BusinessPhoto1'],
+                $row['BusinessPhoto2'],
+                $row['BusinessPhoto3'],
+                $row['BusinessPhoto4'],
+                $row['BusinessPhoto5'],
+            ]));
+        }
+        return $photos;
+    } catch (PDOException $e) {
+        error_log("getUnitPhotosForClient PDOException: " . $e->getMessage());
+        return [];
     }
-    return $photos;
 }
+
 
 public function getAllUnitPhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
@@ -102,12 +109,27 @@ public function getAllUnitPhotosForUnits($unit_ids) {
 
 public function addUnitPhoto($space_id, $client_id, $filename) {
     try {
-        $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+        $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
                 FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$space_id, $client_id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) return false;
+        if (!$row) {
+            error_log("addUnitPhoto: No clientspace record found for Space_ID: $space_id, Client_ID: $client_id");
+            return false;
+        }
+        
+        // Check BusinessPhoto first, then BusinessPhoto1-5
+        if (empty($row["BusinessPhoto"])) {
+            $update = "UPDATE clientspace SET BusinessPhoto = ? WHERE Space_ID = ? AND Client_ID = ?";
+            $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
+            if (!$result) {
+                error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
+            }
+            return $result;
+        }
+        
+        // Then check BusinessPhoto1-5
         for ($i = 1; $i <= 5; $i++) {
             if (empty($row["BusinessPhoto$i"])) {
                 $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
@@ -118,7 +140,9 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
                 return $result;
             }
         }
-        return false;
+        
+        error_log("addUnitPhoto: All photo slots are full for Space_ID: $space_id");
+        return false; // All slots full
     } catch (PDOException $e) {
         error_log("addUnitPhoto PDOException: " . $e->getMessage());
         return false;
@@ -126,21 +150,38 @@ public function addUnitPhoto($space_id, $client_id, $filename) {
 }
 
 public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
-    $sql = "SELECT BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-            FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$space_id, $client_id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-    if (!$row) return false;
-    for ($i = 1; $i <= 5; $i++) {
-        if ($row["BusinessPhoto$i"] === $photo_filename) {
-            $update = "UPDATE clientspace SET BusinessPhoto$i = NULL WHERE Space_ID = ? AND Client_ID = ?";
+    try {
+        $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
+                FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$space_id, $client_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            error_log("deleteUnitPhoto: No clientspace record found for Space_ID: $space_id, Client_ID: $client_id");
+            return false;
+        }
+        
+        // Check BusinessPhoto first
+        if ($row["BusinessPhoto"] === $photo_filename) {
+            $update = "UPDATE clientspace SET BusinessPhoto = NULL WHERE Space_ID = ? AND Client_ID = ?";
             return $this->executeStatement($update, [$space_id, $client_id]);
         }
+        
+        // Then check BusinessPhoto1-5
+        for ($i = 1; $i <= 5; $i++) {
+            if ($row["BusinessPhoto$i"] === $photo_filename) {
+                $update = "UPDATE clientspace SET BusinessPhoto$i = NULL WHERE Space_ID = ? AND Client_ID = ?";
+                return $this->executeStatement($update, [$space_id, $client_id]);
+            }
+        }
+        
+        error_log("deleteUnitPhoto: Photo filename '$photo_filename' not found for Space_ID: $space_id");
+        return false; // Photo not found
+    } catch (PDOException $e) {
+        error_log("deleteUnitPhoto PDOException: " . $e->getMessage());
+        return false;
     }
-    return false;
 }
-
 
 
 
@@ -444,18 +485,37 @@ public function getHomepageRentedUnits($limit = 12) {
 
     // --- Feedback and Testimonials ---
     public function saveFeedback($invoice_id, $rating, $comments) {
-        try {
-            $sql = "INSERT INTO clientfeedback (CS_ID, Rating, Comments, Dates) VALUES (?, ?, ?, NOW())";
-            $result = $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
-            if (!$result) {
-                error_log("saveFeedback failed: " . print_r([$sql, $invoice_id, $rating, $comments], true));
-            }
-            return $result;
-        } catch (PDOException $e) {
-            error_log("saveFeedback PDOException: " . $e->getMessage());
-            return false;
+    try {
+        // The CS_ID column in clientfeedback should reference the clientspace CS_ID, not the invoice_id directly
+        // But according to your constraint, it references invoice.Invoice_ID
+        // So we need to use the invoice_id directly as CS_ID
+        $sql = "INSERT INTO clientfeedback (CS_ID, Rating, Comments, Dates) VALUES (?, ?, ?, NOW())";
+        $result = $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
+        if (!$result) {
+            error_log("saveFeedback failed: " . print_r([$sql, $invoice_id, $rating, $comments], true));
         }
+        return $result;
+    } catch (PDOException $e) {
+        error_log("saveFeedback PDOException: " . $e->getMessage());
+        return false;
     }
+}
+public function saveFeedback($invoice_id, $rating, $comments) {
+    try {
+        // The CS_ID column in clientfeedback should reference the clientspace CS_ID, not the invoice_id directly
+        // But according to your constraint, it references invoice.Invoice_ID
+        // So we need to use the invoice_id directly as CS_ID
+        $sql = "INSERT INTO clientfeedback (CS_ID, Rating, Comments, Dates) VALUES (?, ?, ?, NOW())";
+        $result = $this->executeStatement($sql, [$invoice_id, $rating, $comments]);
+        if (!$result) {
+            error_log("saveFeedback failed: " . print_r([$sql, $invoice_id, $rating, $comments], true));
+        }
+        return $result;
+    } catch (PDOException $e) {
+        error_log("saveFeedback PDOException: " . $e->getMessage());
+        return false;
+    }
+}
 
 
     public function getFeedbackPrompts($client_id) {
@@ -467,6 +527,8 @@ public function getHomepageRentedUnits($limit = 12) {
         return $this->runQuery($sql, [$client_id], true);
     }
 
+
+    
     public function getHomepageTestimonials($limit = 6) {
     $sql = "SELECT cf.*, c.Client_fn, c.Client_ln
         FROM clientfeedback cf
