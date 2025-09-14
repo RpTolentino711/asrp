@@ -238,7 +238,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
 }
 
 // Photo Delete Processing
-if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
+if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
     
