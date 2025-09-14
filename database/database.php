@@ -84,19 +84,22 @@ public function getUnitPhotosForClient($client_id) {
     }
 }
 
-
 public function getAllUnitPhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
+    
     // Prepare placeholders for array of unit IDs
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
+    $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
             FROM clientspace 
             WHERE Space_ID IN ($placeholders)";
+    
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute($unit_ids);
+    
     $photos = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $photos[$row['Space_ID']] = array_values(array_filter([
+            $row['BusinessPhoto'],    // Added the main BusinessPhoto
             $row['BusinessPhoto1'],
             $row['BusinessPhoto2'],
             $row['BusinessPhoto3'],
