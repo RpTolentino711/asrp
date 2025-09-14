@@ -1433,7 +1433,7 @@ public function acceptRentalRequest($request_id) {
     $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
                c.Status, s.Name AS SpaceName
         FROM client c
-        LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID AND cs.active = 1
+        LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
         LEFT JOIN space s ON cs.Space_ID = s.Space_ID
         ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
