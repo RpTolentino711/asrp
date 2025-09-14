@@ -1429,13 +1429,15 @@ public function acceptRentalRequest($request_id) {
 
     // --- Methods for Displaying Data on the Page ---
     public function getAllClientsWithAssignedUnit() {
-        $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
-                       c.Status, s.Name AS SpaceName
-                FROM client c
-                LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
-                LEFT JOIN space s ON cs.Space_ID = s.Space_ID
-                ORDER BY c.Client_ID DESC";
-        return $this->runQuery($sql, [], true);
+    $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
+               c.Status, s.Name AS SpaceName
+        FROM client c
+        LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
+        LEFT JOIN space s ON cs.Space_ID = s.Space_ID
+        LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
+        WHERE (i.Status IS NULL OR i.Status != 'kicked')
+        ORDER BY c.Client_ID DESC";
+    return $this->runQuery($sql, [], true);
     }
 
     public function getAllUnitsWithRenterInfo() {
@@ -1444,7 +1446,9 @@ public function acceptRentalRequest($request_id) {
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
-                LEFT JOIN client c ON cs.Client_ID = c.Client_ID";
+                LEFT JOIN client c ON cs.Client_ID = c.Client_ID
+                LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
+                WHERE (i.Status IS NULL OR i.Status != 'kicked')";
         try {
             return $this->pdo->query($sql)->fetchAll();
         } catch (PDOException $e) {
