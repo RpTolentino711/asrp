@@ -68,7 +68,11 @@ if (isset($_SESSION['login_success'])) {
     unset($_SESSION['login_success']);
 }
 
+// Initialize feedback variables
 $feedback_success = '';
+$feedback_error = '';
+
+// --- FEEDBACK PROCESSING (FIXED) ---
 if (isset($_POST['submit_feedback']) && isset($_POST['invoice_id']) && isset($_POST['rating'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $rating = intval($_POST['rating']);
@@ -76,20 +80,42 @@ if (isset($_POST['submit_feedback']) && isset($_POST['invoice_id']) && isset($_P
 
     // Validate rating range
     if ($rating >= 1 && $rating <= 5) {
-        if ($db->saveFeedback($invoice_id, $rating, $comments)) {
-            $feedback_success = "Thank you for your feedback!";
+        // Check if feedback already exists for this invoice
+        if (method_exists($db, 'checkExistingFeedback')) {
+            $existing_feedback = $db->checkExistingFeedback($invoice_id);
         } else {
-            $feedback_success = "Failed to save feedback. Please try again.";
+            $existing_feedback = false; // Skip check if method doesn't exist
+        }
+        
+        if (!$existing_feedback) {
+            if ($db->saveFeedback($invoice_id, $rating, $comments)) {
+                $feedback_success = "Thank you for your feedback!";
+                $_SESSION['feedback_success'] = $feedback_success;
+                // Redirect to prevent resubmission
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            } else {
+                $feedback_error = "Failed to save feedback. Please try again.";
+            }
+        } else {
+            $feedback_error = "You have already provided feedback for this invoice.";
         }
     } else {
-        $feedback_success = "Invalid rating value.";
+        $feedback_error = "Invalid rating value. Please select a rating between 1 and 5.";
     }
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC ---
+// Check for feedback success from redirect
+if (isset($_SESSION['feedback_success'])) {
+    $feedback_success = $_SESSION['feedback_success'];
+    unset($_SESSION['feedback_success']);
+}
+
+// --- PHOTO UPLOAD/DELETE LOGIC (FIXED) ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
+// Photo Upload Processing
 if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
     $space_id = intval($_POST['space_id']);
     $file = $_FILES['unit_photo'];
@@ -99,90 +125,109 @@ if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_F
     $valid_space_ids = array_column($rented_units, 'Space_ID');
     
     if (!in_array($space_id, $valid_space_ids)) {
-        $photo_upload_error = "Invalid space ID.";
-    } else {
-        // Get used photo slots count (fixed to use all 6 slots)
-        $used_slots = 0;
-        if (method_exists($db, 'getUsedPhotoSlots')) {
-            $used_slots = $db->getUsedPhotoSlots($space_id, $client_id);
-        } else {
-            // Fallback: count current photos
-            $unit_photos = $db->getUnitPhotosForClient($client_id);
-            $current_photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
-            $used_slots = count($current_photos);
+        $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
+    } else if ($file['error'] !== UPLOAD_ERR_OK) {
+        // Handle upload errors
+        switch($file['error']) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+                break;
+            case UPLOAD_ERR_PARTIAL:
+                $photo_upload_error = "File upload was interrupted. Please try again.";
+                break;
+            case UPLOAD_ERR_NO_FILE:
+                $photo_upload_error = "No file selected. Please choose an image to upload.";
+                break;
+            case UPLOAD_ERR_NO_TMP_DIR:
+                $photo_upload_error = "Server configuration error. Please contact support.";
+                break;
+            case UPLOAD_ERR_CANT_WRITE:
+                $photo_upload_error = "Failed to save file. Please try again.";
+                break;
+            default:
+                $photo_upload_error = "Unknown upload error occurred.";
         }
+    } else {
+        // Get current photo count (FIXED - now includes BusinessPhoto)
+        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+        $used_slots = count($current_photos);
         
         if ($used_slots >= 6) {
-            $photo_upload_error = "You can upload up to 6 photos only.";
-        } elseif ($file['error'] === UPLOAD_ERR_OK) {
+            $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
+        } else {
+            // Validate file type and size
             $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
             $max_size = 2 * 1024 * 1024; // 2MB
             
             // Get actual file type using finfo
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $actual_type = $finfo->file($file['tmp_name']);
+            if (function_exists('finfo_open')) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $actual_type = $finfo->file($file['tmp_name']);
+            } else {
+                $actual_type = $file['type']; // Fallback
+            }
             
-            if (in_array($actual_type, $allowed_types) && $file['size'] <= $max_size) {
+            if (!in_array($actual_type, $allowed_types)) {
+                $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF images are allowed.";
+            } else if ($file['size'] > $max_size) {
+                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+            } else {
                 // Validate image dimensions
                 $image_info = getimagesize($file['tmp_name']);
                 if ($image_info === false) {
-                    $photo_upload_error = "Invalid image file.";
-                } elseif ($image_info[0] > 2048 || $image_info[1] > 2048) {
-                    $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels.";
+                    $photo_upload_error = "Invalid image file. File appears to be corrupted.";
+                } else if ($image_info[0] > 2048 || $image_info[1] > 2048) {
+                    $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels allowed.";
                 } else {
+                    // Generate secure filename
                     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                     $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
                     
-                    if (in_array($ext, $allowed_extensions)) {
+                    if (!in_array($ext, $allowed_extensions)) {
+                        $photo_upload_error = "Invalid file extension. Only .jpg, .jpeg, .png, and .gif files are allowed.";
+                    } else {
+                        // Create upload directory if it doesn't exist
                         $upload_dir = __DIR__ . "/uploads/unit_photos/";
                         if (!is_dir($upload_dir)) {
-                            mkdir($upload_dir, 0755, true);
-                        }
-                        
-                        $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
-                        $filepath = $upload_dir . $filename;
-                        
-                        if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                            if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
-                                $photo_upload_success = "Photo uploaded for this unit!";
-                            } else {
-                                // Delete uploaded file if database insert failed
-                                unlink($filepath);
-                                $photo_upload_error = "Database error occurred.";
+                            if (!mkdir($upload_dir, 0755, true)) {
+                                $photo_upload_error = "Failed to create upload directory. Please contact support.";
                             }
-                        } else {
-                            $photo_upload_error = "Failed to move uploaded file.";
                         }
-                    } else {
-                        $photo_upload_error = "Invalid file extension.";
+                        
+                        if (empty($photo_upload_error)) {
+                            // Generate unique filename
+                            $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
+                            $filepath = $upload_dir . $filename;
+                            
+                            if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                                // Save to database
+                                if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
+                                    $photo_upload_success = "Photo uploaded successfully for this unit!";
+                                    $_SESSION['photo_upload_success'] = $photo_upload_success;
+                                    // Redirect to prevent resubmission
+                                    header("Location: " . $_SERVER['PHP_SELF']);
+                                    exit();
+                                } else {
+                                    // Delete uploaded file if database insert failed
+                                    if (file_exists($filepath)) {
+                                        unlink($filepath);
+                                    }
+                                    $photo_upload_error = "Database error occurred. Photo was not saved.";
+                                }
+                            } else {
+                                $photo_upload_error = "Failed to move uploaded file. Check file permissions.";
+                            }
+                        }
                     }
                 }
-            } else {
-                if ($file['size'] > $max_size) {
-                    $photo_upload_error = "File size too large. Maximum 2MB allowed.";
-                } else {
-                    $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF allowed.";
-                }
-            }
-        } else {
-            switch($file['error']) {
-                case UPLOAD_ERR_INI_SIZE:
-                case UPLOAD_ERR_FORM_SIZE:
-                    $photo_upload_error = "File size too large.";
-                    break;
-                case UPLOAD_ERR_PARTIAL:
-                    $photo_upload_error = "File upload was interrupted.";
-                    break;
-                case UPLOAD_ERR_NO_FILE:
-                    $photo_upload_error = "No file selected.";
-                    break;
-                default:
-                    $photo_upload_error = "File upload error occurred.";
             }
         }
     }
 }
 
+// Photo Delete Processing
 if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
@@ -191,24 +236,52 @@ if (isset($_POST['delete_unit_photo']) && isset($_POST['space_id']) && isset($_P
     $rented_units = $db->getRentedUnits($client_id);
     $valid_space_ids = array_column($rented_units, 'Space_ID');
     
-    if (in_array($space_id, $valid_space_ids) && !empty($photo_filename)) {
-        // Validate filename to prevent directory traversal
-        if (preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
-            if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
-                $file_to_delete = __DIR__ . "/uploads/unit_photos/" . basename($photo_filename);
-                if (file_exists($file_to_delete)) {
-                    unlink($file_to_delete);
-                }
-                $photo_upload_success = "Photo deleted!";
-            } else {
-                $photo_upload_error = "Failed to delete photo from database.";
-            }
-        } else {
-            $photo_upload_error = "Invalid photo filename.";
-        }
+    if (!in_array($space_id, $valid_space_ids)) {
+        $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
+    } else if (empty($photo_filename)) {
+        $photo_upload_error = "Invalid photo filename.";
     } else {
-        $photo_upload_error = "Invalid request.";
+        // Validate filename to prevent directory traversal
+        if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+            $photo_upload_error = "Invalid photo filename format.";
+        } else {
+            // Verify the photo belongs to this client and space
+            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+            
+            if (!in_array($photo_filename, $current_photos)) {
+                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
+            } else {
+                // Delete from database first
+                if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
+                    // Delete file from filesystem
+                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                    $file_to_delete = $upload_dir . basename($photo_filename);
+                    if (file_exists($file_to_delete)) {
+                        if (unlink($file_to_delete)) {
+                            $photo_upload_success = "Photo deleted successfully!";
+                        } else {
+                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
+                        }
+                    } else {
+                        $photo_upload_success = "Photo deleted successfully!";
+                    }
+                    $_SESSION['photo_upload_success'] = $photo_upload_success;
+                    // Redirect to prevent resubmission
+                    header("Location: " . $_SERVER['PHP_SELF']);
+                    exit();
+                } else {
+                    $photo_upload_error = "Failed to delete photo from database.";
+                }
+            }
+        }
     }
+}
+
+// Check for photo success from redirect
+if (isset($_SESSION['photo_upload_success'])) {
+    $photo_upload_success = $_SESSION['photo_upload_success'];
+    unset($_SESSION['photo_upload_success']);
 }
 
 // --- SAFELY GET CLIENT DETAILS ---
@@ -935,6 +1008,18 @@ try {
             </div>
         <?php endif; ?>
 
+        <?php if ($feedback_success): ?>
+            <div class="alert alert-success fade-in">
+                <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($feedback_success) ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($feedback_error): ?>
+            <div class="alert alert-danger fade-in">
+                <i class="bi bi-exclamation-triangle me-2"></i><?= htmlspecialchars($feedback_error) ?>
+            </div>
+        <?php endif; ?>
+
         <!-- Feedback Section -->
         <?php if (!empty($feedback_prompts)): ?>
             <div class="alert alert-warning fade-in">
@@ -980,12 +1065,6 @@ try {
                     </div>
                 </div>
             <?php endforeach; ?>
-            
-            <?php if (!empty($feedback_success)): ?>
-                <div class="alert alert-success fade-in">
-                    <i class="bi bi-check-circle me-2"></i><?= htmlspecialchars($feedback_success) ?>
-                </div>
-            <?php endif; ?>
         <?php endif; ?>
 
         <!-- Rented Units Section -->
@@ -1077,7 +1156,7 @@ try {
                                                         <button type="submit" 
                                                                 name="delete_unit_photo" 
                                                                 class="delete-photo-btn"
-                                                                onclick="return false;"
+                                                                onclick="return confirmDeletePhoto(event, '<?= htmlspecialchars($photo) ?>');"
                                                                 title="Delete photo">
                                                             <i class="bi bi-x"></i>
                                                         </button>
@@ -1095,17 +1174,18 @@ try {
                                     <!-- Upload Form -->
                                     <?php if (count($photos) < 6): ?>
                                         <div class="upload-form">
-                                            <form method="post" enctype="multipart/form-data">
+                                            <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">
                                                 <div class="mb-2">
                                                     <input type="file" 
                                                            name="unit_photo" 
                                                            accept="image/jpeg,image/jpg,image/png,image/gif" 
                                                            class="form-control" 
+                                                           id="fileInput_<?= $space_id ?>"
                                                            required>
                                                     <small class="text-muted">Max 2MB. JPG, PNG, GIF only. Max dimensions 2048x2048px.</small>
                                                 </div>
-                                                <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100">
+                                                <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100" id="uploadBtn_<?= $space_id ?>">
                                                     <i class="bi bi-cloud-upload me-1"></i>Upload Photo
                                                 </button>
                                             </form>
@@ -1239,6 +1319,27 @@ try {
             imageModal.show();
         }
 
+        // Enhanced photo delete confirmation
+        function confirmDeletePhoto(event, filename) {
+            event.preventDefault();
+            Swal.fire({
+                title: 'Delete Photo?',
+                text: `Are you sure you want to delete this photo?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Submit the form
+                    event.target.closest('form').submit();
+                }
+            });
+            return false;
+        }
+
         // Close navbar on mobile when clicking nav links
         document.addEventListener('DOMContentLoaded', function() {
             const navbarCollapse = document.getElementById('navbarNav');
@@ -1258,23 +1359,13 @@ try {
                 });
             }
 
-            // Add loading state to forms
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const submitBtn = this.querySelector('button[type="submit"]');
-                    if (submitBtn && !submitBtn.onclick) {
-                        submitBtn.innerHTML = '<span class="spinner me-1"></span>' + submitBtn.textContent;
-                        submitBtn.disabled = true;
-                    }
-                });
-            });
-
-            // Enhanced file input with preview
+            // Enhanced file input with preview and validation
             const fileInputs = document.querySelectorAll('input[type="file"]');
             fileInputs.forEach(input => {
                 input.addEventListener('change', function() {
                     const file = this.files[0];
+                    const spaceId = this.id.replace('fileInput_', '');
+                    
                     if (file) {
                         // Validate file size
                         if (file.size > 2 * 1024 * 1024) { // 2MB
@@ -1330,6 +1421,67 @@ try {
                 });
             });
 
+            // Form submission loading state
+            const uploadForms = document.querySelectorAll('form[id^="uploadForm_"]');
+            uploadForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+                    
+                    // Validate file selection
+                    const fileInput = this.querySelector('input[type="file"]');
+                    if (!fileInput.files[0]) {
+                        e.preventDefault();
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'No File Selected',
+                            text: 'Please select an image to upload.',
+                            confirmButtonColor: '#2563eb'
+                        });
+                        return;
+                    }
+                    
+                    // Show loading state
+                    submitBtn.innerHTML = '<span class="spinner me-1"></span>Uploading...';
+                    submitBtn.disabled = true;
+                    
+                    // Reset button after 30 seconds (timeout)
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }, 30000);
+                });
+            });
+
+            // Feedback form loading state
+            const feedbackForms = document.querySelectorAll('form:has(button[name="submit_feedback"])');
+            feedbackForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const rating = this.querySelector('select[name="rating"]').value;
+                    if (!rating) {
+                        e.preventDefault();
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Rating Required',
+                            text: 'Please select a rating before submitting.',
+                            confirmButtonColor: '#2563eb'
+                        });
+                        return;
+                    }
+                    
+                    const submitBtn = this.querySelector('button[name="submit_feedback"]');
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<span class="spinner me-1"></span>Submitting...';
+                    submitBtn.disabled = true;
+                    
+                    // Reset button after 10 seconds (timeout)
+                    setTimeout(() => {
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }, 10000);
+                });
+            });
+
             // Animate cards on scroll
             const observerOptions = {
                 threshold: 0.1,
@@ -1346,31 +1498,6 @@ try {
 
             document.querySelectorAll('.card').forEach((card) => {
                 observer.observe(card);
-            });
-        });
-
-        // Delete confirmation with better UX
-        function confirmDelete(form, itemName = 'this item') {
-            Swal.fire({
-                title: 'Are you sure?',
-                text: `You want to delete ${itemName}?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Yes, delete it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    form.submit();
-                }
-            });
-        }
-
-        // Enhanced photo delete with better UX
-        document.querySelectorAll('.delete-photo-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                confirmDelete(this.closest('form'), 'this photo');
             });
         });
     </script>
