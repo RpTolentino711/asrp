@@ -14,6 +14,17 @@ if (!empty($_POST) || !empty($_FILES)) {
     echo '</pre>';
 }
 
+// Debug photo upload specifically
+if (isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
+    echo '<div style="background:#e6f3ff;color:#1e40af;padding:1em;border:1px solid #60a5fa;margin:1em auto;max-width:700px;">';
+    echo "<strong>PHOTO UPLOAD DEBUG:</strong><br>";
+    echo "Space ID: " . $_POST['space_id'] . "<br>";
+    echo "File present: " . (isset($_FILES['unit_photo']) ? 'YES' : 'NO') . "<br>";
+    echo "Upload button in POST: " . (isset($_POST['upload_unit_photo']) ? 'YES' : 'NO') . "<br>";
+    echo "File error: " . $_FILES['unit_photo']['error'] . "<br>";
+    echo "</div>";
+}
+
 require 'database/database.php'; 
 session_start();
 
@@ -116,8 +127,7 @@ $photo_upload_success = '';
 $photo_upload_error = '';
 
 // Photo Upload Processing
-if (isset($_POST['upload_unit_photo']) && isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
-    $space_id = intval($_POST['space_id']);
+if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {    $space_id = intval($_POST['space_id']);
     $file = $_FILES['unit_photo'];
 
     // Validate space_id belongs to client
