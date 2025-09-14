@@ -101,14 +101,14 @@
                 <i class="bi bi-telephone"></i>
                 <div class="contact-details">
                   <span class="contact-label">Phone</span>
-                  <a href="tel:+639123456789" class="contact-value">+63 912 345 6789</a>
+                  <a href="tel:+639123456789" class="contact-value">+63 9451357685</a>
                 </div>
               </div>
               <div class="contact-item">
                 <i class="bi bi-envelope"></i>
                 <div class="contact-details">
                   <span class="contact-label">Email</span>
-                  <a href="mailto:info@asrt.com" class="contact-value">info@asrt.com</a>
+                  <a href="mailto:info@asrt.com" class="contact-value">asrt@gmail.com</a>
                 </div>
               </div>
             </div>
