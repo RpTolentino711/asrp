@@ -411,7 +411,7 @@ public function runQueryAll($query, $params = []) {
                         SELECT MAX(sa2.EndDate) FROM spaceavailability sa2
                         WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
                     )
-                WHERE cs.Client_ID = ? AND cs.active = 1
+                WHERE cs.Client_ID = ?
                 ORDER BY sa.EndDate DESC";
         return $this->runQuery($sql, [$client_id], true);
     }
@@ -1430,13 +1430,13 @@ public function acceptRentalRequest($request_id) {
 
     // --- Methods for Displaying Data on the Page ---
     public function getAllClientsWithAssignedUnit() {
-    $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
-               c.Status, s.Name AS SpaceName
-        FROM client c
-        LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
-        LEFT JOIN space s ON cs.Space_ID = s.Space_ID
-        ORDER BY c.Client_ID DESC";
-    return $this->runQuery($sql, [], true);
+        $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
+                       c.Status, s.Name AS SpaceName
+                FROM client c
+                LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
+                LEFT JOIN space s ON cs.Space_ID = s.Space_ID
+                ORDER BY c.Client_ID DESC";
+        return $this->runQuery($sql, [], true);
     }
 
     public function getAllUnitsWithRenterInfo() {
