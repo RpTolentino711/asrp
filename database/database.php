@@ -948,6 +948,7 @@ public function getAllSpacesWithDetails() {
                 LEFT JOIN rentalrequest r ON i.Client_ID = r.Client_ID 
                     AND i.Space_ID = r.Space_ID 
                     AND r.Status = 'Accepted'
+                WHERE i.Flow_Status = 'new'
                 ORDER BY 
                     CASE 
                         WHEN i.Status = 'unpaid' AND DATEDIFF(CURDATE(), i.EndDate) > 0 THEN 1
