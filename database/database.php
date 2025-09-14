@@ -411,7 +411,8 @@ public function runQueryAll($query, $params = []) {
                         SELECT MAX(sa2.EndDate) FROM spaceavailability sa2
                         WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
                     )
-                WHERE cs.Client_ID = ?
+                JOIN invoice i ON i.Client_ID = cs.Client_ID AND i.Space_ID = cs.Space_ID
+                WHERE cs.Client_ID = ? AND i.Status != 'kicked'
                 ORDER BY sa.EndDate DESC";
         return $this->runQuery($sql, [$client_id], true);
     }
