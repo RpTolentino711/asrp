@@ -25,36 +25,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
     echo "</div>";
 }
 
-// Add this debug code after: $feedback_prompts = $db->getFeedbackPrompts($client_id);
-if (!empty($feedback_prompts) || true) { // Force show debug
-    echo '<div style="background:#fff3cd;color:#856404;padding:1em;border:1px solid #ffeaa7;margin:1em auto;max-width:700px;">';
-    echo "<strong>FEEDBACK DEBUG:</strong><br>";
-    echo "Client ID: " . $client_id . "<br>";
-    echo "Feedback prompts count: " . count($feedback_prompts) . "<br>";
-    if (!empty($feedback_prompts)) {
-        foreach ($feedback_prompts as $i => $prompt) {
-            echo "Prompt $i: Invoice_ID=" . $prompt['Invoice_ID'] . ", Status=needs feedback<br>";
-        }
-    } else {
-        echo "No feedback prompts found. Checking invoices...<br>";
-        
-        // Check what invoices exist for this client
-        try {
-            $debug_sql = "SELECT Invoice_ID, Status, InvoiceDate FROM invoice WHERE Client_ID = ? ORDER BY InvoiceDate DESC";
-            $debug_stmt = $db->pdo->prepare($debug_sql);
-            $debug_stmt->execute([$client_id]);
-            $invoices = $debug_stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            echo "Client's invoices:<br>";
-            foreach ($invoices as $inv) {
-                echo "- Invoice {$inv['Invoice_ID']}: Status='{$inv['Status']}', Date={$inv['InvoiceDate']}<br>";
-            }
-        } catch (Exception $e) {
-            echo "Error checking invoices: " . $e->getMessage() . "<br>";
-        }
-    }
-    echo '</div>';
-}
+
 
 require 'database/database.php'; 
 session_start();
@@ -115,7 +86,7 @@ $feedback_success = '';
 $feedback_error = '';
 
 // --- FEEDBACK PROCESSING (FIXED) ---
-if (isset($_POST['submit_feedback']) && isset($_POST['invoice_id']) && isset($_POST['rating'])) {
+if (isset($_POST['invoice_id']) && isset($_POST['rating']) && !empty($_POST['rating'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $rating = intval($_POST['rating']);
     $comments = isset($_POST['comments']) ? trim($_POST['comments']) : '';
@@ -1099,9 +1070,9 @@ try {
                                     <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
                                 </div>
                             </div>
-                            <button class="btn btn-primary" type="submit" name="submit_feedback">
-                                <i class="bi bi-send me-1"></i>Submit Feedback
-                            </button>
+                            <<button class="btn btn-primary" type="submit" name="submit_feedback" value="1">
+    <i class="bi bi-send me-1"></i>Submit Feedback
+</button>
                         </form>
                     </div>
                 </div>
