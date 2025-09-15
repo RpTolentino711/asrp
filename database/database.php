@@ -1430,7 +1430,8 @@ public function acceptRentalRequest($request_id) {
     // --- Methods for Displaying Data on the Page ---
     public function getAllClientsWithAssignedUnit() {
     $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
-               c.Status, s.Name AS SpaceName
+               c.Status, 
+               CASE WHEN i.Status = 'kicked' THEN NULL ELSE s.Name END AS SpaceName
         FROM client c
         LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
         LEFT JOIN space s ON cs.Space_ID = s.Space_ID
