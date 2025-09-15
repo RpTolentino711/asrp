@@ -1,3 +1,4 @@
+  
 <?php
 
 class Database {
@@ -1401,54 +1402,108 @@ public function acceptRentalRequest($request_id) {
     }
 
     // --- Methods for a single Unit/Space ---
-    public function isUnitRented($space_id) {
-        $sql = "SELECT 1 FROM clientspace WHERE Space_ID = ? LIMIT 1";
-        return (bool)$this->runQuery($sql, [$space_id]);
-    }
+public function isUnitRented($space_id) {
+    $sql = "SELECT 1 FROM clientspace WHERE Space_ID = ? AND active = 1 LIMIT 1";
+    return (bool)$this->runQuery($sql, [$space_id]);
+}
 
     public function updateUnit_price($space_id, $price) {
         $sql = "UPDATE space SET Price = ? WHERE Space_ID = ?";
         return $this->executeStatement($sql, [$price, $space_id]);
     }
 
+
+
     public function hardDeleteUnit($space_id) {
-        $this->pdo->beginTransaction();
-        try {
-            $this->executeStatement("DELETE FROM spaceavailability WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM clientspace WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM rentalrequest WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM maintenancerequest WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM space WHERE Space_ID = ?", [$space_id]);
-            $this->pdo->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->pdo->rollBack();
-            return false;
+    $this->pdo->beginTransaction();
+    try {
+        // 1. Find all active renters for this unit
+        $activeRenters = $this->runQuery(
+            "SELECT Client_ID FROM clientspace WHERE Space_ID = ? AND active = 1",
+            [$space_id],
+            true
+        );
+
+        if ($activeRenters) {
+            foreach ($activeRenters as $renter) {
+                $client_id = $renter['Client_ID'];
+
+                // Deactivate clientspace
+                $this->executeStatement(
+                    "UPDATE clientspace SET active = 0 WHERE Client_ID = ? AND Space_ID = ?",
+                    [$client_id, $space_id]
+                );
+
+                // Mark invoices as kicked
+                $this->executeStatement(
+                    "UPDATE invoice 
+                     SET Status = 'kicked', Flow_Status = 'done' 
+                     WHERE Client_ID = ? AND Space_ID = ? AND Status != 'kicked'",
+                    [$client_id, $space_id]
+                );
+
+                // Reject rental requests
+                $this->executeStatement(
+                    "UPDATE rentalrequest 
+                     SET Status = 'Rejected' 
+                     WHERE Client_ID = ? AND Space_ID = ? AND Status != 'Rejected'",
+                    [$client_id, $space_id]
+                );
+            }
         }
+
+        // 2. Update spaceavailability to mark the space as ended
+        $this->executeStatement(
+            "UPDATE spaceavailability 
+             SET Status = 'Available', EndDate = CURDATE() 
+             WHERE Space_ID = ? AND Status = 'Occupied'",
+            [$space_id]
+        );
+
+        // 3. Reset the flow status of the space
+        $this->executeStatement("UPDATE space SET Flow_Status = 'new' WHERE Space_ID = ?", [$space_id]);
+
+        // 4. Delete all related records and the unit itself
+        $this->executeStatement("DELETE FROM spaceavailability WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM clientspace WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM rentalrequest WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM maintenancerequest WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM invoice WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM space WHERE Space_ID = ?", [$space_id]);
+
+        $this->pdo->commit();
+        return true;
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        return false;
     }
+}
+
 
     // --- Methods for Displaying Data on the Page ---
     public function getAllClientsWithAssignedUnit() {
     $sql = "SELECT c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.C_username, 
-               c.Status, s.Name AS SpaceName
+               c.Status, 
+               CASE WHEN i.Status = 'kicked' THEN NULL ELSE s.Name END AS SpaceName
         FROM client c
         LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
         LEFT JOIN space s ON cs.Space_ID = s.Space_ID
         LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
-        WHERE (i.Status IS NULL OR i.Status != 'kicked')
         ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
     }
+    
 
     public function getAllUnitsWithRenterInfo() {
         $sql = "SELECT s.Space_ID, s.Name, s.SpaceType_ID, st.SpaceTypeName, s.Price,
-                       c.Client_fn, c.Client_ln
+                       CASE WHEN i.Status = 'kicked' THEN NULL ELSE c.Client_fn END AS Client_fn,
+                       CASE WHEN i.Status = 'kicked' THEN NULL ELSE c.Client_ln END AS Client_ln
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
                 LEFT JOIN client c ON cs.Client_ID = c.Client_ID
                 LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
-                WHERE (i.Status IS NULL OR i.Status != 'kicked')";
+                ORDER BY s.Space_ID DESC";
         try {
             return $this->pdo->query($sql)->fetchAll();
         } catch (PDOException $e) {
@@ -1456,6 +1511,8 @@ public function acceptRentalRequest($request_id) {
         }
     }
 
+
+    
 public function markRentalRequestDone($client_id, $space_id) {
     // Get the latest accepted rentalrequest for this client/space
     $latest = $this->runQuery(
