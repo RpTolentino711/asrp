@@ -1402,10 +1402,10 @@ public function acceptRentalRequest($request_id) {
     }
 
     // --- Methods for a single Unit/Space ---
-    public function isUnitRented($space_id) {
-        $sql = "SELECT 1 FROM clientspace WHERE Space_ID = ? LIMIT 1";
-        return (bool)$this->runQuery($sql, [$space_id]);
-    }
+public function isUnitRented($space_id) {
+    $sql = "SELECT 1 FROM clientspace WHERE Space_ID = ? AND active = 1 LIMIT 1";
+    return (bool)$this->runQuery($sql, [$space_id]);
+}
 
     public function updateUnit_price($space_id, $price) {
         $sql = "UPDATE space SET Price = ? WHERE Space_ID = ?";
@@ -1414,8 +1414,7 @@ public function acceptRentalRequest($request_id) {
 
 
 
-
-public function hardDeleteUnit($space_id) {
+    public function hardDeleteUnit($space_id) {
     $this->pdo->beginTransaction();
     try {
         // 1. Find all active renters for this unit
