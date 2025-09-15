@@ -1410,32 +1410,40 @@ public function acceptRentalRequest($request_id) {
         $sql = "UPDATE space SET Price = ? WHERE Space_ID = ?";
         return $this->executeStatement($sql, [$price, $space_id]);
     }
+public function hardDeleteUnit($space_id) {
+    // Check if there is at least one active renter in this unit
+    $activeRenter = $this->runQuery(
+        "SELECT 1 FROM clientspace WHERE Space_ID = ? AND active = 1 LIMIT 1",
+        [$space_id]
+    );
 
-    public function hardDeleteUnit($space_id) {
-        // Only allow deletion if all invoices for this unit are kicked or there are no invoices
-        $activeInvoice = $this->runQuery(
-            "SELECT 1 FROM invoice WHERE Space_ID = ? AND Flow_Status != 'kicked' LIMIT 1",
-            [$space_id]
-        );
-        if ($activeInvoice) {
-            // There is at least one active (not kicked) invoice, do not delete
-            return false;
-        }
-        $this->pdo->beginTransaction();
-        try {
-            $this->executeStatement("DELETE FROM spaceavailability WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM clientspace WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM rentalrequest WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM maintenancerequest WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM invoice WHERE Space_ID = ?", [$space_id]);
-            $this->executeStatement("DELETE FROM space WHERE Space_ID = ?", [$space_id]);
-            $this->pdo->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->pdo->rollBack();
-            return false;
-        }
+    if ($activeRenter) {
+        // Cannot delete because at least one renter is still active
+        return false;
     }
+
+    $this->pdo->beginTransaction();
+    try {
+        // Remove all inactive renters linked to this space
+        $this->executeStatement("DELETE FROM clientspace WHERE Space_ID = ?", [$space_id]);
+
+        // Remove related data
+        $this->executeStatement("DELETE FROM spaceavailability WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM rentalrequest WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM maintenancerequest WHERE Space_ID = ?", [$space_id]);
+        $this->executeStatement("DELETE FROM invoice WHERE Space_ID = ?", [$space_id]);
+
+        // Finally delete the unit itself
+        $this->executeStatement("DELETE FROM space WHERE Space_ID = ?", [$space_id]);
+
+        $this->pdo->commit();
+        return true;
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        return false;
+    }
+}
+
 
     // --- Methods for Displaying Data on the Page ---
     public function getAllClientsWithAssignedUnit() {
