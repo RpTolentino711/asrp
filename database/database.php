@@ -1072,13 +1072,6 @@ public function getAllSpacesWithDetails() {
         }
     }
 
-    public function getUnreadAdminMessageCount($client_id) {
-        $sql = "SELECT COUNT(*) FROM messages WHERE client_id = ? AND is_read = 0 AND from_admin = 1";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$client_id]);
-        return (int)$stmt->fetchColumn();
-    }
-
 
 
 
