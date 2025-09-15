@@ -1443,13 +1443,14 @@ public function acceptRentalRequest($request_id) {
 
     public function getAllUnitsWithRenterInfo() {
         $sql = "SELECT s.Space_ID, s.Name, s.SpaceType_ID, st.SpaceTypeName, s.Price,
-                       c.Client_fn, c.Client_ln
+                       CASE WHEN i.Status = 'kicked' THEN NULL ELSE c.Client_fn END AS Client_fn,
+                       CASE WHEN i.Status = 'kicked' THEN NULL ELSE c.Client_ln END AS Client_ln
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
                 LEFT JOIN client c ON cs.Client_ID = c.Client_ID
                 LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
-                WHERE (i.Status IS NULL OR i.Status != 'kicked')";
+                ORDER BY s.Space_ID DESC";
         try {
             return $this->pdo->query($sql)->fetchAll();
         } catch (PDOException $e) {
