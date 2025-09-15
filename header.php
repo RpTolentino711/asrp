@@ -21,6 +21,13 @@ if (isset($_SESSION['client_id'])) {
     }
 }
 
+// --- Admin Message Notification Badge Logic ---
+$admin_message_count = 0;
+if (isset($_SESSION['client_id'])) {
+    // You must implement this method in your Database class!
+    $admin_message_count = $db->getUnreadAdminMessageCount($_SESSION['client_id']);
+}
+
 function display_flash_message($icon, $title, $message) {
     $safe_message = addslashes($message);
     echo "<script>
@@ -543,6 +550,11 @@ $is_logged_in = isset($_SESSION['client_id']);
             <?php if ($invoice_alert_count > 0): ?>
               <span class="notification-badge">
                 <?= $invoice_alert_count ?>
+              </span>
+            <?php endif; ?>
+            <?php if ($admin_message_count > 0): ?>
+              <span class="notification-badge" style="background: var(--navbar-success); right: -25px;">
+                <i class="bi bi-envelope-fill"></i>
               </span>
             <?php endif; ?>
           </a>
@@ -1090,7 +1102,7 @@ document.addEventListener('DOMContentLoaded', function() {
         body: formData
       })
       .then(res => res.json())
-      .then(data => {
+      .then data => {
         submitBtn.disabled = false;
         submitBtn.classList.remove('loading');
         if (data.success && data.pending_verification) {
