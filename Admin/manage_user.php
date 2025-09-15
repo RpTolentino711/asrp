@@ -945,7 +945,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                                     <button type="submit" name="force_delete_unit" class="btn-action btn-force-delete">
                                                         <i class="fas fa-skull"></i>
                                                     </button>
-                                                    <span class="tooltip-text">(Force Delete)</span>
+                                                    <span class="tooltip-text">(Forc)</span>
                                                 </div>
                                             </form>
                                         </div>
