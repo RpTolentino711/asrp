@@ -1435,7 +1435,6 @@ public function acceptRentalRequest($request_id) {
         LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
         LEFT JOIN space s ON cs.Space_ID = s.Space_ID
         LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
-        WHERE (i.Status IS NULL OR i.Status != 'kicked')
         ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
     }
