@@ -149,7 +149,7 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
     } else {
-        if ($db->forceDeleteUnit($sid)) {
+        if ($db->hardDeleteUnit($sid)) {
             $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                     <i class="fas fa-check-circle me-2"></i>
                     Unit deleted successfully!
