@@ -139,15 +139,66 @@ if (isset($_POST['update_price']) && isset($_POST['space_id'], $_POST['new_price
     }
 }
 
+// REGULAR UNIT DELETION - Check if unit has renter before deleting
 if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     $sid = intval($_POST['space_id']);
     
+    // Debug: Log what we're trying to delete
     error_log("Attempting to delete unit ID: $sid");
+    
+    // Check if unit is rented using a more comprehensive check
+    $isRented = $db->isUnitRented($sid);
+    error_log("Unit $sid - isRented check result: " . ($isRented ? 'true' : 'false'));
+    
+    // Additional debug: Check active rentals directly
+    $activeRenters = $db->runQuery(
+        "SELECT Client_ID FROM clientspace WHERE Space_ID = ? AND active = 1",
+        [$sid],
+        true
+    );
+    error_log("Unit $sid - Active renters found: " . count($activeRenters));
+    
+    if ($isRented) {
+        $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Cannot delete unit: This unit currently has a renter assigned. (Active renters: ' . count($activeRenters) . ')
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        // Attempt deletion
+        $deleteResult = $db->hardDeleteUnit($sid);
+        error_log("Unit $sid - hardDeleteUnit result: " . ($deleteResult ? 'success' : 'failed'));
+        
+        if ($deleteResult) {
+            $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Unit deleted successfully! All associated records have been removed.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+        } else {
+            $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Error: Could not delete unit. Check error logs for details.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+        }
+    }
+    
+    // Refresh data after deletion attempt
+    $clients = $db->getAllClientsWithOrWithoutUnit();
+    $units = $db->getAllUnitsWithRenterInfo();
+}
+
+// FORCE DELETE UNIT - Ignores rental status and deletes everything
+if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
+    $sid = intval($_POST['space_id']);
+    
+    error_log("Force deleting unit ID: $sid");
     
     if ($db->hardDeleteUnit($sid)) {
         $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-check-circle me-2"></i>
-                Unit deleted successfully! All associated records and renter relationships have been permanently removed.
+                Unit force deleted successfully! All associated records and renter relationships have been permanently removed.
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
         
@@ -157,7 +208,7 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     } else {
         $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-exclamation-circle me-2"></i>
-                Error: Could not delete unit. Check error logs for details.
+                Error: Could not force delete unit. Check error logs for details.
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
     }
@@ -881,10 +932,19 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
                                                 <div class="tooltip-wrapper">
-                                                    <button type="submit" name="delete_unit" class="btn-action btn-delete">
-                                                        <i class="fas fa-trash"></i>
+                                                    <button type="submit" name="delete_unit" class="btn-action btn-delete" <?= $has_renter ? 'disabled' : '' ?>>
                                                     </button>
-                                                    <span class="tooltip-text">Delete Unit</span>
+                                                    <span class="tooltip-text"><?= $has_renter ? 'Cannot delete: has renter' : 'Delete Unit' ?></span>
+                                                </div>
+                                            </form>
+                                            
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                                <div class="tooltip-wrapper">
+                                                    <button type="submit" name="force_delete_unit" class="btn-action btn-force-delete">
+                                                        <i class="fas fa-skull"></i>
+                                                    </button>
+                                                    <span class="tooltip-text">Force Delete</span>
                                                 </div>
                                             </form>
                                         </div>
@@ -927,7 +987,15 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             
             if (form.querySelector('[name="delete_unit"]')) {
                 form.addEventListener('submit', function(e) {
-                    if (!confirm('Permanently delete this unit and all its records? This action cannot be undone and will remove any associated renter relationships!')) {
+                    if (!confirm('Permanently delete this unit and all its records? This cannot be undone!')) {
+                        e.preventDefault();
+                    }
+                });
+            }
+            
+            if (form.querySelector('[name="force_delete_unit"]')) {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('!!! FORCE DELETE !!!\nThis will PERMANENTLY DELETE the unit and ALL associated records, INCLUDING any renter relationships.\nThis CANNOT BE UNDONE and will likely orphan client records!\n\nAre you absolutely certain?')) {
                         e.preventDefault();
                     }
                 });
