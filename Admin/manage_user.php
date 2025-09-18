@@ -30,7 +30,7 @@ if (isset($_POST['rename_unit']) && isset($_POST['space_id'], $_POST['new_name']
     } else if ($db->renameUnit($sid, $new_name)) {
         $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-check-circle me-2"></i>
-                Unit name updated!
+                Unit name updated successfully!
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
     } else {
@@ -127,7 +127,7 @@ if (isset($_POST['update_price']) && isset($_POST['space_id'], $_POST['new_price
     if ($db->updateUnit_price($sid, $price)) {
         $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-check-circle me-2"></i>
-                Unit price updated!
+                Unit price updated successfully!
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
     } else {
@@ -139,7 +139,7 @@ if (isset($_POST['update_price']) && isset($_POST['space_id'], $_POST['new_price
     }
 }
 
-// FIXED UNIT DELETION - Added debug information and better error handling
+// REGULAR UNIT DELETION - Check if unit has renter before deleting
 if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     $sid = intval($_POST['space_id']);
     
@@ -161,7 +161,7 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     if ($isRented) {
         $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-exclamation-triangle me-2"></i>
-                Cannot delete: This unit currently has a renter assigned. (Active renters: ' . count($activeRenters) . ')
+                Cannot delete unit: This unit currently has a renter assigned. (Active renters: ' . count($activeRenters) . ')
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
     } else {
@@ -172,7 +172,7 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
         if ($deleteResult) {
             $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                     <i class="fas fa-check-circle me-2"></i>
-                    Unit deleted successfully!
+                    Unit deleted successfully! All associated records have been removed.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>';
         } else {
@@ -185,11 +185,11 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     }
     
     // Refresh data after deletion attempt
-    $clients = $db->getAllClientsWithAssignedUnit();
+    $clients = $db->getAllClientsWithOrWithoutUnit();
     $units = $db->getAllUnitsWithRenterInfo();
 }
 
-// ALTERNATIVE: Force delete unit (ignores rental status)
+// FORCE DELETE UNIT - Ignores rental status and deletes everything
 if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
     $sid = intval($_POST['space_id']);
     
@@ -198,12 +198,12 @@ if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
     if ($db->hardDeleteUnit($sid)) {
         $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-check-circle me-2"></i>
-                Unit force deleted successfully! All associated records have been removed.
+                Unit force deleted successfully! All associated records and renter relationships have been permanently removed.
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>';
         
         // Refresh data after deletion
-        $clients = $db->getAllClientsWithAssignedUnit();
+        $clients = $db->getAllClientsWithOrWithoutUnit();
         $units = $db->getAllUnitsWithRenterInfo();
     } else {
         $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
@@ -945,7 +945,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                                     <button type="submit" name="force_delete_unit" class="btn-action btn-force-delete">
                                                         <i class="fas fa-skull"></i>
                                                     </button>
-                                                    <span class="tooltip-text">(Forc)</span>
+                                                    <span class="tooltip-text">Force Delete</span>
                                                 </div>
                                             </form>
                                         </div>
