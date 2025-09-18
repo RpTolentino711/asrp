@@ -929,14 +929,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                     </td>
                                     <td>
                                         <div class="action-group">
-                                            <form method="post" class="d-inline">
-                                                <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
-                                                <div class="tooltip-wrapper">
-                                                    <button type="submit" name="delete_unit" class="btn-action btn-delete" <?= $has_renter ? 'disabled' : '' ?>>
-                                                    </button>
-                                                    <span class="tooltip-text"><?= $has_renter ? 'Cannot delete: has renter' : 'Delete Unit' ?></span>
-                                                </div>
-                                            </form>
+
                                             
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
