@@ -700,7 +700,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             <div class="nav-item">
                 <a href="manage_user.php" class="nav-link active">
                     <i class="fas fa-users"></i>
-                    <span>Manage Users</span>
+                    <span>Manage Users & Uits</span>
                 </a>
             </div>
             

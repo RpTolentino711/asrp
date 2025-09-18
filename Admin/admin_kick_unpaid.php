@@ -411,7 +411,7 @@ function getCurrentUnitPrice($db, $space_id) {
         <div class="nav-item">
             <a href="manage_user.php" class="nav-link">
                 <i class="fas fa-users"></i>
-                <span>Manage Users</span>
+                <span>Manage Users & Uits</span>
             </a>
         </div>
 
