@@ -1481,7 +1481,7 @@ public function hardDeleteUnit($space_id) {
 }
 
 
-    
+
 public function getAllClientsWithOrWithoutUnit() {
     $sql = "SELECT 
                 c.Client_ID,
@@ -1496,6 +1496,12 @@ public function getAllClientsWithOrWithoutUnit() {
             LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
             LEFT JOIN space s ON cs.Space_ID = s.Space_ID
             LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+            WHERE NOT EXISTS (
+                SELECT 1 
+                FROM invoice i 
+                WHERE i.Client_ID = c.Client_ID
+                  AND (i.Status = 'kicked' OR i.Flow_Status = 'done')
+            )
             ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
 }
