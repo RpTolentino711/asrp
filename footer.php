@@ -108,7 +108,7 @@
                 <i class="bi bi-envelope"></i>
                 <div class="contact-details">
                   <span class="contact-label">Email</span>
-                  <a href="mailto:info@asrt.com" class="contact-value">asrt@gmail.com</a>
+                  <a href="mailto:info@asrt.com" class="contact-value">management@asrt.space</a>
                 </div>
               </div>
             </div>
