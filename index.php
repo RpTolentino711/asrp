@@ -1110,7 +1110,7 @@ if (isset($_SESSION['login_error'])) {
                 </div>
                 <h5 class="fw-bold">Email Us</h5>
                 <p class="text-muted mb-2">Get detailed information</p>
-                <a href="mailto:info@asrt.com" class="text-decoration-none">info@asrt.com</a>
+                <a href="mailto:info@asrt.com" class="text-decoration-none">management@asrt.space</a>
               </div>
             </div>
 
