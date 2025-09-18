@@ -62,7 +62,7 @@ $mail->SMTPOptions = [
 
 // Gmail credentials (same as registration)
 $mail->Username = 'management@asrt.space';
-$mail->Password = 'unwr kdad ejcd rysq';
+$mail->Password = 'Pogilameg@10';
 $mail->setFrom($mail->Username, 'ASRP Registration');
 $mail->addReplyTo('no-reply@asrp.local', 'ASRP Registration');
 $mail->addAddress($email);
