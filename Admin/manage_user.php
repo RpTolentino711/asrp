@@ -929,7 +929,6 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                     </td>
                                     <td>
                                         <div class="action-group">
-
                                             
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
