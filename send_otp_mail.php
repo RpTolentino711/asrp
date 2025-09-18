@@ -38,7 +38,7 @@ unset($_SESSION['otp_locked_until']);
 $mail = new PHPMailer;
 $mail->CharSet    = 'UTF-8';
 $mail->isSMTP();
-$mail->Host       = 'smtp.gmail.com';
+$mail->Host       = 'smtp.hostinger.com';
 $mail->Port       = 587;
 $mail->SMTPAuth   = true;
 $mail->SMTPSecure = 'tls';
@@ -59,8 +59,8 @@ $mail->SMTPOptions = [
 ];
 
 // Gmail credentials
-$mail->Username = 'romeotolentino804@gmail.com';
-$mail->Password = 'hhrp moci tugu helk';
+$mail->Username = 'management@asrt.space';
+$mail->Password = '@Pogilameg10';
 
 $mail->setFrom($mail->Username, 'ASRP Registration');
 $mail->addReplyTo('no-reply@asrp.local', 'ASRP Registration');
