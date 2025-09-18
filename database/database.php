@@ -398,25 +398,35 @@ public function runQueryAll($query, $params = []) {
                 ORDER BY r.EndDate DESC, i.InvoiceDate DESC";
         return $this->runQuery($sql, [], true);
     }
-
     
-    public function getRentedUnits($client_id) {
-        $sql = "SELECT s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
-                    sa.StartDate, sa.EndDate
-                FROM clientspace cs
-                JOIN space s ON cs.Space_ID = s.Space_ID
-                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                LEFT JOIN spaceavailability sa ON sa.Space_ID = s.Space_ID
-                    AND sa.Status = 'Occupied'
-                    AND sa.EndDate = (
-                        SELECT MAX(sa2.EndDate) FROM spaceavailability sa2
-                        WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
-                    )
-                JOIN invoice i ON i.Client_ID = cs.Client_ID AND i.Space_ID = cs.Space_ID
-                WHERE cs.Client_ID = ? AND i.Status != 'kicked'
-                ORDER BY sa.EndDate DESC";
-        return $this->runQuery($sql, [$client_id], true);
-    }
+
+public function getRentedUnits($client_id) {
+    $sql = "SELECT s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
+                   sa.StartDate, sa.EndDate
+            FROM clientspace cs
+            JOIN space s ON cs.Space_ID = s.Space_ID
+            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+            LEFT JOIN spaceavailability sa ON sa.Space_ID = s.Space_ID
+                AND sa.Status = 'Occupied'
+                AND sa.EndDate = (
+                    SELECT MAX(sa2.EndDate) FROM spaceavailability sa2
+                    WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
+                )
+            JOIN (
+                SELECT inv1.*
+                FROM invoice inv1
+                INNER JOIN (
+                    SELECT Client_ID, Space_ID, MAX(Created_At) AS max_created
+                    FROM invoice
+                    GROUP BY Client_ID, Space_ID
+                ) inv2 ON inv1.Client_ID = inv2.Client_ID AND inv1.Space_ID = inv2.Space_ID AND inv1.Created_At = inv2.max_created
+            ) i ON i.Client_ID = cs.Client_ID AND i.Space_ID = cs.Space_ID
+            WHERE cs.Client_ID = ? 
+              AND i.Status != 'kicked'
+              AND i.Flow_Status != 'done'
+            ORDER BY sa.EndDate DESC";
+    return $this->runQuery($sql, [$client_id], true);
+}
 
     public function getClientRentedUnitIds($client_id) {
         $sql = "SELECT cs.Space_ID
