@@ -751,6 +751,7 @@ $is_logged_in = isset($_SESSION['client_id']);
       <form id="otpForm" autocomplete="off">
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Verify Email (OTP)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -1255,4 +1256,3 @@ function checkRegisterForm() {
   return true;
 }
 </script>
-
