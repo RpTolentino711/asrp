@@ -1490,18 +1490,19 @@ public function getAllClientsWithOrWithoutUnit() {
                 c.Client_Email,
                 c.C_username,
                 c.Status,
-                s.Name AS SpaceName,
-                st.SpaceTypeName
+                CASE 
+                    WHEN i.Status = 'kicked' OR i.Flow_Status = 'done' THEN NULL
+                    ELSE s.Name
+                END AS SpaceName,
+                CASE 
+                    WHEN i.Status = 'kicked' OR i.Flow_Status = 'done' THEN NULL
+                    ELSE st.SpaceTypeName
+                END AS SpaceTypeName
             FROM client c
             LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
             LEFT JOIN space s ON cs.Space_ID = s.Space_ID
             LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-            WHERE NOT EXISTS (
-                SELECT 1 
-                FROM invoice i 
-                WHERE i.Client_ID = c.Client_ID
-                  AND (i.Status = 'kicked' OR i.Flow_Status = 'done')
-            )
+            LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
             ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
 }
