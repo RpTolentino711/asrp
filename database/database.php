@@ -1519,22 +1519,45 @@ public function getAllClientsWithOrWithoutUnit() {
 
 
 
-    public function getAllUnitsWithRenterInfo() {
-        $sql = "SELECT s.Space_ID, s.Name, s.SpaceType_ID, st.SpaceTypeName, s.Price,
-                       CASE WHEN i.Status = 'kicked' THEN NULL ELSE c.Client_fn END AS Client_fn,
-                       CASE WHEN i.Status = 'kicked' THEN NULL ELSE c.Client_ln END AS Client_ln
-                FROM space s
-                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
-                LEFT JOIN client c ON cs.Client_ID = c.Client_ID
-                LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
-                ORDER BY s.Space_ID DESC";
-        try {
-            return $this->pdo->query($sql)->fetchAll();
-        } catch (PDOException $e) {
-            return [];
-        }
+public function getAllUnitsWithRenterInfo() {
+    $sql = "SELECT 
+                s.Space_ID, 
+                s.Name, 
+                s.SpaceType_ID, 
+                st.SpaceTypeName, 
+                s.Price,
+                CASE 
+                    WHEN i.Status = 'kicked' OR i.Flow_Status = 'done' THEN NULL 
+                    ELSE c.Client_fn 
+                END AS Client_fn,
+                CASE 
+                    WHEN i.Status = 'kicked' OR i.Flow_Status = 'done' THEN NULL 
+                    ELSE c.Client_ln 
+                END AS Client_ln
+            FROM space s
+            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+            LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
+            LEFT JOIN client c ON cs.Client_ID = c.Client_ID
+            LEFT JOIN (
+                SELECT inv1.*
+                FROM invoice inv1
+                INNER JOIN (
+                    SELECT Client_ID, Space_ID, MAX(Created_At) AS max_created
+                    FROM invoice
+                    GROUP BY Client_ID, Space_ID
+                ) inv2
+                ON inv1.Client_ID = inv2.Client_ID 
+                   AND inv1.Space_ID = inv2.Space_ID 
+                   AND inv1.Created_At = inv2.max_created
+            ) i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
+            ORDER BY s.Space_ID DESC";
+    try {
+        return $this->pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) {
+        return [];
     }
+}
+
 
 public function markRentalRequestDone($client_id, $space_id) {
     // Get the latest accepted rentalrequest for this client/space
