@@ -1502,10 +1502,20 @@ public function getAllClientsWithOrWithoutUnit() {
             LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
             LEFT JOIN space s ON cs.Space_ID = s.Space_ID
             LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-            LEFT JOIN invoice i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
+            LEFT JOIN (
+                SELECT inv1.*
+                FROM invoice inv1
+                INNER JOIN (
+                    SELECT Client_ID, Space_ID, MAX(Created_At) AS max_created
+                    FROM invoice
+                    GROUP BY Client_ID, Space_ID
+                ) inv2
+                ON inv1.Client_ID = inv2.Client_ID AND inv1.Space_ID = inv2.Space_ID AND inv1.Created_At = inv2.max_created
+            ) i ON i.Client_ID = c.Client_ID AND i.Space_ID = s.Space_ID
             ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
 }
+
 
 
 
