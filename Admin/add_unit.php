@@ -645,7 +645,7 @@ $spaces = $db->getAllSpacesWithDetails();
             <div class="nav-item">
                 <a href="manage_user.php" class="nav-link">
                     <i class="fas fa-users"></i>
-                    <span>Manage Users & Uits</span>
+                    <span>Manage Users & Units</span>
                 </a>
             </div>
             
