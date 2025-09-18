@@ -59,7 +59,7 @@ $mail->SMTPOptions = [
 ];
 
 // Gmail credentials
-$mail->Username = 'ahmadpaguta2005@gmail.com';
+$mail->Username = 'management@asrt.space';
 $mail->Password = 'unwr kdad ejcd rysq';
 
 $mail->setFrom($mail->Username, 'ASRP Registration');
