@@ -1481,9 +1481,8 @@ public function hardDeleteUnit($space_id) {
 }
 
 
-
-    // --- Methods for Displaying Data on the Page ---
-  public function getAllClientsWithOrWithoutUnit() {
+    
+public function getAllClientsWithOrWithoutUnit() {
     $sql = "SELECT 
                 c.Client_ID,
                 c.Client_fn,
@@ -1497,11 +1496,10 @@ public function hardDeleteUnit($space_id) {
             LEFT JOIN clientspace cs ON c.Client_ID = cs.Client_ID
             LEFT JOIN space s ON cs.Space_ID = s.Space_ID
             LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-            -- Only show units, or NULL if not assigned
-            WHERE (st.SpaceTypeName = 'Unit' OR st.SpaceTypeName IS NULL)
             ORDER BY c.Client_ID DESC";
     return $this->runQuery($sql, [], true);
 }
+
 
 
     public function getAllUnitsWithRenterInfo() {

@@ -12,7 +12,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 $msg = "";
 
 // --- Fetch ALL Data for Display ---
-$clients = $db->getAllClientsWithAssignedUnit();
+$clients = $db->getAllClientsWithOrWithoutUnit();
 $units = $db->getAllUnitsWithRenterInfo();
 
 // --- Handle POST Actions ---
