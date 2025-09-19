@@ -466,9 +466,22 @@ $pending_requests = $db->getPendingRentalRequests();
                                 <?php foreach ($pending_requests as $row): ?>
                                 <tr>
                                     <td>
-                                        <div class="fw-bold"><?= htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']) ?></div>
+                                        <div class="fw-bold" 
+                                            data-bs-toggle="tooltip" 
+                                            data-bs-html="true" 
+                                            title="Email: <?= htmlspecialchars($row['Client_Email'] ?? 'N/A') ?><br>Phone: <?= htmlspecialchars($row['Client_Phone'] ?? 'N/A') ?>">
+                                            <?= htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']) ?>
+                                        </div>
                                         <div class="text-muted small">ID: #<?= htmlspecialchars($row['Request_ID']) ?></div>
                                     </td>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
                                     <td><?= htmlspecialchars($row['Name']) ?></td>
                                     <td>
                                         <div class="fw-medium"><?= htmlspecialchars($row['StartDate']) ?></div>
