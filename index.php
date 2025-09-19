@@ -1149,19 +1149,38 @@ if (isset($_SESSION['login_error'])) {
           <div class="modal-body">
             <div class="mb-3">
               <label for="client_name" class="form-label">Name <span class="text-danger">*</span></label>
-              <input type="text" name="client_name" id="client_name" class="form-control" required>
+              <input type="text" name="client_name" id="client_name" class="form-control" required pattern="[A-Za-z\s]+" title="Name is required and must contain only letters and spaces">
             </div>
             <div class="mb-3">
               <label for="client_email" class="form-label">Email <span class="text-danger">*</span></label>
-              <input type="email" name="client_email" id="client_email" class="form-control" required>
+              <input type="email" name="client_email" id="client_email" class="form-control" required title="A valid email is required">
             </div>
             <div class="mb-3">
               <label for="client_phone" class="form-label">Phone</label>
-              <input type="text" name="client_phone" id="client_phone" class="form-control">
+              <input type="text" name="client_phone" id="client_phone" class="form-control" required pattern="\d{11}" maxlength="11" minlength="11" title="Phone number must be exactly 11 digits">
             </div>
             <div class="mb-3">
               <label for="message_text" class="form-label">Your Message <span class="text-danger">*</span></label>
               <textarea name="message_text" id="message_text" class="form-control" rows="4" required></textarea>
+            <script>
+              // Extra client-side validation for phone field
+              document.addEventListener('DOMContentLoaded', function() {
+                var phoneInput = document.getElementById('client_phone');
+                phoneInput.addEventListener('input', function(e) {
+                  this.value = this.value.replace(/[^\d]/g, '').slice(0, 11);
+                });
+                var form = phoneInput.closest('form');
+                form.addEventListener('submit', function(e) {
+                  if (!/^\d{11}$/.test(phoneInput.value)) {
+                    e.preventDefault();
+                    phoneInput.setCustomValidity('Phone number must be exactly 11 digits');
+                    phoneInput.reportValidity();
+                  } else {
+                    phoneInput.setCustomValidity('');
+                  }
+                });
+              });
+            </script>
             </div>
           </div>
           <div class="modal-footer">
