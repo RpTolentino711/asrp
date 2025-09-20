@@ -828,52 +828,49 @@ if ($logged_in) {
                                     </div>
                                 </div>
                                 <div class="rental-card-body">
-                                    <?php if ($has_pending_request): ?>
-                                        <div class="pending-message">
-                                            <i class="bi bi-clock-history"></i>
-                                            <p><strong>Request Pending</strong></p>
-                                            <p class="small text-muted mb-0">You have already submitted a request for this unit. Please wait for admin approval.</p>
+                                    <form method="post" action="" onsubmit="return <?= ($has_pending_request || !empty($pending_requests)) ? 'false' : 'showConfirmModal(this, ' . htmlspecialchars(json_encode($space['Price'])) . ', \'' . htmlspecialchars($space['Name']) . '\')' ?>;">
+                                        <input type="hidden" name="space_id" value="<?= htmlspecialchars($space['Space_ID']) ?>">
+                                        <input type="hidden" name="confirm_price" value="1">
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-calendar-plus"></i>
+                                                Start Date
+                                            </label>
+                                            <input type="date" name="start_date" class="form-control" <?= ($has_pending_request || !empty($pending_requests)) ? 'disabled' : '' ?> required min="<?= date('Y-m-d') ?>">
                                         </div>
-                                    <?php elseif (!empty($pending_requests)): ?>
-                                        <div class="pending-message">
-                                            <i class="bi bi-exclamation-triangle"></i>
-                                            <p><strong>Cannot Submit Request</strong></p>
-                                            <p class="small text-muted mb-0">You have pending requests for other units. Please wait for them to be processed first.</p>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-calendar-check"></i>
+                                                End Date
+                                            </label>
+                                            <input type="date" name="end_date" class="form-control" <?= ($has_pending_request || !empty($pending_requests)) ? 'disabled' : '' ?> required min="<?= date('Y-m-d') ?>">
                                         </div>
-                                    <?php else: ?>
-                                        <form method="post" action="" onsubmit="return showConfirmModal(this, <?= htmlspecialchars(json_encode($space['Price'])) ?>, '<?= htmlspecialchars($space['Name']) ?>');">
-                                            <input type="hidden" name="space_id" value="<?= htmlspecialchars($space['Space_ID']) ?>">
-                                            <input type="hidden" name="confirm_price" value="1">
-                                            
-                                            <div class="mb-3">
-                                                <label class="form-label">
-                                                    <i class="bi bi-calendar-plus"></i>
-                                                    Start Date
-                                                </label>
-                                                <input type="date" name="start_date" class="form-control" required min="<?= date('Y-m-d') ?>">
-                                            </div>
-                                            
-                                            <div class="mb-3">
-                                                <label class="form-label">
-                                                    <i class="bi bi-calendar-check"></i>
-                                                    End Date
-                                                </label>
-                                                <input type="date" name="end_date" class="form-control" required min="<?= date('Y-m-d') ?>">
-                                            </div>
-                                            
-                                            <div class="rental-notes">
-                                                <p>
-                                                    <i class="bi bi-info-circle me-2"></i>
+                                        
+                                        <div class="rental-notes">
+                                            <p>
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                <?php if ($has_pending_request): ?>
+                                                    You have already submitted a request for this unit. Please wait for admin approval.
+                                                <?php elseif (!empty($pending_requests)): ?>
+                                                    You have pending requests for other units. Please wait for them to be processed first.
+                                                <?php else: ?>
                                                     Choose your preferred rental period. Our team will review your application and contact you within 24 hours.
-                                                </p>
-                                            </div>
-                                            
-                                            <button type="submit" class="request-btn">
+                                                <?php endif; ?>
+                                            </p>
+                                        </div>
+                                        
+                                        <button type="submit" class="request-btn" <?= ($has_pending_request || !empty($pending_requests)) ? 'disabled' : '' ?>>
+                                            <?php if ($has_pending_request || !empty($pending_requests)): ?>
+                                                <i class="bi bi-clock-history"></i>
+                                                PENDING
+                                            <?php else: ?>
                                                 <i class="bi bi-send"></i>
                                                 Submit Request
-                                            </button>
-                                        </form>
-                                    <?php endif; ?>
+                                            <?php endif; ?>
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </div>
