@@ -562,19 +562,31 @@ $is_logged_in = isset($_SESSION['client_id']);
 
         <!-- User Actions -->
         <?php if ($is_logged_in): ?>
-          <?php if ($current_page != 'dashboard.php'): ?>
-          <li class="nav-item ms-2">
-            <a href="dashboard.php" class="modern-btn modern-btn-primary">
-              <i class="bi bi-speedometer2 me-2"></i>Dashboard
+          <?php 
+            $client = $db->runQuery("SELECT Client_fn, Client_ln, Client_Email, Client_Phone, C_username FROM client WHERE Client_ID = ?", [$_SESSION['client_id']]);
+          ?>
+          <li class="nav-item dropdown ms-2">
+            <a class="modern-nav-link dropdown-toggle d-flex align-items-center" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle me-2 fs-5"></i>
+              <?= htmlspecialchars($client['Client_fn'] . ' ' . $client['Client_ln']) ?>
             </a>
-          </li>
-          <?php endif; ?>
-          <li class="nav-item">
-            <form action="logout.php" method="post" class="d-inline">
-              <button type="submit" class="modern-btn modern-btn-accent">
-                <i class="bi bi-box-arrow-right me-2"></i>Logout
-              </button>
-            </form>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="profileDropdown">
+              <li class="px-3 py-2">
+                <div class="fw-bold mb-1"><?= htmlspecialchars($client['Client_fn'] . ' ' . $client['Client_ln']) ?></div>
+                <div class="text-muted small mb-1">Username: <?= htmlspecialchars($client['C_username']) ?></div>
+                <div class="text-muted small mb-1">Email: <?= htmlspecialchars($client['Client_Email']) ?></div>
+                <div class="text-muted small">Phone: <?= htmlspecialchars($client['Client_Phone']) ?></div>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <?php if ($current_page != 'dashboard.php'): ?>
+              <li><a class="dropdown-item" href="dashboard.php"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a></li>
+              <?php endif; ?>
+              <li>
+                <form action="logout.php" method="post" class="d-inline">
+                  <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
+                </form>
+              </li>
+            </ul>
           </li>
         <?php else: ?>
           <li class="nav-item ms-2">
