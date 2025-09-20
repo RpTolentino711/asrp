@@ -9,7 +9,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
-$pending_requests = $db->getPendingRentalRequests();
+// $pending_requests = $db->getPendingRentalRequests();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -523,82 +523,35 @@ $pending_requests = $db->getPendingRentalRequests();
             <div class="card-header">
                 <i class="fas fa-list-alt"></i>
                 <span>Pending Requests</span>
-                <span class="badge bg-primary ms-2"><?= count($pending_requests) ?></span>
+                <span class="badge bg-primary ms-2" id="pendingCount">0</span>
             </div>
-            <div class="card-body p-0">
-                <?php if (!empty($pending_requests)): ?>
-                    <div class="table-container">
-                        <table class="custom-table">
-                            <thead>
-                                <tr>
-                                    <th>Client</th>
-                                    <th>Space</th>
-                                    <th>Start Date</th>
-                                    <th>End Date</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($pending_requests as $row): ?>
-                                <tr>
-                                    <td>
-                                        <div class="client-info">
-                                            <div class="fw-bold"><?= htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']) ?></div>
-                                            <div class="text-muted small">ID: #<?= htmlspecialchars($row['Request_ID']) ?></div>
-                                            
-                                            <!-- Tooltip with contact information -->
-                                            <div class="client-tooltip">
-                                                <div class="contact-item">
-                                                    <i class="fas fa-envelope"></i>
-                                                    <span><?= htmlspecialchars($row['Client_Email']) ?></span>
-                                                </div>
-                                                <?php if (!empty($row['Client_Phone'])): ?>
-                                                <div class="contact-item">
-                                                    <i class="fas fa-phone"></i>
-                                                    <span><?= htmlspecialchars($row['Client_Phone']) ?></span>
-                                                </div>
-                                                <?php endif; ?>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td><?= htmlspecialchars($row['Name']) ?></td>
-                                    <td>
-                                        <div class="fw-medium"><?= htmlspecialchars($row['StartDate']) ?></div>
-                                    </td>
-                                    <td>
-                                        <div class="fw-medium"><?= htmlspecialchars($row['EndDate']) ?></div>
-                                    </td>
-                                    <td>
-                                        <form method="post" action="process_request.php" class="d-inline">
-                                            <input type="hidden" name="request_id" value="<?= $row['Request_ID'] ?>">
-                                            <button name="action" value="accept" class="btn-action btn-accept"
-                                                onclick="return confirm('Are you sure you want to ACCEPT this rental request?')">
-                                                <i class="fas fa-check-circle"></i>Accept
-                                            </button>
-                                            <button name="action" value="reject" class="btn-action btn-reject"
-                                                onclick="return confirm('Are you sure you want to REJECT this rental request?')">
-                                                <i class="fas fa-times-circle"></i>Reject
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-inbox"></i>
-                        <h4>No pending requests</h4>
-                        <p>All rental requests have been processed</p>
-                    </div>
-                <?php endif; ?>
+            <div class="card-body p-0" id="pendingRequestsContainer">
+                <!-- Pending requests table will be loaded here via AJAX -->
+                <noscript>
+                <div class="empty-state">
+                    <i class="fas fa-inbox"></i>
+                    <h4>Enable JavaScript for live updates</h4>
+                </div>
+                </noscript>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // --- LIVE ADMIN: AJAX Polling for Pending Rental Requests ---
+    function fetchPendingRequests() {
+        fetch('../AJAX/ajax_admin_pending_requests.php')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('pendingRequestsContainer').innerHTML = html;
+                // Update count badge
+                const match = html.match(/data-count="(\d+)"/);
+                if (match) document.getElementById('pendingCount').textContent = match[1];
+            });
+    }
+    setInterval(fetchPendingRequests, 10000); // every 10s
+    document.addEventListener('DOMContentLoaded', fetchPendingRequests);
         // SweetAlert for success/error messages
         <?php if (isset($_SESSION['admin_message'])): ?>
             Swal.fire({
