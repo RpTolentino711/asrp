@@ -664,14 +664,6 @@ $is_logged_in = isset($_SESSION['client_id']);
 
         <!-- User Actions -->
         <?php if ($is_logged_in): ?>
-          <!-- Display client name -->
-          <li class="nav-item">
-            <span class="modern-nav-link text-primary fw-semibold">
-              <i class="bi bi-person-circle me-2"></i>
-              Welcome, <?= htmlspecialchars($client_name ?: 'User') ?>
-            </span>
-          </li>
-          
           <?php if ($current_page != 'dashboard.php'): ?>
           <li class="nav-item ms-2">
             <a href="dashboard.php" class="modern-btn modern-btn-primary">
@@ -685,6 +677,13 @@ $is_logged_in = isset($_SESSION['client_id']);
                 <i class="bi bi-box-arrow-right me-2"></i>Logout
               </button>
             </form>
+          </li>
+          <!-- Display client name after logout -->
+          <li class="nav-item">
+            <span class="modern-nav-link text-primary fw-semibold">
+              <i class="bi bi-person-circle me-2"></i>
+              Welcome, <?= htmlspecialchars($client_name ?: 'User') ?>
+            </span>
           </li>
         <?php else: ?>
           <li class="nav-item ms-2">
