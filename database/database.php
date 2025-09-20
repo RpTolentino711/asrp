@@ -1143,7 +1143,7 @@ public function getAllSpacesWithDetails() {
 
 
 public function getPendingRequestsByClient($client_id) {
-    $sql = "SELECT rr.*, s.Name 
+    $sql = "SELECT rr.*, rr.Requested_At AS RequestDate, s.Name 
             FROM rentalrequest rr 
             JOIN space s ON rr.Space_ID = s.Space_ID 
             WHERE rr.Client_ID = ? AND rr.Status = 'Pending'";
@@ -1155,7 +1155,6 @@ public function getPendingRequestsByClient($client_id) {
         return [];
     }
 }
-
 
 public function getPendingRentalRequests() {
     $sql = "SELECT r.Request_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone, 
