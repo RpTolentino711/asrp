@@ -1128,18 +1128,7 @@ public function getAllSpacesWithDetails() {
         }
     }
 
-    public function getClientInfo($client_id) {
-    $sql = "SELECT Client_fn, Client_ln, Client_Email, Client_Phone 
-            FROM client 
-            WHERE Client_ID = ?";
-    try {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$client_id]);
-        return $stmt->fetch();
-    } catch (PDOException $e) {
-        return null;
-    }
-}
+    
 
 
 public function getPendingRentalRequests() {
