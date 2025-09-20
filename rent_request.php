@@ -11,18 +11,45 @@ if (!$logged_in) {
     $show_login_modal = true;
 }
 
+
+// Prevent duplicate pending rental requests for the same unit by the same client
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['start_date'], $_POST['end_date'], $_POST['confirm_price'])) {
     $space_id = intval($_POST['space_id']);
     $start_date = $_POST['start_date'];
     $end_date = $_POST['end_date'];
 
-    if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
-        $success = "Your rental request has been sent to the admin!";
+    // Check if the client already has a pending request for this unit
+    $pendingCheck = $db->runQuery(
+        "SELECT 1 FROM rentalrequest WHERE Client_ID = ? AND Space_ID = ? AND Status = 'Pending'",
+        [$client_id, $space_id]
+    );
+    if ($pendingCheck) {
+        $success = "You already have a pending rental request for this unit. Please wait for admin approval.";
+    } else {
+        if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
+            $success = "Your rental request has been sent to the admin!";
+        }
     }
 }
 
 $id = $_GET["space_id"];
-$available_units = $db->getAvailableUnitsForRental($id);
+
+// Hide units from the list if the client already has a pending request for them
+if ($logged_in) {
+    // Get all unit IDs with a pending request by this client
+    $pendingUnits = $db->runQuery(
+        "SELECT Space_ID FROM rentalrequest WHERE Client_ID = ? AND Status = 'Pending'",
+        [$client_id],
+        true
+    );
+    $pendingUnitIds = $pendingUnits ? array_column($pendingUnits, 'Space_ID') : [];
+    $all_units = $db->getAvailableUnitsForRental($id);
+    $available_units = array_filter($all_units, function($unit) use ($pendingUnitIds) {
+        return !in_array($unit['Space_ID'], $pendingUnitIds);
+    });
+} else {
+    $available_units = $db->getAvailableUnitsForRental($id);
+}
 ?>
 <!doctype html>
 <html lang="en">
