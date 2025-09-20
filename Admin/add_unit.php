@@ -895,7 +895,7 @@ $spaces = $db->getAllSpacesWithDetails();
     <script>
     // --- LIVE ADMIN: AJAX Polling for Spaces/Units and Types ---
     function fetchSpaces() {
-        fetch('ajax_admin_spaces.php')
+        fetch('../AJAX/ajax_admin_spaces.php')
             .then(res => res.text())
             .then(html => {
                 document.getElementById('spacesTableContainer').innerHTML = html;
@@ -905,7 +905,7 @@ $spaces = $db->getAllSpacesWithDetails();
             });
     }
     function fetchTypes() {
-        fetch('ajax_admin_types.php')
+        fetch('../AJAX/ajax_admin_types.php')
             .then(res => res.text())
             .then(html => {
                 document.getElementById('typesTableContainer').innerHTML = html;
