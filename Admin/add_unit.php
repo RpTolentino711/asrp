@@ -801,9 +801,11 @@ $spaces = $db->getAllSpacesWithDetails();
             <div class="card-header">
                 <i class="fas fa-list"></i>
                 <span>Existing Spaces/Units</span>
-                <span class="badge bg-primary ms-2"><?= count($spaces) ?></span>
+                <span class="badge bg-primary ms-2" id="spacesCount"><?= count($spaces) ?></span>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body p-0" id="spacesTableContainer">
+                <!-- Spaces table will be loaded here via AJAX -->
+                <noscript>
                 <?php if (!empty($spaces)): ?>
                     <div class="table-container">
                         <table class="custom-table">
@@ -827,59 +829,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                         </td>
                                         <td><?= htmlspecialchars($space['SpaceTypeName']) ?></td>
                                         <td>₱<?= number_format($space['Price'], 2) ?></td>
-                                        <td>
-                                            <div class="photo-management">
-                                                <?php for ($i=1; $i<=5; $i++): $field = "Photo$i"; ?>
-                                                    <div class="photo-item d-flex align-items-center">
-                                                        <?php if (!empty($space[$field])): ?>
-                                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($space[$field]) ?>" class="photo-preview" alt="Photo<?= $i ?>">
-                                                            <div class="flex-grow-1">
-                                                                <div class="fw-medium"><?= $field ?></div>
-                                                                <div class="text-muted small"><?= htmlspecialchars($space[$field]) ?></div>
-                                                                <div class="photo-actions">
-                                                                    <form method="post" enctype="multipart/form-data" class="d-inline">
-                                                                        <div class="file-input-container">
-                                                                            <div class="file-input-label btn-action btn-update">
-                                                                                <i class="fas fa-sync-alt"></i> Update
-                                                                            </div>
-                                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $space['Space_ID'].$i ?>')">
-                                                                            <input type="hidden" name="form_type" value="update_photo">
-                                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                            <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                        </div>
-                                                                        <span class="filename-display" id="update<?= $space['Space_ID'].$i ?>"></span>
-                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
-                                                                    </form>
-                                                                    <form method="post" class="d-inline" onsubmit="return confirm('Delete this photo?');">
-                                                                        <input type="hidden" name="form_type" value="delete_photo">
-                                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                        <button type="submit" class="btn-action btn-delete">
-                                                                            <i class="fas fa-trash"></i> Delete
-                                                                        </button>
-                                                                    </form>
-                                                                </div>
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <div class="text-muted me-3">No <?= $field ?></div>
-                                                            <form method="post" enctype="multipart/form-data" class="d-inline">
-                                                                <div class="file-input-container">
-                                                                    <div class="file-input-label btn-action btn-upload">
-                                                                        <i class="fas fa-upload"></i> Upload
-                                                                    </div>
-                                                                    <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'upload<?= $space['Space_ID'].$i ?>')">
-                                                                    <input type="hidden" name="form_type" value="update_photo">
-                                                                    <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                    <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                </div>
-                                                                <span class="filename-display" id="upload<?= $space['Space_ID'].$i ?>"></span>
-                                                                <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
-                                                            </form>
-                                                        <?php endif; ?>
-                                                    </div>
-                                                <?php endfor; ?>
-                                            </div>
-                                        </td>
+                                        <td>Photos</td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -892,6 +842,7 @@ $spaces = $db->getAllSpacesWithDetails();
                         <p>There are no spaces or units in the system</p>
                     </div>
                 <?php endif; ?>
+                </noscript>
             </div>
         </div>
 
@@ -900,9 +851,11 @@ $spaces = $db->getAllSpacesWithDetails();
             <div class="card-header">
                 <i class="fas fa-tags"></i>
                 <span>Existing Space Types</span>
-                <span class="badge bg-primary ms-2"><?= count($spacetypes) ?></span>
+                <span class="badge bg-primary ms-2" id="typesCount"><?= count($spacetypes) ?></span>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body p-0" id="typesTableContainer">
+                <!-- Types table will be loaded here via AJAX -->
+                <noscript>
                 <?php if (!empty($spacetypes)): ?>
                     <div class="table-container">
                         <table class="custom-table">
@@ -933,12 +886,37 @@ $spaces = $db->getAllSpacesWithDetails();
                         <p>There are no space types in the system</p>
                     </div>
                 <?php endif; ?>
+                </noscript>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // --- LIVE ADMIN: AJAX Polling for Spaces/Units and Types ---
+    function fetchSpaces() {
+        fetch('ajax_admin_spaces.php')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('spacesTableContainer').innerHTML = html;
+                // Update count badge
+                const match = html.match(/data-count="(\d+)"/);
+                if (match) document.getElementById('spacesCount').textContent = match[1];
+            });
+    }
+    function fetchTypes() {
+        fetch('ajax_admin_types.php')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('typesTableContainer').innerHTML = html;
+                // Update count badge
+                const match = html.match(/data-count="(\d+)"/);
+                if (match) document.getElementById('typesCount').textContent = match[1];
+            });
+    }
+    setInterval(() => { fetchSpaces(); fetchTypes(); }, 10000); // every 10s
+    document.addEventListener('DOMContentLoaded', () => { fetchSpaces(); fetchTypes(); });
+
         // Price formatting
         document.getElementById('price').addEventListener('input', function() {
             const val = this.value;
