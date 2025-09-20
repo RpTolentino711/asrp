@@ -682,7 +682,7 @@ $is_logged_in = isset($_SESSION['client_id']);
           <li class="nav-item">
             <span class="modern-nav-link text-primary fw-semibold">
               <i class="bi bi-person-circle me-2"></i>
-              Welcome, <?= htmlspecialchars($client_name ?: 'User') ?>
+             <?= htmlspecialchars($client_name ?: 'User') ?>
             </span>
           </li>
         <?php else: ?>
