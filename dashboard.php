@@ -989,7 +989,7 @@ try {
             <div class="dashboard-header-content">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                        <h1 class="welcome-title">Welcome back, <?= htmlspecialchars($client_display) ?>!</h1>
+                        <h1 class="welcome-title">Welcome<?= htmlspecialchars($client_display) ?>!</h1>
                         <p class="welcome-subtitle">Manage your rental units and stay updated with your property status</p>
                     </div>
                     <div class="col-md-4 text-md-end">
