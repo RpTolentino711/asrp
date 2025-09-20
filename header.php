@@ -7,16 +7,12 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once 'database/database.php';
 $db = new Database();
 
-// --- Client Information ---
+// --- Get Client Information ---
 $client_name = '';
 if (isset($_SESSION['client_id'])) {
-    $client_info = $db->getClientInfo($_SESSION['client_id']); // You'll need to create this method
+    $client_info = $db->getClientInfo($_SESSION['client_id']);
     if ($client_info) {
         $client_name = trim($client_info['Client_fn'] . ' ' . $client_info['Client_ln']);
-        // If full name is empty, fall back to username
-        if (empty($client_name)) {
-            $client_name = $client_info['C_username'] ?? 'User';
-        }
     }
 }
 
@@ -240,65 +236,6 @@ $is_logged_in = isset($_SESSION['client_id']);
   color: white !important;
 }
 
-/* Client Name Styling */
-.client-name-display {
-  display: flex !important;
-  align-items: center !important;
-  padding: 0.5rem 1rem !important;
-  margin: 0 0.5rem !important;
-  background: linear-gradient(135deg, rgba(30, 64, 175, 0.08) 0%, rgba(59, 130, 246, 0.12) 100%) !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(30, 64, 175, 0.15) !important;
-  transition: var(--navbar-transition) !important;
-  min-height: 45px !important;
-}
-
-.client-name-display:hover {
-  background: linear-gradient(135deg, rgba(30, 64, 175, 0.12) 0%, rgba(59, 130, 246, 0.18) 100%) !important;
-  transform: translateY(-1px);
-}
-
-.client-name-avatar {
-  width: 32px !important;
-  height: 32px !important;
-  background: linear-gradient(135deg, var(--navbar-primary) 0%, var(--navbar-primary-light) 100%) !important;
-  border-radius: 50% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  color: white !important;
-  font-weight: 600 !important;
-  font-size: 0.85rem !important;
-  margin-right: 0.75rem !important;
-  flex-shrink: 0 !important;
-}
-
-.client-name-text {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: flex-start !important;
-}
-
-.client-name {
-  font-weight: 600 !important;
-  font-size: 0.9rem !important;
-  color: var(--navbar-secondary) !important;
-  margin: 0 !important;
-  line-height: 1.2 !important;
-  max-width: 120px !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-.client-status {
-  font-size: 0.75rem !important;
-  color: var(--navbar-success) !important;
-  margin: 0 !important;
-  line-height: 1 !important;
-  font-weight: 500 !important;
-}
-
 /* Disabled button styles */
 .modern-btn:disabled {
   opacity: 0.5 !important;
@@ -466,16 +403,6 @@ $is_logged_in = isset($_SESSION['client_id']);
   .modern-nav-link.active::after {
     display: none;
   }
-
-  .client-name-display {
-    width: 100% !important;
-    margin: 0.25rem 0 !important;
-    justify-content: flex-start !important;
-  }
-
-  .client-name {
-    max-width: none !important;
-  }
 }
 
 @media (max-width: 576px) {
@@ -497,26 +424,6 @@ $is_logged_in = isset($_SESSION['client_id']);
     padding: 0.5rem 1rem !important;
     font-size: 0.9rem !important;
     min-height: 40px !important;
-  }
-
-  .client-name-display {
-    padding: 0.5rem 1rem !important;
-    min-height: 40px !important;
-  }
-
-  .client-name-avatar {
-    width: 28px !important;
-    height: 28px !important;
-    margin-right: 0.5rem !important;
-    font-size: 0.8rem !important;
-  }
-
-  .client-name {
-    font-size: 0.85rem !important;
-  }
-
-  .client-status {
-    font-size: 0.7rem !important;
   }
 }
 
@@ -664,6 +571,14 @@ $is_logged_in = isset($_SESSION['client_id']);
 
         <!-- User Actions -->
         <?php if ($is_logged_in): ?>
+          <!-- Display client name -->
+          <li class="nav-item">
+            <span class="modern-nav-link text-primary fw-semibold">
+              <i class="bi bi-person-circle me-2"></i>
+              Welcome, <?= htmlspecialchars($client_name ?: 'User') ?>
+            </span>
+          </li>
+          
           <?php if ($current_page != 'dashboard.php'): ?>
           <li class="nav-item ms-2">
             <a href="dashboard.php" class="modern-btn modern-btn-primary">
@@ -671,24 +586,6 @@ $is_logged_in = isset($_SESSION['client_id']);
             </a>
           </li>
           <?php endif; ?>
-          
-          <!-- Client Name Display -->
-          <?php if (!empty($client_name)): ?>
-          <li class="nav-item">
-            <div class="client-name-display">
-              <div class="client-name-avatar">
-                <?= strtoupper(substr($client_name, 0, 1)) ?>
-              </div>
-              <div class="client-name-text">
-                <div class="client-name" title="<?= htmlspecialchars($client_name) ?>">
-                  <?= htmlspecialchars($client_name) ?>
-                </div>
-                <div class="client-status">Online</div>
-              </div>
-            </div>
-          </li>
-          <?php endif; ?>
-          
           <li class="nav-item">
             <form action="logout.php" method="post" class="d-inline">
               <button type="submit" class="modern-btn modern-btn-accent">
@@ -863,6 +760,9 @@ $is_logged_in = isset($_SESSION['client_id']);
           </div>
         </div>
       </form>
+    </div>
+  </div>
+</div>
 
 <!-- OTP Modal -->
 <div class="modal fade modern-modal" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
@@ -888,9 +788,6 @@ $is_logged_in = isset($_SESSION['client_id']);
           </div>
         </div>
       </form>
-    </div>
-  </div>
-</div>
     </div>
   </div>
 </div>
@@ -1368,7 +1265,7 @@ function checkRegisterForm() {
         title: 'Passwords Do Not Match',
         text: 'Please make sure your passwords match.'
       });
-      confirmPasswordField.focus();
+      confirmPasswordInput.focus();
       return false;
     }
   }
