@@ -11,44 +11,23 @@ if (!$logged_in) {
     $show_login_modal = true;
 }
 
-
-// Prevent duplicate pending rental requests for the same unit by the same client
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['start_date'], $_POST['end_date'], $_POST['confirm_price'])) {
     $space_id = intval($_POST['space_id']);
     $start_date = $_POST['start_date'];
     $end_date = $_POST['end_date'];
 
-    // Check if the client already has a pending request for this unit
-    $pendingCheck = $db->runQuery(
-        "SELECT 1 FROM rentalrequest WHERE Client_ID = ? AND Space_ID = ? AND Status = 'Pending'",
-        [$client_id, $space_id]
-    );
-    if ($pendingCheck) {
-        $success = "You already have a pending rental request for this unit. Please wait for admin approval.";
-    } else {
-        if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
-            $success = "Your rental request has been sent to the admin!";
-        }
+    if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
+        $success = "Your rental request has been sent to the admin!";
     }
 }
 
 $id = $_GET["space_id"];
+$available_units = $db->getAvailableUnitsForRental($id);
 
-// Hide units from the list if the client already has a pending request for them
+// Get pending requests for the current client
+$pending_requests = [];
 if ($logged_in) {
-    // Get all unit IDs with a pending request by this client
-    $pendingUnits = $db->runQuery(
-        "SELECT Space_ID FROM rentalrequest WHERE Client_ID = ? AND Status = 'Pending'",
-        [$client_id],
-        true
-    );
-    $pendingUnitIds = $pendingUnits ? array_column($pendingUnits, 'Space_ID') : [];
-    $all_units = $db->getAvailableUnitsForRental($id);
-    $available_units = array_filter($all_units, function($unit) use ($pendingUnitIds) {
-        return !in_array($unit['Space_ID'], $pendingUnitIds);
-    });
-} else {
-    $available_units = $db->getAvailableUnitsForRental($id);
+    $pending_requests = $db->getPendingRequestsByClient($client_id);
 }
 ?>
 <!doctype html>
@@ -192,6 +171,57 @@ if ($logged_in) {
             margin-right: 1rem;
         }
 
+        /* Pending Requests Alert */
+        .pending-alert {
+            background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
+            color: #78350f;
+            border: 1px solid #fbbf24;
+            border-radius: var(--border-radius-sm);
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .pending-alert h5 {
+            margin: 0 0 0.5rem 0;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .pending-alert i {
+            margin-right: 0.5rem;
+        }
+
+        .pending-requests-list {
+            margin: 0.5rem 0 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .pending-requests-list li {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 0.5rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: var(--border-radius-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pending-unit-name {
+            font-weight: 600;
+        }
+
+        .pending-status {
+            background: var(--warning);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
         /* Login Required Section */
         .login-required {
             max-width: 600px;
@@ -253,10 +283,25 @@ if ($logged_in) {
             border-color: var(--primary-light);
         }
 
+        .rental-card.pending-request {
+            opacity: 0.6;
+            border-color: var(--warning);
+            background: linear-gradient(135deg, rgba(217, 119, 6, 0.05) 0%, rgba(251, 191, 36, 0.05) 100%);
+        }
+
+        .rental-card.pending-request:hover {
+            transform: none;
+            box-shadow: var(--shadow-lg);
+        }
+
         .rental-card-header {
             background: linear-gradient(135deg, var(--light) 0%, var(--lighter) 100%);
             padding: 1.5rem 2rem 1rem;
             border-bottom: 1px solid var(--gray-light);
+        }
+
+        .rental-card.pending-request .rental-card-header {
+            background: linear-gradient(135deg, rgba(217, 119, 6, 0.1) 0%, rgba(251, 191, 36, 0.1) 100%);
         }
 
         .rental-card-title {
@@ -265,6 +310,26 @@ if ($logged_in) {
             font-weight: 700;
             color: var(--secondary);
             margin-bottom: 1rem;
+        }
+
+        .pending-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--warning);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.8rem;
+            font-weight: 600;
+            z-index: 10;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
 
         .rental-info {
@@ -325,6 +390,11 @@ if ($logged_in) {
             outline: none;
         }
 
+        .form-control:disabled {
+            background: var(--gray-light);
+            opacity: 0.6;
+        }
+
         .rental-notes {
             background: var(--light);
             border-radius: var(--border-radius-sm);
@@ -355,14 +425,34 @@ if ($logged_in) {
             justify-content: center;
         }
 
-        .request-btn:hover {
+        .request-btn:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: var(--shadow-md);
             color: white;
         }
 
+        .request-btn:disabled {
+            background: var(--gray-light);
+            color: var(--gray);
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .request-btn i {
             margin-right: 0.5rem;
+        }
+
+        .pending-message {
+            text-align: center;
+            padding: 2rem;
+            color: var(--warning);
+            font-weight: 600;
+        }
+
+        .pending-message i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
         }
 
         /* Empty State */
@@ -564,6 +654,12 @@ if ($logged_in) {
             .modal-body {
                 padding: 1.5rem;
             }
+
+            .pending-requests-list li {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -659,6 +755,25 @@ if ($logged_in) {
             </div>
         <?php endif; ?>
 
+        <!-- Pending Requests Alert -->
+        <?php if ($logged_in && !empty($pending_requests)): ?>
+            <div class="pending-alert animate-on-scroll">
+                <h5><i class="bi bi-clock-history"></i>You have pending rental requests</h5>
+                <p>You cannot submit new rental requests while you have pending ones. Please wait for admin approval.</p>
+                <ul class="pending-requests-list">
+                    <?php foreach ($pending_requests as $request): ?>
+                        <li>
+                            <div>
+                                <span class="pending-unit-name"><?= htmlspecialchars($request['Name']) ?></span>
+                                <small class="text-muted d-block">Submitted: <?= date('M j, Y', strtotime($request['RequestDate'])) ?></small>
+                            </div>
+                            <span class="pending-status">PENDING</span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php endif; ?>
+
         <?php if (!$logged_in): ?>
             <!-- Login Required Section -->
             <div class="login-required animate-on-scroll">
@@ -681,8 +796,24 @@ if ($logged_in) {
             <div class="row">
                 <?php if ($available_units && count($available_units) > 0): ?>
                     <?php foreach ($available_units as $space): ?>
+                        <?php 
+                        // Check if user has pending request for this unit
+                        $has_pending_request = false;
+                        foreach ($pending_requests as $request) {
+                            if ($request['Space_ID'] == $space['Space_ID']) {
+                                $has_pending_request = true;
+                                break;
+                            }
+                        }
+                        ?>
                         <div class="col-lg-6 col-xl-4 mb-4 animate-on-scroll">
-                            <div class="rental-card">
+                            <div class="rental-card <?= $has_pending_request ? 'pending-request' : '' ?>">
+                                <?php if ($has_pending_request): ?>
+                                    <div class="pending-badge">
+                                        <i class="bi bi-hourglass-split me-1"></i>PENDING REQUEST
+                                    </div>
+                                <?php endif; ?>
+                                
                                 <div class="rental-card-header">
                                     <h3 class="rental-card-title"><?= htmlspecialchars($space['Name']) ?></h3>
                                     <div class="rental-info">
@@ -697,38 +828,52 @@ if ($logged_in) {
                                     </div>
                                 </div>
                                 <div class="rental-card-body">
-                                    <form method="post" action="" onsubmit="return showConfirmModal(this, <?= htmlspecialchars(json_encode($space['Price'])) ?>, '<?= htmlspecialchars($space['Name']) ?>');">
-                                        <input type="hidden" name="space_id" value="<?= htmlspecialchars($space['Space_ID']) ?>">
-                                        <input type="hidden" name="confirm_price" value="1">
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <i class="bi bi-calendar-plus"></i>
-                                                Start Date
-                                            </label>
-                                            <input type="date" name="start_date" class="form-control" required min="<?= date('Y-m-d') ?>">
+                                    <?php if ($has_pending_request): ?>
+                                        <div class="pending-message">
+                                            <i class="bi bi-clock-history"></i>
+                                            <p><strong>Request Pending</strong></p>
+                                            <p class="small text-muted mb-0">You have already submitted a request for this unit. Please wait for admin approval.</p>
                                         </div>
-                                        
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <i class="bi bi-calendar-check"></i>
-                                                End Date
-                                            </label>
-                                            <input type="date" name="end_date" class="form-control" required min="<?= date('Y-m-d') ?>">
+                                    <?php elseif (!empty($pending_requests)): ?>
+                                        <div class="pending-message">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            <p><strong>Cannot Submit Request</strong></p>
+                                            <p class="small text-muted mb-0">You have pending requests for other units. Please wait for them to be processed first.</p>
                                         </div>
-                                        
-                                        <div class="rental-notes">
-                                            <p>
-                                                <i class="bi bi-info-circle me-2"></i>
-                                                Choose your preferred rental period. Our team will review your application and contact you within 24 hours.
-                                            </p>
-                                        </div>
-                                        
-                                        <button type="submit" class="request-btn">
-                                            <i class="bi bi-send"></i>
-                                            Submit Request
-                                        </button>
-                                    </form>
+                                    <?php else: ?>
+                                        <form method="post" action="" onsubmit="return showConfirmModal(this, <?= htmlspecialchars(json_encode($space['Price'])) ?>, '<?= htmlspecialchars($space['Name']) ?>');">
+                                            <input type="hidden" name="space_id" value="<?= htmlspecialchars($space['Space_ID']) ?>">
+                                            <input type="hidden" name="confirm_price" value="1">
+                                            
+                                            <div class="mb-3">
+                                                <label class="form-label">
+                                                    <i class="bi bi-calendar-plus"></i>
+                                                    Start Date
+                                                </label>
+                                                <input type="date" name="start_date" class="form-control" required min="<?= date('Y-m-d') ?>">
+                                            </div>
+                                            
+                                            <div class="mb-3">
+                                                <label class="form-label">
+                                                    <i class="bi bi-calendar-check"></i>
+                                                    End Date
+                                                </label>
+                                                <input type="date" name="end_date" class="form-control" required min="<?= date('Y-m-d') ?>">
+                                            </div>
+                                            
+                                            <div class="rental-notes">
+                                                <p>
+                                                    <i class="bi bi-info-circle me-2"></i>
+                                                    Choose your preferred rental period. Our team will review your application and contact you within 24 hours.
+                                                </p>
+                                            </div>
+                                            
+                                            <button type="submit" class="request-btn">
+                                                <i class="bi bi-send"></i>
+                                                Submit Request
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
@@ -780,6 +925,10 @@ if ($logged_in) {
                             Are you sure you want to submit this rental request? 
                             The price is fixed and non-negotiable.
                         </p>
+                        <div class="alert alert-warning mt-3">
+                            <small><i class="bi bi-exclamation-triangle me-2"></i>
+                            Once submitted, you cannot request other units until this request is processed.</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -949,6 +1098,19 @@ if ($logged_in) {
                 }, 500);
             <?php endif; ?>
 
+            // Show pending requests notification
+            <?php if ($logged_in && !empty($pending_requests)): ?>
+                setTimeout(function() {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Pending Requests',
+                        text: 'You have <?= count($pending_requests) ?> pending rental request(s). You cannot submit new requests until these are processed.',
+                        confirmButtonColor: 'var(--warning)',
+                        timer: 4000
+                    });
+                }, 1000);
+            <?php endif; ?>
+
             // Date input improvements
             document.querySelectorAll('input[type="date"]').forEach(input => {
                 // Set minimum date to today
@@ -970,7 +1132,7 @@ if ($logged_in) {
             });
 
             // Enhanced card interactions
-            document.querySelectorAll('.rental-card').forEach(card => {
+            document.querySelectorAll('.rental-card:not(.pending-request)').forEach(card => {
                 card.addEventListener('mouseenter', function() {
                     this.style.transform = 'translateY(-8px)';
                 });
@@ -994,6 +1156,22 @@ if ($logged_in) {
                         btn.disabled = false;
                     }, 5000);
                 });
+            });
+
+            // Disable interaction for pending cards
+            document.querySelectorAll('.rental-card.pending-request').forEach(card => {
+                const form = card.querySelector('form');
+                if (form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Request Already Pending',
+                            text: 'You have already submitted a request for this unit.',
+                            confirmButtonColor: 'var(--warning)'
+                        });
+                    });
+                }
             });
         });
 

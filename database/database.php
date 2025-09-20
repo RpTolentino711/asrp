@@ -1142,6 +1142,21 @@ public function getAllSpacesWithDetails() {
 }
 
 
+public function getPendingRequestsByClient($client_id) {
+    $sql = "SELECT rr.*, s.Name 
+            FROM rental_requests rr 
+            JOIN spaces s ON rr.Space_ID = s.Space_ID 
+            WHERE rr.Client_ID = ? AND rr.Status = 'pending'";
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$client_id]);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+
 public function getPendingRentalRequests() {
     $sql = "SELECT r.Request_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone, 
                    s.Name, r.StartDate, r.EndDate, r.Status
