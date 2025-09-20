@@ -228,6 +228,67 @@ $pending_requests = $db->getPendingRentalRequests();
             background-color: #f9fafb;
         }
         
+        /* Client Info with Hover Tooltip */
+        .client-info {
+            position: relative;
+            cursor: help;
+            transition: var(--transition);
+        }
+        
+        .client-info:hover {
+            color: var(--primary);
+        }
+        
+        .client-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dark);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            margin-bottom: 8px;
+        }
+        
+        .client-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: var(--dark);
+        }
+        
+        .client-info:hover .client-tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .contact-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .contact-item i {
+            width: 14px;
+            color: var(--info);
+        }
+        
         /* Button Styling */
         .btn-action {
             padding: 0.5rem 1rem;
@@ -318,6 +379,21 @@ $pending_requests = $db->getPendingRentalRequests();
             .btn-action {
                 font-size: 0.8rem;
                 padding: 0.4rem 0.8rem;
+            }
+            
+            /* Mobile tooltip adjustments */
+            .client-tooltip {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                max-width: 280px;
+                white-space: normal;
+                text-align: center;
+            }
+            
+            .client-tooltip::after {
+                display: none;
             }
         }
         
@@ -466,22 +542,25 @@ $pending_requests = $db->getPendingRentalRequests();
                                 <?php foreach ($pending_requests as $row): ?>
                                 <tr>
                                     <td>
-                                        <div class="fw-bold" 
-                                            data-bs-toggle="tooltip" 
-                                            data-bs-html="true" 
-                                            title="Email: <?= htmlspecialchars($row['Client_Email'] ?? 'N/A') ?><br>Phone: <?= htmlspecialchars($row['Client_Phone'] ?? 'N/A') ?>">
-                                            <?= htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']) ?>
+                                        <div class="client-info">
+                                            <div class="fw-bold"><?= htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']) ?></div>
+                                            <div class="text-muted small">ID: #<?= htmlspecialchars($row['Request_ID']) ?></div>
+                                            
+                                            <!-- Tooltip with contact information -->
+                                            <div class="client-tooltip">
+                                                <div class="contact-item">
+                                                    <i class="fas fa-envelope"></i>
+                                                    <span><?= htmlspecialchars($row['Client_Email']) ?></span>
+                                                </div>
+                                                <?php if (!empty($row['Client_Phone'])): ?>
+                                                <div class="contact-item">
+                                                    <i class="fas fa-phone"></i>
+                                                    <span><?= htmlspecialchars($row['Client_Phone']) ?></span>
+                                                </div>
+                                                <?php endif; ?>
+                                            </div>
                                         </div>
-                                        <div class="text-muted small">ID: #<?= htmlspecialchars($row['Request_ID']) ?></div>
                                     </td>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-            new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    });
-</script>
                                     <td><?= htmlspecialchars($row['Name']) ?></td>
                                     <td>
                                         <div class="fw-medium"><?= htmlspecialchars($row['StartDate']) ?></div>

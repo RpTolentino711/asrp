@@ -1128,19 +1128,20 @@ public function getAllSpacesWithDetails() {
         }
     }
 
-    public function getPendingRentalRequests() {
-        $sql = "SELECT r.Request_ID, c.Client_fn, c.Client_ln, s.Name, r.StartDate, r.EndDate, r.Status
-                FROM rentalrequest r
-                JOIN client c ON r.Client_ID = c.Client_ID
-                JOIN space s ON r.Space_ID = s.Space_ID
-                WHERE r.Status = 'Pending'
-                ORDER BY r.Requested_At ASC";
-        try {
-            return $this->pdo->query($sql)->fetchAll();
-        } catch (PDOException $e) {
-            return [];
-        }
+public function getPendingRentalRequests() {
+    $sql = "SELECT r.Request_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone, 
+                   s.Name, r.StartDate, r.EndDate, r.Status
+            FROM rentalrequest r
+            JOIN client c ON r.Client_ID = c.Client_ID
+            JOIN space s ON r.Space_ID = s.Space_ID
+            WHERE r.Status = 'Pending'
+            ORDER BY r.Requested_At ASC";
+    try {
+        return $this->pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) {
+        return [];
     }
+}
 
     public function getAdminByUsername($username) {
         $sql = "SELECT UA_ID, username, password FROM useraccounts WHERE username = ? AND Type = 'Admin'";
