@@ -1129,23 +1129,6 @@ public function getAllSpacesWithDetails() {
     }
 
     
-public function getClientInfo($client_id) {
-    try {
-        $stmt = $this->conn->prepare("SELECT Client_ID, Client_fn, Client_ln, Client_Email, Client_Phone, C_username, Status FROM client WHERE Client_ID = ? AND Status = 'Active'");
-        $stmt->bind_param("i", $client_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            return $result->fetch_assoc();
-        }
-        
-        return null;
-    } catch (Exception $e) {
-        error_log("Error fetching client info: " . $e->getMessage());
-        return null;
-    }
-}
     
 
 
