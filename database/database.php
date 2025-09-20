@@ -1130,6 +1130,13 @@ public function getAllSpacesWithDetails() {
 
     
     
+public function getClientInfo($client_id) {
+    $stmt = $this->connection->prepare("SELECT Client_fn, Client_ln, C_username FROM client WHERE Client_ID = ?");
+    $stmt->bind_param("i", $client_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result->fetch_assoc();
+}
 
 
 public function getPendingRentalRequests() {
