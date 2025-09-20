@@ -665,42 +665,14 @@ function timeAgo($datetime) {
                         <i class="fas fa-list-alt"></i>
                         <span>Latest Rental Requests</span>
                     </div>
-                    <div class="card-body p-0">
-                        <?php if (!empty($latest_requests)): ?>
-                            <div class="table-container">
-                                <table class="custom-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Request ID</th>
-                                            <th>Client</th>
-                                            <th>Unit</th>
-                                            <th>Date</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($latest_requests as $r): ?>
-                                            <tr>
-                                                <td>#<?= htmlspecialchars($r['Request_ID']) ?></td>
-                                                <td><?= htmlspecialchars($r['Client_fn'] . ' ' . $r['Client_ln']) ?></td>
-                                                <td><?= htmlspecialchars($r['UnitName'] ?? $r['Name'] ?? 'N/A') ?></td>
-                                                <td><?= date('M j, Y', strtotime($r['Requested_At'] ?? '')) ?></td>
-                                                <td>
-                                                    <span class="badge bg-warning-light text-warning">
-                                                        <?= htmlspecialchars($r['Status']) ?>
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center p-4 text-muted">
-                                <i class="fas fa-inbox fa-2x mb-2"></i>
-                                <p>No pending rental requests</p>
-                            </div>
-                        <?php endif; ?>
+                    <div class="card-body p-0" id="latestRequestsContainer">
+                        <!-- Latest requests will be loaded here via AJAX -->
+                        <noscript>
+                        <div class="text-center p-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p>No pending rental requests</p>
+                        </div>
+                        </noscript>
                     </div>
                 </div>
             </div>
@@ -714,61 +686,17 @@ function timeAgo($datetime) {
                     </div>
                     <div class="card-body">
                         <div class="filter-buttons">
-                            <form method="get" class="d-inline">
-                                <input type="hidden" name="filter" value="recent">
-                                <button type="submit" class="filter-btn <?= $filter==='recent'?'active':'bg-light' ?>">
-                                    Recent
-                                </button>
-                            </form>
-                            <form method="get" class="d-inline">
-                                <input type="hidden" name="filter" value="all">
-                                <button type="submit" class="filter-btn <?= $filter==='all'?'active':'bg-light' ?>">
-                                    All Messages
-                                </button>
-                            </form>
+                            <button type="button" class="filter-btn bg-light" id="filterRecentBtn">Recent</button>
+                            <button type="button" class="filter-btn bg-light" id="filterAllBtn">All Messages</button>
                         </div>
-                        
-                        <div class="message-board">
-                            <?php if (empty($free_messages)): ?>
-                                <div class="text-center p-4 text-muted">
-                                    <i class="fas fa-envelope-open fa-2x mb-2"></i>
-                                    <p>No messages yet</p>
-                                </div>
-                            <?php else: ?>
-                                <?php foreach ($free_messages as $msg): ?>
-                                    <div class="message-item <?= ($msg['is_deleted'] ? 'deleted' : '') ?>">
-                                        <div class="message-user">
-                                            <?= htmlspecialchars($msg['Client_Name']) ?>
-                                        </div>
-                                        <div class="message-meta">
-                                            <?= htmlspecialchars(date('M d, Y H:i', strtotime($msg['Sent_At']))) ?>
-                                            • <?= timeAgo($msg['Sent_At']) ?>
-                                            <?php if ($filter === 'all' && $msg['is_deleted']): ?>
-                                                <span class="badge bg-danger ms-2">Deleted</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <div class="message-content">
-                                            <div class="mb-1">
-                                                <strong>Email:</strong> <?= htmlspecialchars($msg['Client_Email']) ?>
-                                            </div>
-                                            <div class="mb-2">
-                                                <strong>Phone:</strong> <?= htmlspecialchars($msg['Client_Phone'] ?? 'N/A') ?>
-                                            </div>
-                                            <div>
-                                                <?= nl2br(htmlspecialchars($msg['Message_Text'])) ?>
-                                            </div>
-                                        </div>
-                                        <?php if (empty($msg['is_deleted']) || $msg['is_deleted'] == 0): ?>
-                                            <form method="post" class="mt-2">
-                                                <input type="hidden" name="soft_delete_msg_id" value="<?= $msg['Message_ID'] ?>">
-                                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this message?')">
-                                                    <i class="fas fa-trash-alt me-1"></i> Delete
-                                                </button>
-                                            </form>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                        <div class="message-board" id="messageBoardContainer">
+                            <!-- Messages will be loaded here via AJAX -->
+                            <noscript>
+                            <div class="text-center p-4 text-muted">
+                                <i class="fas fa-envelope-open fa-2x mb-2"></i>
+                                <p>No messages yet</p>
+                            </div>
+                            </noscript>
                         </div>
                     </div>
                 </div>
@@ -778,6 +706,58 @@ function timeAgo($datetime) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
+    function fetchDashboardCounts() {
+        fetch('../AJAX/ajax_admin_dashboard_counts.php')
+            .then(res => res.json())
+            .then(data => {
+                if (data) {
+                    document.getElementById('pendingRentalsCount').textContent = data.pending_rentals ?? 0;
+                    document.getElementById('pendingMaintenanceCount').textContent = data.pending_maintenance ?? 0;
+                    document.getElementById('unpaidInvoicesCount').textContent = data.unpaid_invoices ?? 0;
+                    document.getElementById('overdueInvoicesCount').textContent = data.unpaid_due_invoices ?? 0;
+                }
+            });
+    }
+    function fetchLatestRequests() {
+        fetch('../AJAX/ajax_admin_dashboard_latest_requests.php')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('latestRequestsContainer').innerHTML = html;
+            });
+    }
+    let messageFilter = 'recent';
+    function fetchMessages() {
+        fetch('../AJAX/ajax_admin_dashboard_messages.php?filter=' + messageFilter)
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('messageBoardContainer').innerHTML = html;
+            });
+    }
+    setInterval(() => {
+        fetchDashboardCounts();
+        fetchLatestRequests();
+        fetchMessages();
+    }, 10000); // every 10s
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchDashboardCounts();
+        fetchLatestRequests();
+        fetchMessages();
+        document.getElementById('filterRecentBtn').addEventListener('click', function() {
+            messageFilter = 'recent';
+            this.classList.add('active');
+            document.getElementById('filterAllBtn').classList.remove('active');
+            fetchMessages();
+        });
+        document.getElementById('filterAllBtn').addEventListener('click', function() {
+            messageFilter = 'all';
+            this.classList.add('active');
+            document.getElementById('filterRecentBtn').classList.remove('active');
+            fetchMessages();
+        });
+        // Set initial filter button state
+        document.getElementById('filterRecentBtn').classList.add('active');
+    });
     // --- LIVE ADMIN: AJAX Polling for Dashboard Stats ---
     function fetchDashboardCounts() {
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
