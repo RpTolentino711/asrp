@@ -18,16 +18,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_i
 
     if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
         $success = "Your rental request has been sent to the admin!";
+        // Immediately update pending_requests to reflect the new pending request
+        $pending_requests = $db->getPendingRequestsByClient($client_id);
     }
 }
 
 $id = $_GET["space_id"];
 $available_units = $db->getAvailableUnitsForRental($id);
 
-// Get pending requests for the current client
-$pending_requests = [];
-if ($logged_in) {
-    $pending_requests = $db->getPendingRequestsByClient($client_id);
+// Only fetch pending requests if not just updated above
+if (!isset($pending_requests)) {
+    $pending_requests = [];
+    if ($logged_in) {
+        $pending_requests = $db->getPendingRequestsByClient($client_id);
+    }
 }
 ?>
 <!doctype html>
