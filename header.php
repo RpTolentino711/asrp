@@ -7,6 +7,13 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once 'database/database.php';
 $db = new Database();
 
+// --- Get User Information if logged in ---
+$client_info = null;
+if (isset($_SESSION['client_id'])) {
+    // Fetch client information
+    $client_info = $db->getClientInfo($_SESSION['client_id']);
+}
+
 // --- Invoice Notification Badge Logic ---
 $invoice_alert_count = 0;
 if (isset($_SESSION['client_id'])) {
@@ -55,10 +62,26 @@ $current_page = basename($_SERVER['PHP_SELF']);
 $is_logged_in = isset($_SESSION['client_id']);
 ?>
 
-<!-- Google Fonts -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
-<!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASRT Spaces</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
 
 <style>
 :root {
@@ -73,6 +96,11 @@ $is_logged_in = isset($_SESSION['client_id']);
   --navbar-gray-light: #e2e8f0;
   --navbar-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   --navbar-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding-top: 70px; /* Account for fixed navbar */
 }
 
 .modern-navbar {
@@ -235,6 +263,39 @@ $is_logged_in = isset($_SESSION['client_id']);
   box-shadow: none !important;
 }
 
+/* User Welcome Styles */
+.user-welcome {
+  color: var(--navbar-secondary) !important;
+  font-weight: 600 !important;
+  font-size: 1rem !important;
+  padding: 0.75rem 1rem !important;
+  margin: 0 0.25rem !important;
+  border-radius: 8px !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  border: 1px solid rgba(59, 130, 246, 0.2) !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: 45px !important;
+  transition: var(--navbar-transition) !important;
+  white-space: nowrap !important;
+}
+
+.user-welcome:hover {
+  background: rgba(59, 130, 246, 0.12) !important;
+  transform: translateY(-1px);
+}
+
+.user-welcome .user-icon {
+  font-size: 1.2rem !important;
+  margin-right: 0.5rem !important;
+  color: var(--navbar-primary) !important;
+}
+
+.user-name {
+  color: var(--navbar-primary) !important;
+  font-weight: 700 !important;
+}
+
 .modern-navbar-toggler {
   border: none !important;
   padding: 0.5rem !important;
@@ -359,6 +420,10 @@ $is_logged_in = isset($_SESSION['client_id']);
 
 /* Mobile Styles */
 @media (max-width: 991.98px) {
+  body {
+    padding-top: 60px;
+  }
+  
   .modern-navbar {
     min-height: 60px;
   }
@@ -385,7 +450,8 @@ $is_logged_in = isset($_SESSION['client_id']);
   }
 
   .modern-nav-link,
-  .modern-btn {
+  .modern-btn,
+  .user-welcome {
     width: 100% !important;
     margin: 0.25rem 0 !important;
     justify-content: flex-start !important;
@@ -397,6 +463,10 @@ $is_logged_in = isset($_SESSION['client_id']);
 }
 
 @media (max-width: 576px) {
+  body {
+    padding-top: 50px;
+  }
+  
   .modern-navbar {
     min-height: 50px;
     padding: 0.5rem 1rem !important;
@@ -411,10 +481,15 @@ $is_logged_in = isset($_SESSION['client_id']);
   }
 
   .modern-nav-link,
-  .modern-btn {
+  .modern-btn,
+  .user-welcome {
     padding: 0.5rem 1rem !important;
     font-size: 0.9rem !important;
     min-height: 40px !important;
+  }
+
+  .user-welcome {
+    font-size: 0.85rem !important;
   }
 }
 
@@ -560,8 +635,26 @@ $is_logged_in = isset($_SESSION['client_id']);
           </a>
         </li>
 
-        <!-- User Actions -->
+        <!-- User Welcome/Actions -->
         <?php if ($is_logged_in): ?>
+          <!-- Display Welcome Message with User Name -->
+          <?php if ($client_info && (isset($client_info['Client_fn']) || isset($client_info['Client_ln']))): ?>
+          <li class="nav-item">
+            <div class="user-welcome">
+              <i class="bi bi-person-circle user-icon"></i>
+              <span>Welcome, <span class="user-name"><?= htmlspecialchars(trim($client_info['Client_fn'] . ' ' . $client_info['Client_ln'])) ?></span></span>
+            </div>
+          </li>
+          <?php elseif ($client_info && isset($client_info['C_username'])): ?>
+          <!-- Fallback to username if no first/last name -->
+          <li class="nav-item">
+            <div class="user-welcome">
+              <i class="bi bi-person-circle user-icon"></i>
+              <span>Welcome, <span class="user-name"><?= htmlspecialchars($client_info['C_username']) ?></span></span>
+            </div>
+          </li>
+          <?php endif; ?>
+
           <?php if ($current_page != 'dashboard.php'): ?>
           <li class="nav-item ms-2">
             <a href="dashboard.php" class="modern-btn modern-btn-primary">
@@ -743,6 +836,9 @@ $is_logged_in = isset($_SESSION['client_id']);
           </div>
         </div>
       </form>
+    </div>
+  </div>
+</div>
 
 <!-- OTP Modal -->
 <div class="modal fade modern-modal" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
@@ -771,9 +867,9 @@ $is_logged_in = isset($_SESSION['client_id']);
     </div>
   </div>
 </div>
-    </div>
-  </div>
-</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
 // ========== LIVE VALIDATION FUNCTIONS ==========
