@@ -568,31 +568,28 @@ function timeAgo($datetime) {
                 <div class="stat-icon">
                     <i class="fas fa-clipboard-check"></i>
                 </div>
-                <div class="stat-value"><?= $pending ?></div>
+                <div class="stat-value" id="pendingRentalsCount"><?= $pending ?></div>
                 <div class="stat-label">Pending Rentals</div>
             </div>
-            
             <div class="stat-card maintenance animate-fade-in" style="animation-delay: 0.1s;">
                 <div class="stat-icon">
                     <i class="fas fa-tools"></i>
                 </div>
-                <div class="stat-value"><?= $pending_maintenance ?></div>
+                <div class="stat-value" id="pendingMaintenanceCount"><?= $pending_maintenance ?></div>
                 <div class="stat-label">Maintenance Requests</div>
             </div>
-            
             <div class="stat-card invoices animate-fade-in" style="animation-delay: 0.2s;">
                 <div class="stat-icon">
                     <i class="fas fa-file-invoice"></i>
                 </div>
-                <div class="stat-value"><?= $unpaid_invoices ?></div>
+                <div class="stat-value" id="unpaidInvoicesCount"><?= $unpaid_invoices ?></div>
                 <div class="stat-label">Unpaid Invoices</div>
             </div>
-            
             <div class="stat-card overdue animate-fade-in" style="animation-delay: 0.3s;">
                 <div class="stat-icon">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
-                <div class="stat-value"><?= $unpaid_due_invoices ?></div>
+                <div class="stat-value" id="overdueInvoicesCount"><?= $unpaid_due_invoices ?></div>
                 <div class="stat-label">Overdue Invoices</div>
             </div>
         </div>
@@ -781,6 +778,21 @@ function timeAgo($datetime) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // --- LIVE ADMIN: AJAX Polling for Dashboard Stats ---
+    function fetchDashboardCounts() {
+        fetch('../AJAX/ajax_admin_dashboard_counts.php')
+            .then(res => res.json())
+            .then(data => {
+                if (data) {
+                    document.getElementById('pendingRentalsCount').textContent = data.pending_rentals ?? 0;
+                    document.getElementById('pendingMaintenanceCount').textContent = data.pending_maintenance ?? 0;
+                    document.getElementById('unpaidInvoicesCount').textContent = data.unpaid_invoices ?? 0;
+                    document.getElementById('overdueInvoicesCount').textContent = data.unpaid_due_invoices ?? 0;
+                }
+            });
+    }
+    setInterval(fetchDashboardCounts, 10000); // every 10s
+    document.addEventListener('DOMContentLoaded', fetchDashboardCounts);
         const chartData = <?= json_encode($chartData) ?>;
         const ctx = document.getElementById('activityChart').getContext('2d');
 
