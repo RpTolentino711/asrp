@@ -71,7 +71,7 @@ function timeAgo($datetime) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
     <title>Admin Dashboard | ASRT Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
@@ -107,36 +107,11 @@ function timeAgo($datetime) {
             color: #374151;
             min-height: 100vh;
             overflow-x: hidden;
+            position: relative;
         }
-        
-        /* Mobile Menu Toggle */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 1rem;
-            left: 1rem;
-            z-index: 1001;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.75rem;
-            border-radius: 50%;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-            transition: var(--transition);
-        }
-        
-        .mobile-menu-toggle:hover {
-            background: var(--primary-dark);
-            transform: scale(1.05);
-        }
-        
-        .mobile-menu-toggle i {
-            font-size: 1.2rem;
-        }
-        
-        /* Mobile Overlay */
+
+        /* Mobile Menu Overlay */
         .mobile-overlay {
-            display: none;
             position: fixed;
             top: 0;
             left: 0;
@@ -144,12 +119,48 @@ function timeAgo($datetime) {
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
             z-index: 999;
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            display: none;
         }
-        
+
         .mobile-overlay.active {
-            opacity: 1;
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
         }
         
         /* Sidebar Styling */
@@ -201,6 +212,7 @@ function timeAgo($datetime) {
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
+            font-size: 0.95rem;
         }
         
         .nav-link:hover, .nav-link.active {
@@ -269,7 +281,6 @@ function timeAgo($datetime) {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             transition: var(--transition);
             border-left: 4px solid var(--primary);
-            cursor: pointer;
         }
         
         .stat-card:hover {
@@ -344,12 +355,6 @@ function timeAgo($datetime) {
             width: 100%;
         }
         
-        /* Chart controls for mobile */
-        .chart-controls {
-            display: none;
-            margin-bottom: 1rem;
-        }
-        
         /* Table Styling */
         .table-container {
             overflow-x: auto;
@@ -360,7 +365,6 @@ function timeAgo($datetime) {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            min-width: 600px;
         }
         
         .custom-table th {
@@ -370,13 +374,11 @@ function timeAgo($datetime) {
             text-align: left;
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
-            white-space: nowrap;
         }
         
         .custom-table td {
             padding: 1rem;
             border-bottom: 1px solid #f3f4f6;
-            vertical-align: middle;
         }
         
         .custom-table tr:last-child td {
@@ -431,6 +433,7 @@ function timeAgo($datetime) {
             display: flex;
             gap: 0.5rem;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
         }
         
         .filter-btn {
@@ -440,6 +443,8 @@ function timeAgo($datetime) {
             font-size: 0.9rem;
             transition: var(--transition);
             border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
             cursor: pointer;
         }
         
@@ -448,87 +453,65 @@ function timeAgo($datetime) {
             color: white;
             border-color: var(--primary);
         }
-        
+
         /* Mobile Card Layout */
-        .mobile-request-card, .mobile-message-card {
-            display: none;
+        .mobile-card {
             background: white;
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             margin-bottom: 1rem;
             padding: 1rem;
             border-left: 4px solid var(--primary);
         }
-        
+
         .mobile-card-header {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 0.75rem;
+            align-items: center;
         }
-        
-        .mobile-card-title {
-            font-weight: 600;
-            color: var(--dark);
-            font-size: 1rem;
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
         }
-        
-        .mobile-card-meta {
-            font-size: 0.8rem;
+
+        .mobile-card-detail .label {
+            font-weight: 500;
             color: #6b7280;
         }
-        
-        .mobile-card-content {
-            margin-bottom: 0.75rem;
-            color: #4b5563;
+
+        .mobile-card-detail .value {
+            color: var(--dark);
         }
-        
-        .mobile-card-actions {
-            display: flex;
-            gap: 0.5rem;
-            justify-content: flex-end;
-        }
-        
-        /* Summary boxes responsive */
-        .summary-boxes {
-            display: flex;
-            flex-wrap: wrap;
+
+        /* Summary Cards */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
-        
-        .summary-box {
-            flex: 1;
-            min-width: 120px;
-            padding: 1rem;
+
+        .summary-card {
+            background: white;
             border-radius: var(--border-radius);
+            padding: 1rem;
             text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-top: 3px solid var(--primary);
         }
+
+        .summary-card.warning { border-top-color: var(--warning); }
+        .summary-card.info { border-top-color: var(--info); }
         
-        /* Responsive Design */
-        @media (max-width: 1200px) {
-            .main-content {
-                padding: 1.5rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            }
-            
-            .welcome-text h1 {
-                font-size: 1.6rem;
-            }
-        }
-        
+        /* Mobile Responsive */
         @media (max-width: 992px) {
-            .mobile-menu-toggle {
-                display: block;
-            }
-            
-            .mobile-overlay {
-                display: block;
-            }
-            
             .sidebar {
                 transform: translateX(-100%);
                 width: 280px;
@@ -537,171 +520,142 @@ function timeAgo($datetime) {
             .sidebar.active {
                 transform: translateX(0);
             }
+
+            .mobile-header {
+                display: flex;
+            }
             
             .main-content {
                 margin-left: 0;
-                padding-top: 5rem;
+                margin-top: 60px;
+                padding: 1rem;
             }
-            
+
             .dashboard-header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 1rem;
+                margin-bottom: 1.5rem;
             }
-            
+
+            .welcome-text h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+
+            .stat-card {
+                padding: 1rem;
+            }
+
+            .stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+            }
+
+            .stat-label {
+                font-size: 0.8rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
             .chart-container {
                 height: 250px;
             }
-            
-            /* Stack activity overview sections */
-            .row.mb-4 > .col-md-6:first-child {
-                margin-bottom: 1.5rem;
+
+            .summary-cards {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.5rem;
+            }
+
+            .summary-card {
+                padding: 0.75rem;
             }
         }
         
         @media (max-width: 768px) {
             .main-content {
-                padding: 1rem;
-                padding-top: 5rem;
+                padding: 0.75rem;
             }
-            
+
             .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 1rem;
+                grid-template-columns: 1fr;
             }
-            
-            .stat-card {
-                padding: 1rem;
-            }
-            
-            .stat-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
-            }
-            
-            .stat-value {
-                font-size: 1.5rem;
-            }
-            
-            .welcome-text h1 {
-                font-size: 1.4rem;
-            }
-            
-            .welcome-text p {
-                font-size: 0.9rem;
-            }
-            
-            .card-header {
-                padding: 1rem;
-                font-size: 1rem;
-            }
-            
-            .card-body {
-                padding: 1rem;
-            }
-            
+
             .chart-container {
                 height: 200px;
             }
-            
-            /* Show chart controls on mobile */
-            .chart-controls {
-                display: block;
+
+            .message-board {
+                max-height: 300px;
             }
-            
-            /* Hide table, show mobile cards */
-            .table-container {
-                display: none;
+
+            .message-item {
+                padding: 0.75rem;
             }
-            
-            .mobile-request-card,
-            .mobile-message-card {
-                display: block;
+
+            .form-control, .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
             }
-            
-            /* Make summary boxes stack */
-            .summary-boxes {
-                flex-direction: column;
+
+            .summary-cards {
+                grid-template-columns: 1fr;
             }
-            
-            .summary-box {
-                min-width: unset;
-            }
-            
-            /* Responsive form */
-            .row.g-3 .col-md-3 {
-                margin-bottom: 1rem;
-            }
-            
-            /* Responsive filter buttons */
+
             .filter-buttons {
-                flex-wrap: wrap;
+                justify-content: center;
             }
-            
+
             .filter-btn {
                 flex: 1;
-                min-width: 100px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .main-content {
-                padding: 0.75rem;
-                padding-top: 4.5rem;
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: 0.75rem;
-            }
-            
-            .stat-card {
-                padding: 0.75rem;
                 text-align: center;
             }
-            
-            .stat-icon {
-                width: 35px;
-                height: 35px;
-                font-size: 0.9rem;
-                margin: 0 auto 0.75rem;
-            }
-            
-            .stat-value {
-                font-size: 1.25rem;
-            }
-            
-            .stat-label {
-                font-size: 0.85rem;
-            }
-            
+        }
+
+        @media (max-width: 480px) {
             .welcome-text h1 {
-                font-size: 1.25rem;
+                font-size: 1.3rem;
             }
-            
-            .dashboard-header {
-                margin-bottom: 1.5rem;
-                padding-bottom: 0.75rem;
+
+            .dashboard-card {
+                border-radius: 8px;
             }
-            
-            .header-actions {
-                font-size: 0.85rem;
-            }
-            
-            .mobile-request-card,
-            .mobile-message-card {
-                padding: 0.75rem;
-                margin-bottom: 0.75rem;
-            }
-            
-            .mobile-card-title {
+
+            .btn {
                 font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
             }
-            
-            .mobile-card-meta,
-            .message-meta {
-                font-size: 0.75rem;
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .filter-btn, .nav-link, .mobile-menu-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            .stat-card:hover {
+                transform: none;
             }
         }
         
@@ -748,32 +702,23 @@ function timeAgo($datetime) {
             padding: 0.35rem 0.75rem;
             font-size: 0.8rem;
         }
-        
-        /* Smooth scrolling for mobile */
-        @media (max-width: 768px) {
-            .sidebar {
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            .message-board {
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            .table-container {
-                -webkit-overflow-scrolling: touch;
-            }
-        }
     </style>
 </head>
 <body>
-    <!-- Mobile Menu Toggle -->
-    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">
-        <i class="fas fa-bars"></i>
-    </button>
-    
     <!-- Mobile Overlay -->
-    <div class="mobile-overlay" onclick="toggleMobileMenu()"></div>
-    
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-brand">
+            ASRT Admin
+        </div>
+        <div></div>
+    </div>
+
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -784,6 +729,13 @@ function timeAgo($datetime) {
         </div>
         
         <div class="sidebar-nav">
+            <div class="nav-item">
+                <a href="dashboard.php" class="nav-link active">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+            
             <div class="nav-item">
                 <a href="manage_user.php" class="nav-link">
                     <i class="fas fa-users"></i>
@@ -862,35 +814,35 @@ function timeAgo($datetime) {
                 <h1>Welcome back, Admin</h1>
                 <p>Here's what's happening with your properties today</p>
             </div>
-            <div class="header-actions">
+            <div class="header-actions d-none d-md-block">
                 <span class="text-muted"><?= date('l, F j, Y') ?></span>
             </div>
         </div>
         
         <!-- Stats Grid -->
         <div class="stats-grid">
-            <div class="stat-card rentals animate-fade-in" onclick="window.location.href='view_rental_requests.php'">
+            <div class="stat-card rentals animate-fade-in">
                 <div class="stat-icon">
                     <i class="fas fa-clipboard-check"></i>
                 </div>
                 <div class="stat-value" id="pendingRentalsCount"><?= $pending ?></div>
                 <div class="stat-label">Pending Rentals</div>
             </div>
-            <div class="stat-card maintenance animate-fade-in" style="animation-delay: 0.1s;" onclick="window.location.href='manage_maintenance.php'">
+            <div class="stat-card maintenance animate-fade-in" style="animation-delay: 0.1s;">
                 <div class="stat-icon">
                     <i class="fas fa-tools"></i>
                 </div>
                 <div class="stat-value" id="pendingMaintenanceCount"><?= $pending_maintenance ?></div>
                 <div class="stat-label">Maintenance Requests</div>
             </div>
-            <div class="stat-card invoices animate-fade-in" style="animation-delay: 0.2s;" onclick="window.location.href='generate_invoice.php'">
+            <div class="stat-card invoices animate-fade-in" style="animation-delay: 0.2s;">
                 <div class="stat-icon">
                     <i class="fas fa-file-invoice"></i>
                 </div>
                 <div class="stat-value" id="unpaidInvoicesCount"><?= $unpaid_invoices ?></div>
                 <div class="stat-label">Unpaid Invoices</div>
             </div>
-            <div class="stat-card overdue animate-fade-in" style="animation-delay: 0.3s;" onclick="window.location.href='admin_kick_unpaid.php'">
+            <div class="stat-card overdue animate-fade-in" style="animation-delay: 0.3s;">
                 <div class="stat-icon">
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
@@ -906,8 +858,8 @@ function timeAgo($datetime) {
                 <span>Activity Overview</span>
             </div>
             <div class="card-body">
-                <form class="row g-3 align-items-center mb-4" method="get">
-                    <div class="col-md-3">
+                <form class="row g-3 align-items-end mb-4" method="get">
+                    <div class="col-md-4 col-6">
                         <label for="month" class="form-label">Month</label>
                         <select id="month" name="month" class="form-select">
                             <option value="">All Months</option>
@@ -918,7 +870,7 @@ function timeAgo($datetime) {
                             <?php endfor; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4 col-6">
                         <label for="year" class="form-label">Year</label>
                         <select id="year" name="year" class="form-select">
                             <option value="">All Years</option>
@@ -929,39 +881,57 @@ function timeAgo($datetime) {
                             <?php endfor; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label d-block">&nbsp;</label>
-                        <button class="btn btn-primary" type="submit">Apply Filter</button>
+                    <div class="col-md-4 col-12">
+                        <button class="btn btn-primary w-100" type="submit">Apply Filter</button>
                     </div>
                 </form>
                 
-                <div class="row mb-4">
+                <!-- Mobile Summary Cards -->
+                <div class="summary-cards d-md-none">
+                    <div class="summary-card">
+                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_rentals']) ?></div>
+                        <div class="text-muted small">New Rentals</div>
+                    </div>
+                    <div class="summary-card warning">
+                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_maintenance']) ?></div>
+                        <div class="text-muted small">Maintenance</div>
+                    </div>
+                    <div class="summary-card info">
+                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_messages']) ?></div>
+                        <div class="text-muted small">Messages</div>
+                    </div>
+                </div>
+
+                <!-- Desktop Summary -->
+                <div class="row mb-4 d-none d-md-flex">
                     <div class="col-md-6">
                         <h6 class="text-primary mb-3">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
-                        <div class="summary-boxes">
-                            <div class="summary-box bg-primary-light">
+                        <div class="d-flex flex-wrap gap-4">
+                            <div class="bg-primary-light p-3 rounded">
                                 <div class="fw-bold fs-5"><?= array_sum($chartData['new_rentals']) ?></div>
                                 <div class="text-muted small">New Rentals</div>
                             </div>
-                            <div class="summary-box bg-warning-light">
+                            <div class="bg-warning-light p-3 rounded">
                                 <div class="fw-bold fs-5"><?= array_sum($chartData['new_maintenance']) ?></div>
                                 <div class="text-muted small">Maintenance Requests</div>
                             </div>
-                            <div class="summary-box bg-info-light">
+                            <div class="bg-info-light p-3 rounded">
                                 <div class="fw-bold fs-5"><?= array_sum($chartData['new_messages']) ?></div>
                                 <div class="text-muted small">Messages</div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="chart-controls">
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="toggleDataset(0)">Rentals</button>
-                            <button class="btn btn-sm btn-outline-warning me-2" onclick="toggleDataset(1)">Maintenance</button>
-                            <button class="btn btn-sm btn-outline-info" onclick="toggleDataset(2)">Messages</button>
-                        </div>
                         <div class="chart-container">
                             <canvas id="activityChart"></canvas>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Chart -->
+                <div class="d-md-none">
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -996,8 +966,8 @@ function timeAgo($datetime) {
                     </div>
                     <div class="card-body">
                         <div class="filter-buttons">
-                            <button type="button" class="filter-btn bg-light" id="filterRecentBtn">Recent</button>
-                            <button type="button" class="filter-btn bg-light" id="filterAllBtn">All Messages</button>
+                            <button type="button" class="filter-btn" id="filterRecentBtn">Recent</button>
+                            <button type="button" class="filter-btn" id="filterAllBtn">All Messages</button>
                         </div>
                         <div class="message-board" id="messageBoardContainer">
                             <!-- Messages will be loaded here via AJAX -->
@@ -1016,50 +986,37 @@ function timeAgo($datetime) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // Mobile menu toggle function
+    // Mobile menu functionality
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+
     function toggleMobileMenu() {
-        const sidebar = document.getElementById('sidebar');
-        const overlay = document.querySelector('.mobile-overlay');
-        const isActive = sidebar.classList.contains('active');
-        
-        if (isActive) {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        } else {
-            sidebar.classList.add('active');
-            overlay.classList.add('active');
-        }
+        sidebar.classList.toggle('active');
+        mobileOverlay.classList.toggle('active');
     }
-    
+
+    mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+    mobileOverlay.addEventListener('click', toggleMobileMenu);
+
     // Close mobile menu when clicking on nav links
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', () => {
             if (window.innerWidth <= 992) {
-                toggleMobileMenu();
+                sidebar.classList.remove('active');
+                mobileOverlay.classList.remove('active');
             }
         });
     });
-    
-    // Close mobile menu on window resize if screen becomes large
+
+    // Handle window resize
     window.addEventListener('resize', () => {
         if (window.innerWidth > 992) {
-            document.getElementById('sidebar').classList.remove('active');
-            document.querySelector('.mobile-overlay').classList.remove('active');
+            sidebar.classList.remove('active');
+            mobileOverlay.classList.remove('active');
         }
     });
-    
-    // Chart instance for mobile controls
-    let activityChart;
-    
-    // Mobile chart controls
-    function toggleDataset(datasetIndex) {
-        if (!activityChart) return;
-        
-        const isVisible = activityChart.isDatasetVisible(datasetIndex);
-        activityChart.setDatasetVisibility(datasetIndex, !isVisible);
-        activityChart.update();
-    }
-    
+
     // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
     function fetchDashboardCounts() {
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
@@ -1072,168 +1029,75 @@ function timeAgo($datetime) {
                     document.getElementById('overdueInvoicesCount').textContent = data.unpaid_due_invoices ?? 0;
                 }
             })
-            .catch(error => {
-                console.error('Error fetching dashboard counts:', error);
-            });
+            .catch(err => console.log('Error fetching dashboard counts:', err));
     }
-    
+
     function fetchLatestRequests() {
         fetch('../AJAX/ajax_admin_dashboard_latest_requests.php')
             .then(res => res.text())
             .then(html => {
                 document.getElementById('latestRequestsContainer').innerHTML = html;
-                
-                // Convert to mobile cards on small screens
-                convertRequestsToMobileCards();
             })
-            .catch(error => {
-                console.error('Error fetching latest requests:', error);
+            .catch(err => {
+                document.getElementById('latestRequestsContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
             });
     }
-    
+
     let messageFilter = 'recent';
     function fetchMessages() {
         fetch('../AJAX/ajax_admin_dashboard_messages.php?filter=' + messageFilter)
             .then(res => res.text())
             .then(html => {
                 document.getElementById('messageBoardContainer').innerHTML = html;
-                
-                // Convert to mobile cards on small screens
-                convertMessagesToMobileCards();
             })
-            .catch(error => {
-                console.error('Error fetching messages:', error);
+            .catch(err => {
+                document.getElementById('messageBoardContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading messages</p></div>';
             });
     }
-    
-    // Function to convert table data to mobile-friendly cards for requests
-    function convertRequestsToMobileCards() {
-        if (window.innerWidth <= 768) {
-            const tableContainer = document.querySelector('#latestRequestsContainer .table-container');
-            const table = document.querySelector('#latestRequestsContainer .custom-table');
-            
-            if (table && tableContainer) {
-                const rows = table.querySelectorAll('tbody tr');
-                let mobileCardsHTML = '';
-                
-                rows.forEach(row => {
-                    const cells = row.querySelectorAll('td');
-                    if (cells.length >= 3) {
-                        const clientInfo = cells[0].textContent.trim();
-                        const unitInfo = cells[1].textContent.trim();
-                        const requestDate = cells[2].textContent.trim();
-                        
-                        mobileCardsHTML += `
-                            <div class="mobile-request-card">
-                                <div class="mobile-card-header">
-                                    <div class="mobile-card-title">${clientInfo}</div>
-                                    <div class="mobile-card-meta">${requestDate}</div>
-                                </div>
-                                <div class="mobile-card-content">
-                                    <strong>Unit:</strong> ${unitInfo}
-                                </div>
-                            </div>
-                        `;
-                    }
-                });
-                
-                if (mobileCardsHTML) {
-                    tableContainer.style.display = 'none';
-                    
-                    let mobileContainer = document.querySelector('#latestRequestsContainer .mobile-cards-container');
-                    if (!mobileContainer) {
-                        mobileContainer = document.createElement('div');
-                        mobileContainer.className = 'mobile-cards-container';
-                        document.getElementById('latestRequestsContainer').appendChild(mobileContainer);
-                    }
-                    mobileContainer.innerHTML = mobileCardsHTML;
-                }
-            }
-        } else {
-            // Show table on larger screens
-            const tableContainer = document.querySelector('#latestRequestsContainer .table-container');
-            const mobileContainer = document.querySelector('#latestRequestsContainer .mobile-cards-container');
-            
-            if (tableContainer) tableContainer.style.display = 'block';
-            if (mobileContainer) mobileContainer.style.display = 'none';
-        }
-    }
-    
-    // Function to convert messages to mobile-friendly cards
-    function convertMessagesToMobileCards() {
-        if (window.innerWidth <= 768) {
-            const messageBoard = document.querySelector('.message-board');
-            const messageItems = document.querySelectorAll('.message-item');
-            
-            if (messageItems.length > 0) {
-                let mobileCardsHTML = '';
-                
-                messageItems.forEach(item => {
-                    const user = item.querySelector('.message-user')?.textContent || 'Unknown User';
-                    const meta = item.querySelector('.message-meta')?.textContent || '';
-                    const content = item.querySelector('.message-content')?.textContent || '';
-                    const actions = item.querySelector('.message-actions')?.innerHTML || '';
-                    
-                    mobileCardsHTML += `
-                        <div class="mobile-message-card">
-                            <div class="mobile-card-header">
-                                <div class="mobile-card-title">${user}</div>
-                                <div class="mobile-card-meta">${meta}</div>
-                            </div>
-                            <div class="mobile-card-content">${content}</div>
-                            ${actions ? `<div class="mobile-card-actions">${actions}</div>` : ''}
-                        </div>
-                    `;
-                });
-                
-                messageBoard.innerHTML = mobileCardsHTML;
-            }
-        }
-    }
-    
-    // Polling intervals
-    setInterval(() => {
-        fetchDashboardCounts();
-        fetchLatestRequests();
-        fetchMessages();
-    }, 10000); // every 10s
-    
+
+    // Initial load and set up polling
     document.addEventListener('DOMContentLoaded', () => {
         fetchDashboardCounts();
         fetchLatestRequests();
         fetchMessages();
         
-        // Message filter buttons
-        document.getElementById('filterRecentBtn').addEventListener('click', function() {
+        // Set up filter buttons
+        const recentBtn = document.getElementById('filterRecentBtn');
+        const allBtn = document.getElementById('filterAllBtn');
+        
+        recentBtn.addEventListener('click', function() {
             messageFilter = 'recent';
             this.classList.add('active');
-            document.getElementById('filterAllBtn').classList.remove('active');
+            allBtn.classList.remove('active');
             fetchMessages();
         });
         
-        document.getElementById('filterAllBtn').addEventListener('click', function() {
+        allBtn.addEventListener('click', function() {
             messageFilter = 'all';
             this.classList.add('active');
-            document.getElementById('filterRecentBtn').classList.remove('active');
+            recentBtn.classList.remove('active');
             fetchMessages();
         });
         
         // Set initial filter button state
-        document.getElementById('filterRecentBtn').classList.add('active');
-        
-        // Handle window resize for responsive behavior
-        window.addEventListener('resize', () => {
-            convertRequestsToMobileCards();
-            convertMessagesToMobileCards();
-        });
+        recentBtn.classList.add('active');
     });
-    
+
+    // Poll every 10 seconds
+    setInterval(() => {
+        fetchDashboardCounts();
+        fetchLatestRequests();
+        fetchMessages();
+    }, 10000);
+
     // Chart initialization
     const chartData = <?= json_encode($chartData) ?>;
     const ctx = document.getElementById('activityChart').getContext('2d');
 
     let lastFocusedIndex = null;
-    activityChart = new Chart(ctx, {
+    const activityChart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: chartData.labels,
@@ -1273,7 +1137,10 @@ function timeAgo($datetime) {
                     labels: { 
                         color: '#374151',
                         usePointStyle: true,
-                        padding: 20
+                        padding: window.innerWidth <= 768 ? 10 : 20,
+                        font: {
+                            size: window.innerWidth <= 768 ? 10 : 12
+                        }
                     }
                 },
                 tooltip: {
@@ -1296,20 +1163,44 @@ function timeAgo($datetime) {
             scales: {
                 x: { 
                     grid: { display: false },
-                    ticks: { color: '#6b7280' }
+                    ticks: { 
+                        color: '#6b7280',
+                        font: {
+                            size: window.innerWidth <= 768 ? 10 : 11
+                        }
+                    }
                 },
                 y: { 
                     beginAtZero: true,
                     grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                    ticks: { color: '#6b7280' }
+                    ticks: { 
+                        color: '#6b7280',
+                        font: {
+                            size: window.innerWidth <= 768 ? 10 : 11
+                        }
+                    }
                 }
             },
             elements: {
                 point: {
-                    radius: 4,
-                    hoverRadius: 6
+                    radius: window.innerWidth <= 768 ? 2 : 4,
+                    hoverRadius: window.innerWidth <= 768 ? 4 : 6
                 }
             }
+        }
+    });
+
+    // Handle window resize for chart responsiveness
+    window.addEventListener('resize', () => {
+        if (activityChart) {
+            const isMobile = window.innerWidth <= 768;
+            activityChart.options.plugins.legend.labels.padding = isMobile ? 10 : 20;
+            activityChart.options.plugins.legend.labels.font.size = isMobile ? 10 : 12;
+            activityChart.options.scales.x.ticks.font.size = isMobile ? 10 : 11;
+            activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
+            activityChart.options.elements.point.radius = isMobile ? 2 : 4;
+            activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
+            activityChart.update();
         }
     });
 
@@ -1333,6 +1224,21 @@ function timeAgo($datetime) {
             lastFocusedIndex = null;
             activityChart.update();
         }
+    });
+
+    // Auto-hide notifications after 5 seconds
+    document.querySelectorAll('.alert').forEach(alert => {
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 300);
+            }
+        }, 5000);
     });
     </script>
 </body>
