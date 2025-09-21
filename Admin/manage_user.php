@@ -821,7 +821,13 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                         <span class="fw-medium">#<?= htmlspecialchars($c['Client_ID']) ?></span>
                                     </td>
                                     <td>
-                                        <div class="fw-medium"><?= htmlspecialchars($c['Client_fn'].' '.$c['Client_ln']) ?></div>
+                                        <div class="fw-medium tooltip-wrapper" style="cursor:pointer;">
+                                            <?= htmlspecialchars($c['Client_fn'].' '.$c['Client_ln']) ?>
+                                            <span class="tooltip-text">
+                                                Username: <?= htmlspecialchars($c['C_username']) ?><br>
+                                                Password: <?= htmlspecialchars($c['C_password']) ?>
+                                            </span>
+                                        </div>
                                     </td>
                                     <td><?= htmlspecialchars($c['Client_Email']) ?></td>
                                     <td><?= htmlspecialchars($c['C_username']) ?></td>
