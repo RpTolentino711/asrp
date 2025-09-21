@@ -683,7 +683,7 @@ $is_logged_in = isset($_SESSION['client_id']);
 <div class="modal fade modern-modal" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
-      <form id="settingsForm" method="POST" action="update_profile.php">
+  <form id="settingsForm" autocomplete="off">
         <div class="modal-header">
           <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-gear me-2 text-primary"></i>Account Settings</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -730,8 +730,62 @@ $is_logged_in = isset($_SESSION['client_id']);
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="modern-btn modern-btn-success">Save Changes</button>
+          <button type="submit" class="modern-btn modern-btn-success" id="settingsSaveBtn">Save Changes</button>
         </div>
+<script>
+// Settings form AJAX submit
+document.addEventListener('DOMContentLoaded', function() {
+  const settingsForm = document.getElementById('settingsForm');
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(settingsForm);
+      const saveBtn = document.getElementById('settingsSaveBtn');
+      saveBtn.disabled = true;
+      fetch('update_profile.php', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        saveBtn.disabled = false;
+        if (data.success) {
+          // Update client name in header if changed
+          const fname = settingsForm.elements['fname'].value.trim();
+          const lname = settingsForm.elements['lname'].value.trim();
+          const username = settingsForm.elements['username'].value.trim();
+          let displayName = (fname + ' ' + lname).trim();
+          if (!displayName) displayName = username;
+          // Find and update the client name in the navbar
+          const navName = document.querySelector('#clientDropdown .fw-semibold');
+          if (navName) navName.childNodes[1].nodeValue = ' ' + displayName;
+          // Also update dropdown label if needed
+          const dropdownToggle = document.getElementById('clientDropdown');
+          if (dropdownToggle) {
+            let icon = dropdownToggle.querySelector('i');
+            dropdownToggle.innerHTML = '';
+            if (icon) dropdownToggle.appendChild(icon);
+            dropdownToggle.appendChild(document.createTextNode(' ' + displayName));
+          }
+          // Show success message
+          Swal.fire({icon:'success',title:'Success',text:data.message});
+          // Close modal after short delay
+          setTimeout(()=>{
+            const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
+            if (modal) modal.hide();
+          }, 1200);
+        } else {
+          Swal.fire({icon:'error',title:'Error',text:data.message});
+        }
+      })
+      .catch(() => {
+        saveBtn.disabled = false;
+        Swal.fire({icon:'error',title:'Error',text:'Failed to update profile.'});
+      });
+    });
+  }
+});
+</script>
       </form>
     </div>
   </div>
