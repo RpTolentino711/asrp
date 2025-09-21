@@ -1,223 +1,257 @@
 <?php
+require '../database/database.php';
 session_start();
-require_once '../database/database.php';
-
-// Turn on error reporting for debugging (remove in production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 $db = new Database();
 
-// --- Admin auth check ---
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header('Location: login.php');
     exit();
 }
-$ua_id = $_SESSION['admin_id'] ?? null;
 
-$success_unit = '';
-$error_unit = '';
-$success_type = '';
-$error_type = '';
+$msg = "";
 
-// --- Handle photo delete for a specific slot ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
-    $space_id = intval($_POST['space_id'] ?? 0);
-    $photo_field = $_POST['photo_field'] ?? 'Photo1';
-    if ($space_id && in_array($photo_field, ['Photo1','Photo2','Photo3','Photo4','Photo5'])) {
-        $space = $db->getSpacePhoto($space_id);
-        if ($space && !empty($space[$photo_field])) {
-            $filepath = __DIR__ . "/../uploads/unit_photos/" . $space[$photo_field];
-            if (file_exists($filepath)) unlink($filepath);
-        }
-        $db->removeSpacePhoto($space_id, $photo_field);
-        $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Photo deleted successfully!
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>';
-    }
-}
+// --- Fetch ALL Data for Display ---
+$clients = $db->getAllClientsWithOrWithoutUnit();
+$units = $db->getAllUnitsWithRenterInfo();
 
-// --- Handle photo update/upload for a specific slot ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
-    $space_id = intval($_POST['space_id'] ?? 0);
-    $photo_field = $_POST['photo_field'] ?? 'Photo1';
-    if ($space_id && in_array($photo_field, ['Photo1','Photo2','Photo3','Photo4','Photo5']) &&
-        isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        $file = $_FILES['new_photo'];
-        if (!in_array($file['type'], $allowed_types)) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Invalid file type for photo.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } elseif ($file['size'] > 2*1024*1024) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Photo is too large (max 2MB).
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } else {
-            // Delete old photo if exists
-            $space = $db->getSpacePhoto($space_id);
-            if ($space && !empty($space[$photo_field])) {
-                $filepath = __DIR__ . "/../uploads/unit_photos/" . $space[$photo_field];
-                if (file_exists($filepath)) unlink($filepath);
-            }
-            // Save new
-            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
-            $upload_dir = __DIR__ . "/../uploads/unit_photos/";
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-            $filepath = $upload_dir . $filename;
-            if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $db->updateSpacePhotoField($space_id, $photo_field, $filename);
-                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Photo updated successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
-            } else {
-                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                              <i class="fas fa-exclamation-circle me-2"></i>
-                              Failed to upload new photo.
-                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                              </div>';
-            }
-        }
-    }
-}
+// --- Handle POST Actions ---
 
-// --- Handle form submission for new space/unit ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'unit') {
-    $name = trim($_POST['name'] ?? '');
-    $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
-    $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
-
-    // Handle file upload (main photo goes to Photo1 only)
-    $photo1_filename = null;
-    $upload_dir = __DIR__ . "/../uploads/unit_photos/";
-    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-
-    if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK) {
-        $file = $_FILES['photo'];
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        if (!in_array($file['type'], $allowed_types)) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Invalid file type for photo.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } elseif ($file['size'] > 2*1024*1024) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Photo is too large (max 2MB).
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } else {
-            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
-            $filepath = $upload_dir . $filename;
-            if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $photo1_filename = $filename;
-            } else {
-                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                              <i class="fas fa-exclamation-circle me-2"></i>
-                              Failed to upload photo.
-                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                              </div>';
-            }
-        }
-    }
-
-    if (empty($name) || empty($spacetype_id) || $price === null || empty($ua_id)) {
-        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      Please fill in all required fields.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
-    } elseif ($price < 0) {
-        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      Price must be a non-negative number.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
-    } elseif ($db->isSpaceNameExists($name)) {
-        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      A space/unit with this name already exists.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
-    } elseif (!$error_unit) {
-        // For new units, only Photo1 is set at creation. Others can be edited after creation.
-        if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo1_filename)) {
-            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Space/unit added successfully!
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
-        } else {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          A database error occurred. The unit could not be added.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        }
-    }
-}
-
-// --- Handle form submission for new space type ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'type') {
-    $spacetype_name = trim($_POST['spacetype_name'] ?? '');
-
-    if (empty($spacetype_name)) {
-        $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      Please enter a space type name.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
+// Rename Space Unit
+if (isset($_POST['rename_unit']) && isset($_POST['space_id'], $_POST['new_name'])) {
+    $sid = intval($_POST['space_id']);
+    $new_name = trim($_POST['new_name']);
+    if ($new_name === '') {
+        $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Unit name cannot be empty.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else if ($db->renameUnit($sid, $new_name)) {
+        $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                Unit name updated successfully!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
     } else {
-        $existing_types = $db->getAllSpaceTypes();
-        $existing = array_filter($existing_types, function($type) use ($spacetype_name) {
-            return strtolower(trim($type['SpaceTypeName'])) === strtolower(trim($spacetype_name));
-        });
-        if ($existing) {
-            $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          This space type already exists.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
+        $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error: Could not update unit name.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    }
+}
+
+// Nuke (PERMA DELETE) - This will delete the client, their records, and set any rented unit as available again
+if (isset($_POST['nuke_client']) && isset($_POST['client_id'])) {
+    $cid = intval($_POST['client_id']);
+    // Find ALL units assigned to this client (supporting multi-unit clients)
+    $client_unit_ids = [];
+    foreach ($clients as $cl) {
+        if ($cl['Client_ID'] == $cid && !empty($cl['Space_ID'])) {
+            $client_unit_ids[] = $cl['Space_ID'];
+        }
+    }
+    // Free all spaces BEFORE deleting the client
+    foreach ($client_unit_ids as $space_id) {
+        $db->setUnitAvailable($space_id);
+    }
+    // Now nuke the client (permanent delete)
+    if ($db->hardDeleteClient($cid)) {
+        $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                Client and all associated records PERMANENTLY deleted. Any rented space is now available.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error: Could not nuke client (delete client and free space).
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    }
+}
+
+if (isset($_POST['delete_client']) && isset($_POST['client_id'])) {
+    $cid = intval($_POST['client_id']);
+    $client_has_unit = false;
+    foreach ($clients as $cl) {
+        if ($cl['Client_ID'] == $cid && !empty($cl['SpaceName'])) {
+            $client_has_unit = true;
+            break;
+        }
+    }
+    if ($client_has_unit) {
+        $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Cannot set inactive: Client still has a rented unit assigned.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        if ($db->updateClientStatus($cid, 'inactive')) {
+            $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Client set as inactive!
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
         } else {
-            if ($db->addSpaceType($spacetype_name)) {
-                $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Space type added successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
-            } else {
-                $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                              <i class="fas fa-exclamation-circle me-2"></i>
-                              A database error occurred. Space type could not be added.
-                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                              </div>';
-            }
+            $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Error: Could not set client as inactive.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
         }
     }
 }
 
-// --- Fetch Data for Display ---
-$spacetypes = $db->getAllSpaceTypes();
-$spaces = $db->getAllSpacesWithDetails();
+if (isset($_POST['activate_client']) && isset($_POST['client_id'])) {
+    $cid = intval($_POST['client_id']);
+    if ($db->updateClientStatus($cid, 'active')) {
+        $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                Client reactivated!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error: Could not reactivate client.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    }
+}
+
+if (isset($_POST['update_price']) && isset($_POST['space_id'], $_POST['new_price'])) {
+    $sid = intval($_POST['space_id']);
+    $price = floatval($_POST['new_price']);
+    if ($db->updateUnit_price($sid, $price)) {
+        $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                Unit price updated successfully!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error: Could not update unit price.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    }
+}
+
+// REGULAR UNIT DELETION - Check if unit has renter before deleting
+if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
+    $sid = intval($_POST['space_id']);
+    
+    // Debug: Log what we're trying to delete
+    error_log("Attempting to delete unit ID: $sid");
+    
+    // Check if unit is rented using a more comprehensive check
+    $isRented = $db->isUnitRented($sid);
+    error_log("Unit $sid - isRented check result: " . ($isRented ? 'true' : 'false'));
+    
+    // Additional debug: Check active rentals directly
+    $activeRenters = $db->runQuery(
+        "SELECT Client_ID FROM clientspace WHERE Space_ID = ? AND active = 1",
+        [$sid],
+        true
+    );
+    error_log("Unit $sid - Active renters found: " . count($activeRenters));
+    
+    if ($isRented) {
+        $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Cannot delete unit: This unit currently has a renter assigned. (Active renters: ' . count($activeRenters) . ')
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        // Attempt deletion
+        $deleteResult = $db->hardDeleteUnit($sid);
+        error_log("Unit $sid - hardDeleteUnit result: " . ($deleteResult ? 'success' : 'failed'));
+        
+        if ($deleteResult) {
+            $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Unit deleted successfully! All associated records have been removed.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+        } else {
+            $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Error: Could not delete unit. Check error logs for details.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+        }
+    }
+    
+    // Refresh data after deletion attempt
+    $clients = $db->getAllClientsWithOrWithoutUnit();
+    $units = $db->getAllUnitsWithRenterInfo();
+}
+
+// FORCE DELETE UNIT - Ignores rental status and deletes everything
+if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
+    $sid = intval($_POST['space_id']);
+    
+    error_log("Force deleting unit ID: $sid");
+    
+    if ($db->hardDeleteUnit($sid)) {
+        $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-check-circle me-2"></i>
+                Unit force deleted successfully! All associated records and renter relationships have been permanently removed.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+        
+        // Refresh data after deletion
+        $clients = $db->getAllClientsWithOrWithoutUnit();
+        $units = $db->getAllUnitsWithRenterInfo();
+    } else {
+        $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Error: Could not force delete unit. Check error logs for details.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    }
+}
+
+if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
+    $cid = intval($_POST['client_id']);
+    $client_has_unit = false;
+    foreach ($clients as $cl) {
+        if ($cl['Client_ID'] == $cid && !empty($cl['SpaceName'])) {
+            $client_has_unit = true;
+            break;
+        }
+    }
+    if ($client_has_unit) {
+        $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Cannot hard delete: Client has a rented unit assigned.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    } else {
+        if ($db->hardDeleteClient($cid)) {
+            $msg = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Client and all associated records have been permanently deleted.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+        } else {
+            $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Error: Could not delete client and their records.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+        }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
-    <title>Space & Unit Management | ASRT Management</title>
+    <title>User & Unit Management | ASRT Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -452,18 +486,6 @@ $spaces = $db->getAllSpacesWithDetails();
             padding: 1.5rem;
         }
         
-        /* Form Styling */
-        .form-control, .form-select {
-            border-radius: var(--border-radius);
-            border: 1px solid #d1d5db;
-            transition: var(--transition);
-        }
-        
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
-        }
-        
         /* Table Styling */
         .table-container {
             overflow-x: auto;
@@ -474,7 +496,7 @@ $spaces = $db->getAllSpacesWithDetails();
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            min-width: 600px;
+            min-width: 800px;
         }
         
         .custom-table th {
@@ -502,127 +524,128 @@ $spaces = $db->getAllSpacesWithDetails();
             background-color: #f9fafb;
         }
         
-        /* Photo Management */
-        .photo-management {
-            background: #f9fafb;
+        /* Form Elements */
+        .form-control-sm {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.875rem;
             border-radius: var(--border-radius);
-            padding: 1rem;
-            margin-bottom: 1rem;
+            border: 1px solid #d1d5db;
+            transition: var(--transition);
         }
         
-        .photo-item {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            background: white;
-            border-radius: var(--border-radius);
-            border: 1px solid #e5e7eb;
+        .form-control-sm:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
         }
         
-        .photo-preview {
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-            margin-right: 1rem;
-        }
-        
-        .photo-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            flex-wrap: wrap;
-        }
-        
+        /* Button Styling */
         .btn-action {
-            padding: 0.5rem 1rem;
+            padding: 0.5rem;
             border-radius: var(--border-radius);
             font-weight: 500;
-            font-size: 0.8rem;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
             cursor: pointer;
         }
         
-        .btn-update {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--primary);
-            border: 1px solid rgba(99, 102, 241, 0.2);
+        .btn-action:hover {
+            transform: translateY(-2px);
         }
         
-        .btn-update:hover {
-            background: var(--primary);
+        .btn-deactivate {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .btn-deactivate:hover {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-activate {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-activate:hover {
+            background: #10b981;
             color: white;
         }
         
         .btn-delete {
             background: rgba(239, 68, 68, 0.1);
-            color: var(--danger);
+            color: #ef4444;
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
         
         .btn-delete:hover {
-            background: var(--danger);
+            background: #ef4444;
             color: white;
         }
         
-        .btn-upload {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--secondary);
-            border: 1px solid rgba(16, 185, 129, 0.2);
+        .btn-nuke {
+            background: rgba(55, 65, 81, 0.1);
+            color: #374151;
+            border: 1px solid rgba(55, 65, 81, 0.2);
         }
         
-        .btn-upload:hover {
-            background: var(--secondary);
+        .btn-nuke:hover {
+            background: #374151;
             color: white;
         }
         
-        /* File Input Styling */
-        .file-input-container {
-            position: relative;
-            display: inline-block;
-        }
-        
-        .file-input-container input[type="file"] {
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-        }
-        
-        .file-input-label {
-            display: inline-block;
-            padding: 0.5rem 1rem;
+        .btn-update {
             background: rgba(99, 102, 241, 0.1);
-            color: var(--primary);
+            color: #6366f1;
             border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-size: 0.9rem;
         }
         
-        .file-input-label:hover {
-            background: var(--primary);
+        .btn-update:hover {
+            background: #6366f1;
             color: white;
         }
         
-        .filename-display {
-            font-size: 0.8rem;
-            color: #6b7280;
-            margin-left: 0.5rem;
-            word-break: break-all;
+        .btn-force-delete {
+            background: rgba(220, 38, 127, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(220, 38, 127, 0.2);
         }
         
-        /* Price Display */
-        .price-display {
-            font-size: 0.9rem;
-            color: #6b7280;
-            margin-top: 0.25rem;
+        .btn-force-delete:hover {
+            background: #dc2626;
+            color: white;
+        }
+        
+        /* Status Badges */
+        .badge {
+            padding: 0.35rem 0.65rem;
+            font-weight: 600;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+        
+        /* Action Group */
+        .action-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Price Update Form */
+        .price-form {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .price-input {
+            width: 100px;
         }
         
         /* Empty State */
@@ -638,7 +661,7 @@ $spaces = $db->getAllSpacesWithDetails();
             opacity: 0.5;
         }
 
-        /* Mobile Card Layout for Tables */
+        /* Mobile Card Layout */
         .mobile-card {
             background: white;
             border-radius: var(--border-radius);
@@ -650,9 +673,13 @@ $spaces = $db->getAllSpacesWithDetails();
 
         .mobile-card-header {
             font-weight: 600;
-            font-size: 1.1rem;
+            font-size: 1rem;
             color: var(--dark);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         .mobile-card-detail {
@@ -660,6 +687,7 @@ $spaces = $db->getAllSpacesWithDetails();
             justify-content: space-between;
             margin-bottom: 0.5rem;
             font-size: 0.9rem;
+            flex-wrap: wrap;
         }
 
         .mobile-card-detail .label {
@@ -671,38 +699,37 @@ $spaces = $db->getAllSpacesWithDetails();
             color: var(--dark);
         }
 
-        .mobile-photo-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        .mobile-actions {
+            display: flex;
             gap: 0.5rem;
             margin-top: 1rem;
+            flex-wrap: wrap;
         }
 
-        .mobile-photo-item {
-            background: #f9fafb;
-            border-radius: 8px;
-            padding: 0.75rem;
-            text-align: center;
-            border: 1px solid #e5e7eb;
-        }
-
-        .mobile-photo-item img {
-            width: 60px;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-        }
-
-        .mobile-photo-actions {
+        .mobile-form {
             display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
-        .mobile-photo-actions .btn-action {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.7rem;
+        .mobile-form input {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .filter-container {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Hide desktop table on mobile */
+        .table-mobile {
+            display: none;
         }
         
         /* Mobile Responsive */
@@ -743,6 +770,14 @@ $spaces = $db->getAllSpacesWithDetails();
                 font-size: 1rem;
             }
 
+            .custom-table {
+                display: none;
+            }
+
+            .table-mobile {
+                display: block;
+            }
+
             .card-body {
                 padding: 1rem;
             }
@@ -752,17 +787,9 @@ $spaces = $db->getAllSpacesWithDetails();
                 font-size: 1rem;
             }
 
-            .custom-table {
-                display: none;
-            }
-
-            .table-mobile {
-                display: block;
-            }
-
             .btn-action {
-                font-size: 0.75rem;
-                padding: 0.4rem 0.8rem;
+                width: 40px;
+                height: 40px;
             }
         }
         
@@ -771,41 +798,25 @@ $spaces = $db->getAllSpacesWithDetails();
                 padding: 0.75rem;
             }
 
-            .dashboard-card {
-                margin-bottom: 1.5rem;
+            .action-group {
+                justify-content: center;
             }
 
             .form-control, .form-select {
                 font-size: 16px; /* Prevents zoom on iOS */
             }
 
-            .photo-item {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .photo-preview {
-                margin-bottom: 0.5rem;
-                margin-right: 0;
-            }
-
-            .photo-actions {
-                flex-direction: column;
-                width: 100%;
-            }
-
-            .btn-action {
+            .mobile-actions {
                 justify-content: center;
-                width: 100%;
             }
 
-            .filename-display {
-                margin-left: 0;
-                margin-top: 0.25rem;
+            .mobile-form {
+                flex-direction: column;
+                align-items: stretch;
             }
 
-            .mobile-photo-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .mobile-form input {
+                min-width: auto;
             }
         }
 
@@ -818,10 +829,6 @@ $spaces = $db->getAllSpacesWithDetails();
                 border-radius: 8px;
             }
 
-            .mobile-photo-grid {
-                grid-template-columns: 1fr;
-            }
-
             .btn {
                 font-size: 0.9rem;
                 padding: 0.75rem 1.5rem;
@@ -830,16 +837,22 @@ $spaces = $db->getAllSpacesWithDetails();
             .form-control, .form-select {
                 padding: 0.75rem;
             }
+
+            .btn-action {
+                width: 36px;
+                height: 36px;
+            }
         }
 
-        /* Hide desktop table on mobile */
-        .table-mobile {
-            display: none;
-        }
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-action, .nav-link, .mobile-menu-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
 
-        @media (max-width: 992px) {
-            .table-mobile {
-                display: block;
+            .btn-action:hover {
+                transform: none;
             }
         }
         
@@ -852,21 +865,40 @@ $spaces = $db->getAllSpacesWithDetails();
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        
+        /* Tooltip */
+        .tooltip-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip-wrapper .tooltip-text {
+            visibility: hidden;
+            width: 120px;
+            background-color: #374151;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+        }
+        
+        .tooltip-wrapper:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
 
-        /* Touch-friendly improvements */
-        @media (hover: none) and (pointer: coarse) {
-            .btn-action {
-                min-height: 44px;
-                min-width: 44px;
-            }
-
-            .nav-link {
-                min-height: 44px;
-            }
-
-            .mobile-menu-btn {
-                min-height: 44px;
-                min-width: 44px;
+        /* Hide tooltips on mobile */
+        @media (max-width: 992px) {
+            .tooltip-wrapper .tooltip-text {
+                display: none;
             }
         }
     </style>
@@ -904,7 +936,7 @@ $spaces = $db->getAllSpacesWithDetails();
             </div>
             
             <div class="nav-item">
-                <a href="manage_user.php" class="nav-link">
+                <a href="manage_user.php" class="nav-link active">
                     <i class="fas fa-users"></i>
                     <span>Manage Users & Units</span>
                 </a>
@@ -917,12 +949,12 @@ $spaces = $db->getAllSpacesWithDetails();
                 </a>
             </div>
             
-           <div class="nav-item">
-    <a href="manage_maintenance.php" class="nav-link">
-        <i class="fas fa-tools"></i>
-        <span>Maintenance</span>
-    </a>
-</div>
+            <div class="nav-item">
+                <a href="manage_maintenance.php" class="nav-link">
+                    <i class="fas fa-tools"></i>
+                    <span>Maintenance</span>
+                </a>
+            </div>
             
             <div class="nav-item">
                 <a href="generate_invoice.php" class="nav-link">
@@ -932,7 +964,7 @@ $spaces = $db->getAllSpacesWithDetails();
             </div>
             
             <div class="nav-item">
-                <a href="add_unit.php" class="nav-link active">
+                <a href="add_unit.php" class="nav-link">
                     <i class="fas fa-plus-square"></i>
                     <span>Add Unit</span>
                 </a>
@@ -967,103 +999,49 @@ $spaces = $db->getAllSpacesWithDetails();
         <div class="dashboard-header">
             <div class="page-title">
                 <div class="title-icon">
-                    <i class="fas fa-home"></i>
+                    <i class="fas fa-users-cog"></i>
                 </div>
                 <div>
-                    <h1>Space & Unit Management</h1>
-                    <p class="text-muted mb-0">Add and manage spaces, units, and space types</p>
+                    <h1>User & Unit Management</h1>
+                    <p class="text-muted mb-0">Manage clients, units, and their relationships</p>
                 </div>
             </div>
         </div>
         
-        <?= $success_unit ?>
-        <?= $error_unit ?>
-        <?= $success_type ?>
-        <?= $error_type ?>
+        <?= $msg ?>
         
-        <div class="row">
-            <!-- Add New Space/Unit -->
-            <div class="col-lg-6">
-                <div class="dashboard-card animate-fade-in">
-                    <div class="card-header">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Add New Space/Unit</span>
-                    </div>
-                    <div class="card-body">
-                        <form method="post" enctype="multipart/form-data" class="row g-3" autocomplete="off">
-                            <input type="hidden" name="form_type" value="unit" />
-                            <div class="col-12">
-                                <label for="name" class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
-                                <input id="name" type="text" class="form-control" name="name" placeholder="Unit name" required />
-                            </div>
-                            <div class="col-12">
-                                <label for="spacetype_id" class="form-label fw-semibold">Space Type <span class="text-danger">*</span></label>
-                                <select id="spacetype_id" name="spacetype_id" class="form-select" required>
-                                    <option value="" selected disabled>Select Type</option>
-                                    <?php foreach ($spacetypes as $stype): ?>
-                                        <option value="<?= $stype['SpaceType_ID'] ?>"><?= htmlspecialchars($stype['SpaceTypeName']) ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label for="price" class="form-label fw-semibold">Price (PHP) <span class="text-danger">*</span></label>
-                                <input id="price" type="number" step="100" min="0" class="form-control" name="price" placeholder="0.00" required />
-                                <div id="priceDisplay" class="price-display"></div>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label fw-semibold">Main Photo (max 2MB, JPG/PNG/GIF):</label>
-                                <div class="file-input-container">
-                                    <div class="file-input-label">
-                                        <i class="fas fa-upload me-1"></i> Choose File
-                                    </div>
-                                    <input type="file" name="photo" accept="image/*" required />
-                                </div>
-                                <div class="filename-display" id="photoFileName"></div>
-                            </div>
-                            <div class="col-12 text-center mt-4">
-                                <button type="submit" class="btn btn-primary px-5">
-                                    <i class="fas fa-plus-circle me-1"></i> Add Space/Unit
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Add New Space Type -->
-            <div class="col-lg-6">
-                <div class="dashboard-card animate-fade-in">
-                    <div class="card-header">
-                        <i class="fas fa-tag"></i>
-                        <span>Add New Space Type</span>
-                    </div>
-                    <div class="card-body">
-                        <form method="post" class="row g-3" autocomplete="off">
-                            <input type="hidden" name="form_type" value="type" />
-                            <div class="col-12">
-                                <label for="spacetype_name" class="form-label fw-semibold">Space Type Name <span class="text-danger">*</span></label>
-                                <input id="spacetype_name" type="text" class="form-control" name="spacetype_name" placeholder="e.g. Apartment, Studio, Commercial" required />
-                            </div>
-                            <div class="col-12 text-center mt-4">
-                                <button type="submit" class="btn btn-primary px-5">
-                                    <i class="fas fa-plus-circle me-1"></i> Add Space Type
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+        <!-- Filter Section -->
+        <div class="filter-container">
+            <form method="get" class="d-flex align-items-center gap-2 flex-wrap" id="clientUnitFilterForm">
+                <label for="clientUnitFilter" class="form-label mb-0">Filter:</label>
+                <select name="unit_filter" id="clientUnitFilter" class="form-select form-select-sm w-auto">
+                    <option value="all"<?= (!isset($_GET['unit_filter']) || $_GET['unit_filter']==='all') ? ' selected' : '' ?>>All Clients</option>
+                    <option value="with"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='with') ? ' selected' : '' ?>>With Unit</option>
+                    <option value="without"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='without') ? ' selected' : '' ?>>Without Unit</option>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            </form>
         </div>
-        
-        <!-- Existing Spaces/Units -->
+
+        <!-- Clients Card -->
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
-                <i class="fas fa-list"></i>
-                <span>Existing Spaces/Units</span>
-                <span class="badge bg-primary ms-2"><?= count($spaces) ?></span>
+                <i class="fas fa-users"></i>
+                <span>Clients</span>
+                <span class="badge bg-primary ms-2"><?= count($clients) ?></span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($spaces)): ?>
+                <?php
+                // Filter logic for clients with/without unit
+                $unit_filter = isset($_GET['unit_filter']) ? $_GET['unit_filter'] : 'all';
+                $filtered_clients = array_filter($clients, function($c) use ($unit_filter) {
+                    $has_unit = !empty($c['SpaceName']);
+                    if ($unit_filter === 'with') return $has_unit;
+                    if ($unit_filter === 'without') return !$has_unit;
+                    return true;
+                });
+                ?>
+                <?php if (!empty($filtered_clients)): ?>
                     <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
@@ -1071,76 +1049,80 @@ $spaces = $db->getAllSpacesWithDetails();
                                 <tr>
                                     <th>ID</th>
                                     <th>Name</th>
-                                    <th>Type</th>
-                                    <th>Price (PHP)</th>
-                                    <th>Photos</th>
+                                    <th>Email</th>
+                                    <th>Username</th>
+                                    <th>Status</th>
+                                    <th>Rented Unit</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($spaces as $space): ?>
-                                    <tr>
-                                        <td>
-                                            <span class="fw-medium">#<?= $space['Space_ID'] ?></span>
-                                        </td>
-                                        <td>
-                                            <div class="fw-medium"><?= htmlspecialchars($space['Name']) ?></div>
-                                        </td>
-                                        <td><?= htmlspecialchars($space['SpaceTypeName']) ?></td>
-                                        <td>₱<?= number_format($space['Price'], 2) ?></td>
-                                        <td>
-                                            <div class="photo-management">
-                                                <?php for ($i=1; $i<=5; $i++): $field = "Photo$i"; ?>
-                                                    <div class="photo-item d-flex align-items-center">
-                                                        <?php if (!empty($space[$field])): ?>
-                                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($space[$field]) ?>" class="photo-preview" alt="Photo<?= $i ?>">
-                                                            <div class="flex-grow-1">
-                                                                <div class="fw-medium"><?= $field ?></div>
-                                                                <div class="text-muted small"><?= htmlspecialchars($space[$field]) ?></div>
-                                                                <div class="photo-actions">
-                                                                    <form method="post" enctype="multipart/form-data" class="d-inline">
-                                                                        <div class="file-input-container">
-                                                                            <div class="file-input-label btn-action btn-update">
-                                                                                <i class="fas fa-sync-alt"></i> Update
-                                                                            </div>
-                                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $space['Space_ID'].$i ?>')">
-                                                                            <input type="hidden" name="form_type" value="update_photo">
-                                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                            <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                        </div>
-                                                                        <span class="filename-display" id="update<?= $space['Space_ID'].$i ?>"></span>
-                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
-                                                                    </form>
-                                                                    <form method="post" class="d-inline" onsubmit="return confirm('Delete this photo?');">
-                                                                        <input type="hidden" name="form_type" value="delete_photo">
-                                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                        <button type="submit" class="btn-action btn-delete">
-                                                                            <i class="fas fa-trash"></i> Delete
-                                                                        </button>
-                                                                    </form>
-                                                                </div>
-                                                            </div>
-                                                        <?php else: ?>
-                                                            <div class="text-muted me-3">No <?= $field ?></div>
-                                                            <form method="post" enctype="multipart/form-data" class="d-inline">
-                                                                <div class="file-input-container">
-                                                                    <div class="file-input-label btn-action btn-upload">
-                                                                        <i class="fas fa-upload"></i> Upload
-                                                                    </div>
-                                                                    <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'upload<?= $space['Space_ID'].$i ?>')">
-                                                                    <input type="hidden" name="form_type" value="update_photo">
-                                                                    <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                    <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                </div>
-                                                                <span class="filename-display" id="upload<?= $space['Space_ID'].$i ?>"></span>
-                                                                <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
-                                                            </form>
-                                                        <?php endif; ?>
+                                <?php foreach ($filtered_clients as $c): ?>
+                                <?php $client_has_unit = !empty($c['SpaceName']); ?>
+                                <tr>
+                                    <td>
+                                        <span class="fw-medium">#<?= htmlspecialchars($c['Client_ID']) ?></span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-medium"><?= htmlspecialchars($c['Client_fn'].' '.$c['Client_ln']) ?></div>
+                                    </td>
+                                    <td><?= htmlspecialchars($c['Client_Email']) ?></td>
+                                    <td><?= htmlspecialchars($c['C_username']) ?></td>
+                                    <td>
+                                        <?php if (strtolower($c['Status']) === 'active'): ?>
+                                            <span class="badge bg-success">Active</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?= $client_has_unit ? htmlspecialchars($c['SpaceName']) : '<span class="text-muted">None</span>' ?>
+                                    </td>
+                                    <td>
+                                        <div class="action-group">
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                                <?php if (strtolower($c['Status']) === 'active'): ?>
+                                                    <div class="tooltip-wrapper">
+                                                        <button type="submit" name="delete_client" class="btn-action btn-deactivate"
+                                                            <?= $client_has_unit ? 'disabled' : '' ?>>
+                                                            <i class="fas fa-user-slash"></i>
+                                                        </button>
+                                                        <span class="tooltip-text"><?= $client_has_unit ? 'Cannot deactivate: has rented unit' : 'Deactivate' ?></span>
                                                     </div>
-                                                <?php endfor; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                                <?php else: ?>
+                                                    <div class="tooltip-wrapper">
+                                                        <button type="submit" name="activate_client" class="btn-action btn-activate">
+                                                            <i class="fas fa-undo"></i>
+                                                        </button>
+                                                        <span class="tooltip-text">Reactivate</span>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </form>
+                                            
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                                <div class="tooltip-wrapper">
+                                                    <button type="submit" name="hard_delete_client" class="btn-action btn-delete"
+                                                        <?= $client_has_unit ? 'disabled' : '' ?>>
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                    <span class="tooltip-text"><?= $client_has_unit ? 'Cannot delete: has rented unit' : 'Delete' ?></span>
+                                                </div>
+                                            </form>
+                                            
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                                <div class="tooltip-wrapper">
+                                                    <button type="submit" name="nuke_client" class="btn-action btn-nuke">
+                                                        <i class="fas fa-bomb"></i>
+                                                    </button>
+                                                    <span class="tooltip-text">Nuke (Delete + Free Unit)</span>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -1148,71 +1130,208 @@ $spaces = $db->getAllSpacesWithDetails();
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach ($spaces as $space): ?>
+                        <?php foreach ($filtered_clients as $c): ?>
+                        <?php $client_has_unit = !empty($c['SpaceName']); ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
-                                    <?= htmlspecialchars($space['Name']) ?>
-                                    <span class="badge bg-primary ms-2">#<?= $space['Space_ID'] ?></span>
+                                    <div>
+                                        <strong><?= htmlspecialchars($c['Client_fn'].' '.$c['Client_ln']) ?></strong>
+                                        <span class="badge bg-primary ms-2">#<?= $c['Client_ID'] ?></span>
+                                    </div>
+                                    <div>
+                                        <?php if (strtolower($c['Status']) === 'active'): ?>
+                                            <span class="badge bg-success">Active</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                                 
                                 <div class="mobile-card-detail">
-                                    <span class="label">Type:</span>
-                                    <span class="value"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
+                                    <span class="label">Email:</span>
+                                    <span class="value"><?= htmlspecialchars($c['Client_Email']) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Username:</span>
+                                    <span class="value"><?= htmlspecialchars($c['C_username']) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Rented Unit:</span>
+                                    <span class="value"><?= $client_has_unit ? htmlspecialchars($c['SpaceName']) : '<span class="text-muted">None</span>' ?></span>
+                                </div>
+
+                                <div class="mobile-actions">
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                        <?php if (strtolower($c['Status']) === 'active'): ?>
+                                            <button type="submit" name="delete_client" class="btn-action btn-deactivate"
+                                                <?= $client_has_unit ? 'disabled title="Cannot deactivate: has rented unit"' : 'title="Deactivate"' ?>>
+                                                <i class="fas fa-user-slash"></i>
+                                            </button>
+                                        <?php else: ?>
+                                            <button type="submit" name="activate_client" class="btn-action btn-activate" title="Reactivate">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    </form>
+                                    
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                        <button type="submit" name="hard_delete_client" class="btn-action btn-delete"
+                                            <?= $client_has_unit ? 'disabled title="Cannot delete: has rented unit"' : 'title="Delete"' ?>>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                    
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                        <button type="submit" name="nuke_client" class="btn-action btn-nuke" title="Nuke (Delete + Free Unit)">
+                                            <i class="fas fa-bomb"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-user-slash"></i>
+                        <h4>No clients found</h4>
+                        <p>There are no clients in the system</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Units Card -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-home"></i>
+                <span>Units</span>
+                <span class="badge bg-primary ms-2"><?= count($units) ?></span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (!empty($units)): ?>
+                    <!-- Desktop Table -->
+                    <div class="table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Type ID</th>
+                                    <th>Price</th>
+                                    <th>Renter</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($units as $u): 
+                                    $has_renter = !empty($u['Client_fn']);
+                                    $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
+                                ?>
+                                <tr>
+                                    <td>
+                                        <span class="fw-medium">#<?= htmlspecialchars($u['Space_ID']) ?></span>
+                                    </td>
+                                    <td>
+                                        <form method="post" class="d-inline-flex align-items-center" style="gap:0.5rem;">
+                                            <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                            <input type="text" name="new_name" value="<?= htmlspecialchars($u['Name']) ?>" class="form-control form-control-sm" style="width:120px;" required>
+                                            <button type="submit" name="rename_unit" class="btn-action btn-update" title="Rename Unit">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td><?= htmlspecialchars($u['SpaceType_ID']) ?></td>
+                                    <td>
+                                        <form method="post" class="price-form">
+                                            <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                            <input type="number" min="0" step="0.01" name="new_price" value="<?= htmlspecialchars($u['Price']) ?>" class="form-control form-control-sm price-input" required>
+                                            <button type="submit" name="update_price" class="btn-action btn-update">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <?= $has_renter ? $renter_name : '<span class="text-muted">None</span>' ?>
+                                    </td>
+                                    <td>
+                                        <div class="action-group">
+                                            <form method="post" class="d-inline">
+                                                <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                                <div class="tooltip-wrapper">
+                                                    <button type="submit" name="force_delete_unit" class="btn-action btn-force-delete">
+                                                        <i class="fas fa-skull"></i>
+                                                    </button>
+                                                    <span class="tooltip-text">Delete</span>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Mobile Card Layout -->
+                    <div class="table-mobile">
+                        <?php foreach ($units as $u): 
+                            $has_renter = !empty($u['Client_fn']);
+                            $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
+                        ?>
+                            <div class="mobile-card">
+                                <div class="mobile-card-header">
+                                    <div>
+                                        <strong><?= htmlspecialchars($u['Name']) ?></strong>
+                                        <span class="badge bg-primary ms-2">#<?= $u['Space_ID'] ?></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Type ID:</span>
+                                    <span class="value"><?= htmlspecialchars($u['SpaceType_ID']) ?></span>
                                 </div>
                                 
                                 <div class="mobile-card-detail">
                                     <span class="label">Price:</span>
-                                    <span class="value">₱<?= number_format($space['Price'], 2) ?></span>
+                                    <span class="value">₱<?= number_format($u['Price'], 2) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Renter:</span>
+                                    <span class="value"><?= $has_renter ? $renter_name : '<span class="text-muted">None</span>' ?></span>
                                 </div>
 
-                                <div class="mobile-photo-grid">
-                                    <?php for ($i=1; $i<=5; $i++): $field = "Photo$i"; ?>
-                                        <div class="mobile-photo-item">
-                                            <div class="fw-medium mb-2" style="font-size: 0.8rem;"><?= $field ?></div>
-                                            
-                                            <?php if (!empty($space[$field])): ?>
-                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($space[$field]) ?>" alt="Photo<?= $i ?>">
-                                                <div class="mobile-photo-actions">
-                                                    <form method="post" enctype="multipart/form-data">
-                                                        <div class="file-input-container w-100">
-                                                            <div class="file-input-label btn-action btn-update w-100">
-                                                                <i class="fas fa-sync-alt"></i> Update
-                                                            </div>
-                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-update<?= $space['Space_ID'].$i ?>')">
-                                                            <input type="hidden" name="form_type" value="update_photo">
-                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                            <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                        </div>
-                                                        <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$i ?>"></div>
-                                                        <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Submit</button>
-                                                    </form>
-                                                    <form method="post" onsubmit="return confirm('Delete this photo?');">
-                                                        <input type="hidden" name="form_type" value="delete_photo">
-                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                        <button type="submit" class="btn-action btn-delete w-100">
-                                                            <i class="fas fa-trash"></i> Delete
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            <?php else: ?>
-                                                <div class="text-muted mb-2" style="font-size: 0.8rem;">No image</div>
-                                                <form method="post" enctype="multipart/form-data">
-                                                    <div class="file-input-container w-100">
-                                                        <div class="file-input-label btn-action btn-upload w-100">
-                                                            <i class="fas fa-upload"></i> Upload
-                                                        </div>
-                                                        <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-upload<?= $space['Space_ID'].$i ?>')">
-                                                        <input type="hidden" name="form_type" value="update_photo">
-                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                    </div>
-                                                    <div class="filename-display" id="mobile-upload<?= $space['Space_ID'].$i ?>"></div>
-                                                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Submit</button>
-                                                </form>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endfor; ?>
+                                <!-- Rename Form -->
+                                <form method="post" class="mobile-form">
+                                    <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                    <input type="text" name="new_name" value="<?= htmlspecialchars($u['Name']) ?>" class="form-control form-control-sm" placeholder="Unit name" required>
+                                    <button type="submit" name="rename_unit" class="btn-action btn-update" title="Rename Unit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Price Update Form -->
+                                <form method="post" class="mobile-form">
+                                    <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                    <input type="number" min="0" step="0.01" name="new_price" value="<?= htmlspecialchars($u['Price']) ?>" class="form-control form-control-sm" placeholder="Price" required>
+                                    <button type="submit" name="update_price" class="btn-action btn-update" title="Update Price">
+                                        <i class="fas fa-save"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Actions -->
+                                <div class="mobile-actions">
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                        <button type="submit" name="force_delete_unit" class="btn-action btn-force-delete" title="Delete Unit">
+                                            <i class="fas fa-skull"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -1220,62 +1339,8 @@ $spaces = $db->getAllSpacesWithDetails();
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-home"></i>
-                        <h4>No spaces/units found</h4>
-                        <p>There are no spaces or units in the system</p>
-                    </div>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Existing Space Types -->
-        <div class="dashboard-card animate-fade-in">
-            <div class="card-header">
-                <i class="fas fa-tags"></i>
-                <span>Existing Space Types</span>
-                <span class="badge bg-primary ms-2"><?= count($spacetypes) ?></span>
-            </div>
-            <div class="card-body p-0">
-                <?php if (!empty($spacetypes)): ?>
-                    <!-- Desktop Table -->
-                    <div class="table-container">
-                        <table class="custom-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Name</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($spacetypes as $type): ?>
-                                    <tr>
-                                        <td>
-                                            <span class="fw-medium">#<?= $type['SpaceType_ID'] ?></span>
-                                        </td>
-                                        <td>
-                                            <div class="fw-medium"><?= htmlspecialchars($type['SpaceTypeName']) ?></div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Mobile Card Layout -->
-                    <div class="table-mobile">
-                        <?php foreach ($spacetypes as $type): ?>
-                            <div class="mobile-card">
-                                <div class="mobile-card-header">
-                                    <?= htmlspecialchars($type['SpaceTypeName']) ?>
-                                    <span class="badge bg-primary ms-2">#<?= $type['SpaceType_ID'] ?></span>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else: ?>
-                    <div class="empty-state">
-                        <i class="fas fa-tag"></i>
-                        <h4>No space types found</h4>
-                        <p>There are no space types in the system</p>
+                        <h4>No units found</h4>
+                        <p>There are no units in the system</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -1315,63 +1380,39 @@ $spaces = $db->getAllSpacesWithDetails();
             }
         });
 
-        // Price formatting
-        document.getElementById('price').addEventListener('input', function() {
-            const val = this.value;
-            const display = document.getElementById('priceDisplay');
-            if (val !== "" && !isNaN(val)) {
-                display.textContent = "₱ " + Number(val).toLocaleString();
-            } else {
-                display.textContent = "";
-            }
-        });
-
-        // File name display for main photo
-        document.querySelector('input[name="photo"]').addEventListener('change', function() {
-            const display = document.getElementById('photoFileName');
-            if (this.files.length > 0) {
-                display.textContent = this.files[0].name;
-            } else {
-                display.textContent = '';
-            }
-        });
-
-        // File name display for photo updates
-        function showFileName(input, elementId) {
-            const display = document.getElementById(elementId);
-            if (display && input.files.length > 0) {
-                display.textContent = input.files[0].name;
-            } else if (display) {
-                display.textContent = '';
-            }
-        }
-
-        // Confirmation for delete actions
+        // Confirmations for destructive actions
         document.querySelectorAll('form').forEach(form => {
-            if (form.querySelector('input[name="form_type"][value="delete_photo"]')) {
+            if (form.querySelector('[name="nuke_client"]')) {
                 form.addEventListener('submit', function(e) {
-                    if (!confirm('Are you sure you want to delete this photo? This action cannot be undone.')) {
+                    if (!confirm('!!! NUKE !!!\nPERMANENTLY DELETE this client and ALL their records.\nAny space they rent will be set to available! THIS CANNOT BE UNDONE. Are you SURE?')) {
                         e.preventDefault();
                     }
                 });
             }
-        });
-
-        // Prevent double submission on forms
-        document.querySelectorAll('form').forEach(form => {
-            let isSubmitting = false;
-            form.addEventListener('submit', function(e) {
-                if (isSubmitting) {
-                    e.preventDefault();
-                    return false;
-                }
-                isSubmitting = true;
-                
-                // Re-enable after 3 seconds to handle errors
-                setTimeout(() => {
-                    isSubmitting = false;
-                }, 3000);
-            });
+            
+            if (form.querySelector('[name="hard_delete_client"]')) {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('PERMANENTLY DELETE this client and all their records? This cannot be undone!')) {
+                        e.preventDefault();
+                    }
+                });
+            }
+            
+            if (form.querySelector('[name="delete_unit"]')) {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('Permanently delete this unit and all its records? This cannot be undone!')) {
+                        e.preventDefault();
+                    }
+                });
+            }
+            
+            if (form.querySelector('[name="force_delete_unit"]')) {
+                form.addEventListener('submit', function(e) {
+                    if (!confirm('!!! FORCE DELETE !!!\nThis will PERMANENTLY DELETE the unit and ALL associated records, INCLUDING any renter relationships.\nThis CANNOT BE UNDONE and will likely orphan client records!\n\nAre you absolutely certain?')) {
+                        e.preventDefault();
+                    }
+                });
+            }
         });
 
         // Auto-hide alerts after 5 seconds
@@ -1387,6 +1428,23 @@ $spaces = $db->getAllSpacesWithDetails();
                     }, 300);
                 }
             }, 5000);
+        });
+
+        // Prevent double form submission
+        document.querySelectorAll('form').forEach(form => {
+            let isSubmitting = false;
+            form.addEventListener('submit', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                isSubmitting = true;
+                
+                // Re-enable after 3 seconds to handle errors
+                setTimeout(() => {
+                    isSubmitting = false;
+                }, 3000);
+            });
         });
     </script>
 </body>
