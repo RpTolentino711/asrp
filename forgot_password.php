@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="alert alert-success"> <?= htmlspecialchars($success) ?> </div>
                     <?php endif; ?>
                     <?php if ($step === 1): ?>
-                        <form method="POST">
+                        <form method="POST" id="fpEmailForm">
                             <div class="mb-3">
                                 <label class="form-label">Enter your email address</label>
                                 <input type="email" class="form-control" name="email" required autofocus>
@@ -144,23 +144,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <button type="submit" class="btn btn-primary">Send OTP</button>
                             </div>
                         </form>
-                    <?php elseif ($step === 2): ?>
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label class="form-label">Enter the OTP sent to your email</label>
-                                <input type="text" class="form-control" name="otp" maxlength="6" required autofocus>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <form method="POST">
-                                    <input type="hidden" name="email" value="<?= htmlspecialchars($fp_email) ?>">
-                                    <button type="submit" class="btn btn-link p-0">Resend OTP</button>
-                                </form>
-                            </div>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-success">Verify OTP</button>
-                            </div>
-                        </form>
                     <?php elseif ($step === 3): ?>
+<!-- OTP Modal -->
+<div class="modal fade" id="fpOtpModal" tabindex="-1" aria-labelledby="fpOtpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" id="fpOtpForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fpOtpModalLabel">Enter OTP</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Enter the OTP sent to your email</label>
+                        <input type="text" class="form-control" name="otp" maxlength="6" required autofocus>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <form method="POST" id="fpResendForm">
+                            <input type="hidden" name="email" value="<?= htmlspecialchars($fp_email) ?>">
+                            <button type="submit" class="btn btn-link p-0">Resend OTP</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Verify OTP</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if ($step === 2): ?>
+        var otpModal = new bootstrap.Modal(document.getElementById('fpOtpModal'));
+        otpModal.show();
+    <?php endif; ?>
+});
+</script>
                         <form method="POST">
                             <div class="mb-3">
                                 <label class="form-label">New Password</label>
