@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </form>
                     <?php elseif ($step === 3): ?>
-<!-- OTP Modal -->
+<!-- OTP Modal (always present) -->
 <div class="modal fade" id="fpOtpModal" tabindex="-1" aria-labelledby="fpOtpModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -160,9 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <input type="text" class="form-control" name="otp" maxlength="6" required autofocus>
                     </div>
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <form method="POST" id="fpResendForm">
+                        <button type="submit" form="fpResendForm" class="btn btn-link p-0">Resend OTP</button>
+                        <form method="POST" id="fpResendForm" style="display:none;">
                             <input type="hidden" name="email" value="<?= htmlspecialchars($fp_email) ?>">
-                            <button type="submit" class="btn btn-link p-0">Resend OTP</button>
                         </form>
                     </div>
                 </div>
@@ -176,8 +176,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     <?php if ($step === 2): ?>
-        var otpModal = new bootstrap.Modal(document.getElementById('fpOtpModal'));
-        otpModal.show();
+        setTimeout(function() {
+            var otpModal = new bootstrap.Modal(document.getElementById('fpOtpModal'));
+            otpModal.show();
+        }, 200);
     <?php endif; ?>
 });
 </script>
