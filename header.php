@@ -671,132 +671,19 @@ $is_logged_in = isset($_SESSION['client_id']);
             </a>
           </li>
           <?php endif; ?>
-          <!-- Client dropdown with name, settings, and logout -->
-          <li class="nav-item dropdown">
-            <a class="modern-nav-link text-primary fw-semibold dropdown-toggle d-flex align-items-center" href="#" id="clientDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+          <li class="nav-item">
+            <form action="logout.php" method="post" class="d-inline">
+              <button type="submit" class="modern-btn modern-btn-accent">
+                <i class="bi bi-box-arrow-right me-2"></i>Logout
+              </button>
+            </form>
+          </li>
+          <!-- Display client name after logout -->
+          <li class="nav-item">
+            <span class="modern-nav-link text-primary fw-semibold">
               <i class="bi bi-person-circle me-2"></i>
-              <?= htmlspecialchars($client_name ?: 'User') ?>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="clientDropdown">
-              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2"></i>Settings</a></li>
-<!-- Settings Modal -->
-<div class="modal fade modern-modal" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
-  <form id="settingsForm" autocomplete="off">
-        <div class="modal-header">
-          <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-gear me-2 text-primary"></i>Account Settings</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label">First Name</label>
-              <input type="text" class="form-control" name="fname" value="<?= htmlspecialchars($client_info['Client_fn'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Last Name</label>
-              <input type="text" class="form-control" name="lname" value="<?= htmlspecialchars($client_info['Client_ln'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Email</label>
-              <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($client_info['Client_Email'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Phone Number</label>
-              <input type="text" class="form-control" name="phone" value="<?= htmlspecialchars($client_info['Client_Contact'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Username</label>
-              <input type="text" class="form-control" name="username" value="<?= htmlspecialchars($client_info['C_username'] ?? '') ?>" required>
-            </div>
-          </div>
-          <hr>
-          <h6 class="mb-3"><i class="bi bi-key me-2 text-primary"></i>Change Password</h6>
-          <div class="row">
-            <div class="col-md-4 mb-3">
-              <label class="form-label">Current Password</label>
-              <input type="password" class="form-control" name="current_password" autocomplete="current-password">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label">New Password</label>
-              <input type="password" class="form-control" name="new_password" autocomplete="new-password">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label">Confirm New Password</label>
-              <input type="password" class="form-control" name="confirm_new_password" autocomplete="new-password">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="modern-btn modern-btn-success" id="settingsSaveBtn">Save Changes</button>
-        </div>
-<script>
-// Settings form AJAX submit
-document.addEventListener('DOMContentLoaded', function() {
-  const settingsForm = document.getElementById('settingsForm');
-  if (settingsForm) {
-    settingsForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const formData = new FormData(settingsForm);
-      const saveBtn = document.getElementById('settingsSaveBtn');
-      saveBtn.disabled = true;
-      fetch('update_profile.php', {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        saveBtn.disabled = false;
-        if (data.success) {
-          // Update client name in header if changed
-          const fname = settingsForm.elements['fname'].value.trim();
-          const lname = settingsForm.elements['lname'].value.trim();
-          const username = settingsForm.elements['username'].value.trim();
-          let displayName = (fname + ' ' + lname).trim();
-          if (!displayName) displayName = username;
-          // Find and update the client name in the navbar
-          const navName = document.querySelector('#clientDropdown .fw-semibold');
-          if (navName) navName.childNodes[1].nodeValue = ' ' + displayName;
-          // Also update dropdown label if needed
-          const dropdownToggle = document.getElementById('clientDropdown');
-          if (dropdownToggle) {
-            let icon = dropdownToggle.querySelector('i');
-            dropdownToggle.innerHTML = '';
-            if (icon) dropdownToggle.appendChild(icon);
-            dropdownToggle.appendChild(document.createTextNode(' ' + displayName));
-          }
-          // Show success message
-          Swal.fire({icon:'success',title:'Success',text:data.message});
-          // Close modal after short delay
-          setTimeout(()=>{
-            const modal = bootstrap.Modal.getInstance(document.getElementById('settingsModal'));
-            if (modal) modal.hide();
-          }, 1200);
-        } else {
-          Swal.fire({icon:'error',title:'Error',text:data.message});
-        }
-      })
-      .catch(() => {
-        saveBtn.disabled = false;
-        Swal.fire({icon:'error',title:'Error',text:'Failed to update profile.'});
-      });
-    });
-  }
-});
-</script>
-      </form>
-    </div>
-  </div>
-</div>
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <form action="logout.php" method="post" class="d-inline">
-                  <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
-                </form>
-              </li>
-            </ul>
+             <?= htmlspecialchars($client_name ?: 'User') ?>
+            </span>
           </li>
         <?php else: ?>
           <li class="nav-item ms-2">
@@ -1478,3 +1365,4 @@ function checkRegisterForm() {
   return true;
 }
 </script>
+
