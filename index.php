@@ -799,7 +799,7 @@ if (isset($_SESSION['login_error'])) {
                                         <div class="col-md-6">
                                             <div class="alert alert-warning">
                                                 <strong>Direct Contact:</strong><br>
-                                                   If you would like to contact the admin directly regarding this unit, please use the following details.
+                                                   If you would like to contact the admin directly regarding this unit, please use the contact information provided.
                                             </div>
                                         </div>
                                     </div>
