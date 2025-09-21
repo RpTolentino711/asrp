@@ -671,19 +671,21 @@ $is_logged_in = isset($_SESSION['client_id']);
             </a>
           </li>
           <?php endif; ?>
-          <li class="nav-item">
-            <form action="logout.php" method="post" class="d-inline">
-              <button type="submit" class="modern-btn modern-btn-accent">
-                <i class="bi bi-box-arrow-right me-2"></i>Logout
-              </button>
-            </form>
-          </li>
-          <!-- Display client name after logout -->
-          <li class="nav-item">
-            <span class="modern-nav-link text-primary fw-semibold">
+          <!-- Client dropdown with name, settings, and logout -->
+          <li class="nav-item dropdown">
+            <a class="modern-nav-link text-primary fw-semibold dropdown-toggle d-flex align-items-center" href="#" id="clientDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="bi bi-person-circle me-2"></i>
-             <?= htmlspecialchars($client_name ?: 'User') ?>
-            </span>
+              <?= htmlspecialchars($client_name ?: 'User') ?>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="clientDropdown">
+              <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Settings</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <form action="logout.php" method="post" class="d-inline">
+                  <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
+                </form>
+              </li>
+            </ul>
           </li>
         <?php else: ?>
           <li class="nav-item ms-2">
