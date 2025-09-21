@@ -735,6 +735,9 @@ $is_logged_in = isset($_SESSION['client_id']);
                 <i class="bi bi-eye"></i>
               </button>
             </div>
+            <div class="text-end mt-1">
+              <a href="forgot_password.php" class="link-secondary small">Forgot Password?</a>
+            </div>
           </div>
           <div class="d-grid">
             <button type="submit" class="modern-btn modern-btn-primary">
