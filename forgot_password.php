@@ -145,29 +145,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </form>
                     <?php elseif ($step === 3): ?>
-<!-- OTP Modal (always present) -->
-<div class="modal fade" id="fpOtpModal" tabindex="-1" aria-labelledby="fpOtpModalLabel" aria-hidden="true">
+<!-- OTP Modal (copied from header.php registration modal, adapted for forgot password) -->
+<div class="modal fade modern-modal" id="fpOtpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <form method="POST" id="fpOtpForm">
+            <form id="fpOtpForm" method="POST" autocomplete="off">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="fpOtpModalLabel">Enter OTP</h5>
+                    <h5 class="modal-title"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Verify Email (OTP)</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Enter the OTP sent to your email</label>
-                        <input type="text" class="form-control" name="otp" maxlength="6" required autofocus>
+                        <label for="fpOtpInput" class="form-label">Enter the 6-digit code sent to your email</label>
+                        <input type="text" class="form-control text-center" id="fpOtpInput" name="otp" maxlength="6" pattern="\d{6}" required autofocus autocomplete="one-time-code">
+                        <div class="form-text text-danger" id="fpOtpErrorMsg"></div>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <button type="submit" form="fpResendForm" class="btn btn-link p-0">Resend OTP</button>
-                        <form method="POST" id="fpResendForm" style="display:none;">
-                            <input type="hidden" name="email" value="<?= htmlspecialchars($fp_email) ?>">
-                        </form>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <button type="button" class="btn btn-link p-0" id="fpResendOtpBtn">Resend OTP</button>
+                        <span id="fpOtpTimer" class="text-muted small"></span>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-success">Verify OTP</button>
+                    <div class="d-grid">
+                        <button type="submit" class="modern-btn modern-btn-primary">Verify & Continue</button>
+                    </div>
                 </div>
             </form>
         </div>
