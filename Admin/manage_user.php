@@ -250,7 +250,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
     <title>User & Unit Management | ASRT Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
@@ -282,6 +282,60 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             background: linear-gradient(to right, #f8fafc, #f1f5f9);
             color: #374151;
             min-height: 100vh;
+            position: relative;
+        }
+
+        /* Mobile Menu Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
         }
         
         /* Sidebar Styling */
@@ -333,6 +387,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
+            font-size: 0.95rem;
         }
         
         .nav-link:hover, .nav-link.active {
@@ -386,6 +441,10 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             color: var(--dark);
             margin-bottom: 0;
         }
+
+        .page-title p {
+            font-size: 0.9rem;
+        }
         
         .title-icon {
             width: 50px;
@@ -437,6 +496,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
+            min-width: 800px;
         }
         
         .custom-table th {
@@ -446,12 +506,14 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             text-align: left;
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
         }
         
         .custom-table td {
             padding: 1rem;
             border-bottom: 1px solid #f3f4f6;
             vertical-align: middle;
+            font-size: 0.9rem;
         }
         
         .custom-table tr:last-child td {
@@ -487,6 +549,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             justify-content: center;
             width: 36px;
             height: 36px;
+            cursor: pointer;
         }
         
         .btn-action:hover {
@@ -571,6 +634,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
         .action-group {
             display: flex;
             gap: 0.5rem;
+            flex-wrap: wrap;
         }
         
         /* Price Update Form */
@@ -596,8 +660,79 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             margin-bottom: 1rem;
             opacity: 0.5;
         }
+
+        /* Mobile Card Layout */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-card-header {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .mobile-card-detail .label {
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        .mobile-card-detail .value {
+            color: var(--dark);
+        }
+
+        .mobile-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .mobile-form {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .mobile-form input {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .filter-container {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Hide desktop table on mobile */
+        .table-mobile {
+            display: none;
+        }
         
-        /* Responsive */
+        /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -607,35 +742,117 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             .sidebar.active {
                 transform: translateX(0);
             }
+
+            .mobile-header {
+                display: flex;
+            }
             
             .main-content {
                 margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .page-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .title-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .custom-table {
+                display: none;
+            }
+
+            .table-mobile {
+                display: block;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .btn-action {
+                width: 40px;
+                height: 40px;
             }
         }
         
         @media (max-width: 768px) {
             .main-content {
-                padding: 1rem;
+                padding: 0.75rem;
             }
-            
-            .dashboard-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-            }
-            
-            .custom-table {
-                font-size: 0.875rem;
-            }
-            
+
             .action-group {
-                flex-direction: column;
-                gap: 0.25rem;
+                justify-content: center;
             }
-            
+
+            .form-control, .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            .mobile-actions {
+                justify-content: center;
+            }
+
+            .mobile-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .mobile-form input {
+                min-width: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .dashboard-card {
+                border-radius: 8px;
+            }
+
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+            }
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+
             .btn-action {
-                width: 32px;
-                height: 32px;
+                width: 36px;
+                height: 36px;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-action, .nav-link, .mobile-menu-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            .btn-action:hover {
+                transform: none;
             }
         }
         
@@ -677,11 +894,32 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             visibility: visible;
             opacity: 1;
         }
+
+        /* Hide tooltips on mobile */
+        @media (max-width: 992px) {
+            .tooltip-wrapper .tooltip-text {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-brand">
+            ASRT Admin
+        </div>
+        <div></div>
+    </div>
+
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
                 <i class="fas fa-crown"></i>
@@ -772,16 +1010,20 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
         
         <?= $msg ?>
         
+        <!-- Filter Section -->
+        <div class="filter-container">
+            <form method="get" class="d-flex align-items-center gap-2 flex-wrap" id="clientUnitFilterForm">
+                <label for="clientUnitFilter" class="form-label mb-0">Filter:</label>
+                <select name="unit_filter" id="clientUnitFilter" class="form-select form-select-sm w-auto">
+                    <option value="all"<?= (!isset($_GET['unit_filter']) || $_GET['unit_filter']==='all') ? ' selected' : '' ?>>All Clients</option>
+                    <option value="with"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='with') ? ' selected' : '' ?>>With Unit</option>
+                    <option value="without"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='without') ? ' selected' : '' ?>>Without Unit</option>
+                </select>
+                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+            </form>
+        </div>
+
         <!-- Clients Card -->
-        <form method="get" class="mb-3 d-flex align-items-center gap-2" id="clientUnitFilterForm">
-            <label for="clientUnitFilter" class="form-label mb-0">Filter:</label>
-            <select name="unit_filter" id="clientUnitFilter" class="form-select form-select-sm w-auto">
-                <option value="all"<?= (!isset($_GET['unit_filter']) || $_GET['unit_filter']==='all') ? ' selected' : '' ?>>All Clients</option>
-                <option value="with"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='with') ? ' selected' : '' ?>>With Unit</option>
-                <option value="without"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='without') ? ' selected' : '' ?>>Without Unit</option>
-            </select>
-            <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
-        </form>
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-users"></i>
@@ -800,6 +1042,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                 });
                 ?>
                 <?php if (!empty($filtered_clients)): ?>
+                    <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
                             <thead>
@@ -884,6 +1127,74 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Mobile Card Layout -->
+                    <div class="table-mobile">
+                        <?php foreach ($filtered_clients as $c): ?>
+                        <?php $client_has_unit = !empty($c['SpaceName']); ?>
+                            <div class="mobile-card">
+                                <div class="mobile-card-header">
+                                    <div>
+                                        <strong><?= htmlspecialchars($c['Client_fn'].' '.$c['Client_ln']) ?></strong>
+                                        <span class="badge bg-primary ms-2">#<?= $c['Client_ID'] ?></span>
+                                    </div>
+                                    <div>
+                                        <?php if (strtolower($c['Status']) === 'active'): ?>
+                                            <span class="badge bg-success">Active</span>
+                                        <?php else: ?>
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Email:</span>
+                                    <span class="value"><?= htmlspecialchars($c['Client_Email']) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Username:</span>
+                                    <span class="value"><?= htmlspecialchars($c['C_username']) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Rented Unit:</span>
+                                    <span class="value"><?= $client_has_unit ? htmlspecialchars($c['SpaceName']) : '<span class="text-muted">None</span>' ?></span>
+                                </div>
+
+                                <div class="mobile-actions">
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                        <?php if (strtolower($c['Status']) === 'active'): ?>
+                                            <button type="submit" name="delete_client" class="btn-action btn-deactivate"
+                                                <?= $client_has_unit ? 'disabled title="Cannot deactivate: has rented unit"' : 'title="Deactivate"' ?>>
+                                                <i class="fas fa-user-slash"></i>
+                                            </button>
+                                        <?php else: ?>
+                                            <button type="submit" name="activate_client" class="btn-action btn-activate" title="Reactivate">
+                                                <i class="fas fa-undo"></i>
+                                            </button>
+                                        <?php endif; ?>
+                                    </form>
+                                    
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                        <button type="submit" name="hard_delete_client" class="btn-action btn-delete"
+                                            <?= $client_has_unit ? 'disabled title="Cannot delete: has rented unit"' : 'title="Delete"' ?>>
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                    
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="client_id" value="<?= $c['Client_ID'] ?>">
+                                        <button type="submit" name="nuke_client" class="btn-action btn-nuke" title="Nuke (Delete + Free Unit)">
+                                            <i class="fas fa-bomb"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-user-slash"></i>
@@ -903,6 +1214,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             </div>
             <div class="card-body p-0">
                 <?php if (!empty($units)): ?>
+                    <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
                             <thead>
@@ -948,7 +1260,6 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                     </td>
                                     <td>
                                         <div class="action-group">
-                                            
                                             <form method="post" class="d-inline">
                                                 <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
                                                 <div class="tooltip-wrapper">
@@ -965,6 +1276,66 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Mobile Card Layout -->
+                    <div class="table-mobile">
+                        <?php foreach ($units as $u): 
+                            $has_renter = !empty($u['Client_fn']);
+                            $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
+                        ?>
+                            <div class="mobile-card">
+                                <div class="mobile-card-header">
+                                    <div>
+                                        <strong><?= htmlspecialchars($u['Name']) ?></strong>
+                                        <span class="badge bg-primary ms-2">#<?= $u['Space_ID'] ?></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Type ID:</span>
+                                    <span class="value"><?= htmlspecialchars($u['SpaceType_ID']) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Price:</span>
+                                    <span class="value">₱<?= number_format($u['Price'], 2) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Renter:</span>
+                                    <span class="value"><?= $has_renter ? $renter_name : '<span class="text-muted">None</span>' ?></span>
+                                </div>
+
+                                <!-- Rename Form -->
+                                <form method="post" class="mobile-form">
+                                    <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                    <input type="text" name="new_name" value="<?= htmlspecialchars($u['Name']) ?>" class="form-control form-control-sm" placeholder="Unit name" required>
+                                    <button type="submit" name="rename_unit" class="btn-action btn-update" title="Rename Unit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Price Update Form -->
+                                <form method="post" class="mobile-form">
+                                    <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                    <input type="number" min="0" step="0.01" name="new_price" value="<?= htmlspecialchars($u['Price']) ?>" class="form-control form-control-sm" placeholder="Price" required>
+                                    <button type="submit" name="update_price" class="btn-action btn-update" title="Update Price">
+                                        <i class="fas fa-save"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Actions -->
+                                <div class="mobile-actions">
+                                    <form method="post" class="d-inline">
+                                        <input type="hidden" name="space_id" value="<?= $u['Space_ID'] ?>">
+                                        <button type="submit" name="force_delete_unit" class="btn-action btn-force-delete" title="Delete Unit">
+                                            <i class="fas fa-skull"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-home"></i>
@@ -978,6 +1349,37 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Mobile menu functionality
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+
+        function toggleMobileMenu() {
+            sidebar.classList.toggle('active');
+            mobileOverlay.classList.toggle('active');
+        }
+
+        mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+        mobileOverlay.addEventListener('click', toggleMobileMenu);
+
+        // Close mobile menu when clicking on nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('active');
+                    mobileOverlay.classList.remove('active');
+                }
+            });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('active');
+                mobileOverlay.classList.remove('active');
+            }
+        });
+
         // Confirmations for destructive actions
         document.querySelectorAll('form').forEach(form => {
             if (form.querySelector('[name="nuke_client"]')) {
@@ -1012,7 +1414,38 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                 });
             }
         });
+
+        // Auto-hide alerts after 5 seconds
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        });
+
+        // Prevent double form submission
+        document.querySelectorAll('form').forEach(form => {
+            let isSubmitting = false;
+            form.addEventListener('submit', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                isSubmitting = true;
+                
+                // Re-enable after 3 seconds to handle errors
+                setTimeout(() => {
+                    isSubmitting = false;
+                }, 3000);
+            });
+        });
     </script>
 </body>
 </html>
-
