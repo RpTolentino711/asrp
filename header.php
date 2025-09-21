@@ -678,24 +678,8 @@ $is_logged_in = isset($_SESSION['client_id']);
               <?= htmlspecialchars($client_name ?: 'User') ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="clientDropdown">
-              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal"><i class="bi bi-gear me-2"></i>Settings</a></li>
-<!-- Settings Modal -->
-<div class="modal fade modern-modal" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-gear me-2 text-primary"></i>Account Settings</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body text-center">
-        <p class="text-muted">Settings functionality coming soon.</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-      </form>
-    </div>
-  </div>
+              <li><a class="dropdown-item" href="settings.php"><i class="bi bi-gear me-2"></i>Settings</a></li>
+
 </div>
               <li><hr class="dropdown-divider"></li>
               <li>
