@@ -798,8 +798,8 @@ if (isset($_SESSION['login_error'])) {
                                         </div>
                                         <div class="col-md-6">
                                             <div class="alert alert-warning">
-                                                <strong>Invoice Required:</strong><br>
-                                                Please request your invoice from the admin for the rental process.
+                                                <strong>Direct Contact:</strong><br>
+                                                   If you would like to contact the admin directly regarding this unit, please use the following details.
                                             </div>
                                         </div>
                                     </div>
