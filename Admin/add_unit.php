@@ -216,7 +216,7 @@ $spaces = $db->getAllSpacesWithDetails();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
     <title>Space & Unit Management | ASRT Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
@@ -248,6 +248,60 @@ $spaces = $db->getAllSpacesWithDetails();
             background: linear-gradient(to right, #f8fafc, #f1f5f9);
             color: #374151;
             min-height: 100vh;
+            position: relative;
+        }
+
+        /* Mobile Menu Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
         }
         
         /* Sidebar Styling */
@@ -299,6 +353,7 @@ $spaces = $db->getAllSpacesWithDetails();
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
+            font-size: 0.95rem;
         }
         
         .nav-link:hover, .nav-link.active {
@@ -351,6 +406,10 @@ $spaces = $db->getAllSpacesWithDetails();
             font-size: 1.8rem;
             color: var(--dark);
             margin-bottom: 0;
+        }
+
+        .page-title p {
+            font-size: 0.9rem;
         }
         
         .title-icon {
@@ -415,6 +474,7 @@ $spaces = $db->getAllSpacesWithDetails();
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
+            min-width: 600px;
         }
         
         .custom-table th {
@@ -424,12 +484,14 @@ $spaces = $db->getAllSpacesWithDetails();
             text-align: left;
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
         }
         
         .custom-table td {
             padding: 1rem;
             border-bottom: 1px solid #f3f4f6;
             vertical-align: middle;
+            font-size: 0.9rem;
         }
         
         .custom-table tr:last-child td {
@@ -468,17 +530,19 @@ $spaces = $db->getAllSpacesWithDetails();
             display: flex;
             gap: 0.5rem;
             margin-top: 0.5rem;
+            flex-wrap: wrap;
         }
         
         .btn-action {
             padding: 0.5rem 1rem;
             border-radius: var(--border-radius);
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             transition: var(--transition);
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            cursor: pointer;
         }
         
         .btn-update {
@@ -539,6 +603,7 @@ $spaces = $db->getAllSpacesWithDetails();
             border-radius: var(--border-radius);
             cursor: pointer;
             transition: var(--transition);
+            font-size: 0.9rem;
         }
         
         .file-input-label:hover {
@@ -547,9 +612,10 @@ $spaces = $db->getAllSpacesWithDetails();
         }
         
         .filename-display {
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             color: #6b7280;
             margin-left: 0.5rem;
+            word-break: break-all;
         }
         
         /* Price Display */
@@ -571,8 +637,75 @@ $spaces = $db->getAllSpacesWithDetails();
             margin-bottom: 1rem;
             opacity: 0.5;
         }
+
+        /* Mobile Card Layout for Tables */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-card-header {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .mobile-card-detail .label {
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        .mobile-card-detail .value {
+            color: var(--dark);
+        }
+
+        .mobile-photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .mobile-photo-item {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 0.75rem;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+        }
+
+        .mobile-photo-item img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .mobile-photo-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .mobile-photo-actions .btn-action {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+        }
         
-        /* Responsive */
+        /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -582,34 +715,131 @@ $spaces = $db->getAllSpacesWithDetails();
             .sidebar.active {
                 transform: translateX(0);
             }
+
+            .mobile-header {
+                display: flex;
+            }
             
             .main-content {
                 margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .page-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .title-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .custom-table {
+                display: none;
+            }
+
+            .table-mobile {
+                display: block;
+            }
+
+            .btn-action {
+                font-size: 0.75rem;
+                padding: 0.4rem 0.8rem;
             }
         }
         
         @media (max-width: 768px) {
             .main-content {
-                padding: 1rem;
+                padding: 0.75rem;
             }
-            
-            .dashboard-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
+
+            .dashboard-card {
+                margin-bottom: 1.5rem;
             }
-            
-            .custom-table {
-                font-size: 0.875rem;
+
+            .form-control, .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
             }
-            
+
             .photo-item {
                 flex-direction: column;
                 align-items: flex-start;
             }
-            
+
             .photo-preview {
                 margin-bottom: 0.5rem;
+                margin-right: 0;
+            }
+
+            .photo-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn-action {
+                justify-content: center;
+                width: 100%;
+            }
+
+            .filename-display {
+                margin-left: 0;
+                margin-top: 0.25rem;
+            }
+
+            .mobile-photo-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .dashboard-card {
+                border-radius: 8px;
+            }
+
+            .mobile-photo-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+            }
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Hide desktop table on mobile */
+        .table-mobile {
+            display: none;
+        }
+
+        @media (max-width: 992px) {
+            .table-mobile {
+                display: block;
             }
         }
         
@@ -622,11 +852,42 @@ $spaces = $db->getAllSpacesWithDetails();
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-action {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            .nav-link {
+                min-height: 44px;
+            }
+
+            .mobile-menu-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-brand">
+            ASRT Admin
+        </div>
+        <div></div>
+    </div>
+
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
                 <i class="fas fa-crown"></i>
@@ -713,8 +974,6 @@ $spaces = $db->getAllSpacesWithDetails();
                     <p class="text-muted mb-0">Add and manage spaces, units, and space types</p>
                 </div>
             </div>
-            
-            
         </div>
         
         <?= $success_unit ?>
@@ -759,7 +1018,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                     </div>
                                     <input type="file" name="photo" accept="image/*" required />
                                 </div>
-                                <span class="filename-display" id="photoFileName"></span>
+                                <div class="filename-display" id="photoFileName"></div>
                             </div>
                             <div class="col-12 text-center mt-4">
                                 <button type="submit" class="btn btn-primary px-5">
@@ -805,6 +1064,7 @@ $spaces = $db->getAllSpacesWithDetails();
             </div>
             <div class="card-body p-0">
                 <?php if (!empty($spaces)): ?>
+                    <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
                             <thead>
@@ -885,6 +1145,78 @@ $spaces = $db->getAllSpacesWithDetails();
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Mobile Card Layout -->
+                    <div class="table-mobile">
+                        <?php foreach ($spaces as $space): ?>
+                            <div class="mobile-card">
+                                <div class="mobile-card-header">
+                                    <?= htmlspecialchars($space['Name']) ?>
+                                    <span class="badge bg-primary ms-2">#<?= $space['Space_ID'] ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Type:</span>
+                                    <span class="value"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Price:</span>
+                                    <span class="value">₱<?= number_format($space['Price'], 2) ?></span>
+                                </div>
+
+                                <div class="mobile-photo-grid">
+                                    <?php for ($i=1; $i<=5; $i++): $field = "Photo$i"; ?>
+                                        <div class="mobile-photo-item">
+                                            <div class="fw-medium mb-2" style="font-size: 0.8rem;"><?= $field ?></div>
+                                            
+                                            <?php if (!empty($space[$field])): ?>
+                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($space[$field]) ?>" alt="Photo<?= $i ?>">
+                                                <div class="mobile-photo-actions">
+                                                    <form method="post" enctype="multipart/form-data">
+                                                        <div class="file-input-container w-100">
+                                                            <div class="file-input-label btn-action btn-update w-100">
+                                                                <i class="fas fa-sync-alt"></i> Update
+                                                            </div>
+                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-update<?= $space['Space_ID'].$i ?>')">
+                                                            <input type="hidden" name="form_type" value="update_photo">
+                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                            <input type="hidden" name="photo_field" value="<?= $field ?>">
+                                                        </div>
+                                                        <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$i ?>"></div>
+                                                        <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Submit</button>
+                                                    </form>
+                                                    <form method="post" onsubmit="return confirm('Delete this photo?');">
+                                                        <input type="hidden" name="form_type" value="delete_photo">
+                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
+                                                        <button type="submit" class="btn-action btn-delete w-100">
+                                                            <i class="fas fa-trash"></i> Delete
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="text-muted mb-2" style="font-size: 0.8rem;">No image</div>
+                                                <form method="post" enctype="multipart/form-data">
+                                                    <div class="file-input-container w-100">
+                                                        <div class="file-input-label btn-action btn-upload w-100">
+                                                            <i class="fas fa-upload"></i> Upload
+                                                        </div>
+                                                        <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-upload<?= $space['Space_ID'].$i ?>')">
+                                                        <input type="hidden" name="form_type" value="update_photo">
+                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
+                                                    </div>
+                                                    <div class="filename-display" id="mobile-upload<?= $space['Space_ID'].$i ?>"></div>
+                                                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Submit</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endfor; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-home"></i>
@@ -904,6 +1236,7 @@ $spaces = $db->getAllSpacesWithDetails();
             </div>
             <div class="card-body p-0">
                 <?php if (!empty($spacetypes)): ?>
+                    <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
                             <thead>
@@ -926,6 +1259,18 @@ $spaces = $db->getAllSpacesWithDetails();
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Mobile Card Layout -->
+                    <div class="table-mobile">
+                        <?php foreach ($spacetypes as $type): ?>
+                            <div class="mobile-card">
+                                <div class="mobile-card-header">
+                                    <?= htmlspecialchars($type['SpaceTypeName']) ?>
+                                    <span class="badge bg-primary ms-2">#<?= $type['SpaceType_ID'] ?></span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-tag"></i>
@@ -939,6 +1284,37 @@ $spaces = $db->getAllSpacesWithDetails();
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Mobile menu functionality
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+
+        function toggleMobileMenu() {
+            sidebar.classList.toggle('active');
+            mobileOverlay.classList.toggle('active');
+        }
+
+        mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+        mobileOverlay.addEventListener('click', toggleMobileMenu);
+
+        // Close mobile menu when clicking on nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('active');
+                    mobileOverlay.classList.remove('active');
+                }
+            });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('active');
+                mobileOverlay.classList.remove('active');
+            }
+        });
+
         // Price formatting
         document.getElementById('price').addEventListener('input', function() {
             const val = this.value;
@@ -963,14 +1339,12 @@ $spaces = $db->getAllSpacesWithDetails();
         // File name display for photo updates
         function showFileName(input, elementId) {
             const display = document.getElementById(elementId);
-            if (input.files.length > 0) {
+            if (display && input.files.length > 0) {
                 display.textContent = input.files[0].name;
-            } else {
+            } else if (display) {
                 display.textContent = '';
             }
         }
-
-    // Removed auto-submit on file input change. Now, form submits only when the submit button is clicked.
 
         // Confirmation for delete actions
         document.querySelectorAll('form').forEach(form => {
@@ -981,6 +1355,38 @@ $spaces = $db->getAllSpacesWithDetails();
                     }
                 });
             }
+        });
+
+        // Prevent double submission on forms
+        document.querySelectorAll('form').forEach(form => {
+            let isSubmitting = false;
+            form.addEventListener('submit', function(e) {
+                if (isSubmitting) {
+                    e.preventDefault();
+                    return false;
+                }
+                isSubmitting = true;
+                
+                // Re-enable after 3 seconds to handle errors
+                setTimeout(() => {
+                    isSubmitting = false;
+                }, 3000);
+            });
+        });
+
+        // Auto-hide alerts after 5 seconds
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }
+            }, 5000);
         });
     </script>
 </body>
