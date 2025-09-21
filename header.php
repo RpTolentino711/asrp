@@ -683,56 +683,16 @@ $is_logged_in = isset($_SESSION['client_id']);
 <div class="modal fade modern-modal" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
-  <form id="settingsForm" method="POST" action="update_profile.php">
-        <div class="modal-header">
-          <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-gear me-2 text-primary"></i>Account Settings</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label">First Name</label>
-              <input type="text" class="form-control" name="fname" value="<?= htmlspecialchars($client_info['Client_fn'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Last Name</label>
-              <input type="text" class="form-control" name="lname" value="<?= htmlspecialchars($client_info['Client_ln'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Email</label>
-              <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($client_info['Client_Email'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Phone Number</label>
-              <input type="text" class="form-control" name="phone" value="<?= htmlspecialchars($client_info['Client_Contact'] ?? '') ?>" required>
-            </div>
-            <div class="col-md-6 mb-3">
-              <label class="form-label">Username</label>
-              <input type="text" class="form-control" name="username" value="<?= htmlspecialchars($client_info['C_username'] ?? '') ?>" required>
-            </div>
-          </div>
-          <hr>
-          <h6 class="mb-3"><i class="bi bi-key me-2 text-primary"></i>Change Password</h6>
-          <div class="row">
-            <div class="col-md-4 mb-3">
-              <label class="form-label">Current Password</label>
-              <input type="password" class="form-control" name="current_password" autocomplete="current-password">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label">New Password</label>
-              <input type="password" class="form-control" name="new_password" autocomplete="new-password">
-            </div>
-            <div class="col-md-4 mb-3">
-              <label class="form-label">Confirm New Password</label>
-              <input type="password" class="form-control" name="confirm_new_password" autocomplete="new-password">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-          <button type="submit" class="modern-btn modern-btn-success">Save Changes</button>
-        </div>
-
+      <div class="modal-header">
+        <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-gear me-2 text-primary"></i>Account Settings</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="text-muted">Settings functionality coming soon.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
       </form>
     </div>
   </div>
