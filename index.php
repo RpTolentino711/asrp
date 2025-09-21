@@ -788,7 +788,7 @@ if (isset($_SESSION['login_error'])) {
                                 <div class="modal-body">
                                     <div class="alert alert-info">
                                         <i class="bi bi-info-circle me-2"></i>
-                                        To rent this unit and receive an invoice, please contact our admin team for rental approval.
+                                          To rent this unit and join our community, please submit your rental request. The admin will review your application and contact you to guide you through the next steps.
                                     </div>
                                     <div class="row">
                                         <div class="col-md-6">
