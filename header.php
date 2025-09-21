@@ -678,10 +678,6 @@ $is_logged_in = isset($_SESSION['client_id']);
               <?= htmlspecialchars($client_name ?: 'User') ?>
             </a>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="clientDropdown">
-              <li><a class="dropdown-item" href="settings.php"><i class="bi bi-gear me-2"></i>Settings</a></li>
-
-</div>
-              <li><hr class="dropdown-divider"></li>
               <li>
                 <form action="logout.php" method="post" class="d-inline">
                   <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
