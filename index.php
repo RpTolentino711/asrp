@@ -882,7 +882,7 @@ if (isset($_SESSION['login_error'])) {
             <?php endif; ?>
             <div class="card-body">
               <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
-              <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p>
+              <!-- <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p> -->
               <p class="card-text text-muted">Currently occupied commercial space.</p>
               <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
@@ -951,7 +951,7 @@ if (isset($_SESSION['login_error'])) {
                   <i class="fa-solid fa-house-user"></i>
                 </div>
                 <ul class="list-group list-group-flush">
-                  <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li>
+                  <!-- <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li> -->
                   <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
                   <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
                   <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>
