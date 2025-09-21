@@ -1369,3 +1369,4 @@ function checkRegisterForm() {
   return true;
 }
 </script>
+
