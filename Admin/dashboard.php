@@ -71,7 +71,7 @@ function timeAgo($datetime) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
     <title>Admin Dashboard | ASRT Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
@@ -107,6 +107,60 @@ function timeAgo($datetime) {
             color: #374151;
             min-height: 100vh;
             overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Mobile Menu Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
         }
         
         /* Sidebar Styling */
@@ -158,6 +212,7 @@ function timeAgo($datetime) {
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
+            font-size: 0.95rem;
         }
         
         .nav-link:hover, .nav-link.active {
@@ -378,6 +433,7 @@ function timeAgo($datetime) {
             display: flex;
             gap: 0.5rem;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
         }
         
         .filter-btn {
@@ -386,14 +442,75 @@ function timeAgo($datetime) {
             font-weight: 500;
             font-size: 0.9rem;
             transition: var(--transition);
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #6b7280;
+            cursor: pointer;
         }
         
         .filter-btn.active {
             background: var(--primary);
             color: white;
+            border-color: var(--primary);
         }
+
+        /* Mobile Card Layout */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-card-header {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .mobile-card-detail .label {
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        .mobile-card-detail .value {
+            color: var(--dark);
+        }
+
+        /* Summary Cards */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-top: 3px solid var(--primary);
+        }
+
+        .summary-card.warning { border-top-color: var(--warning); }
+        .summary-card.info { border-top-color: var(--info); }
         
-        /* Responsive */
+        /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -403,23 +520,142 @@ function timeAgo($datetime) {
             .sidebar.active {
                 transform: translateX(0);
             }
+
+            .mobile-header {
+                display: flex;
+            }
             
             .main-content {
                 margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
             }
-            
-            .menu-toggle {
-                display: block;
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .welcome-text h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+
+            .stat-card {
+                padding: 1rem;
+            }
+
+            .stat-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .stat-value {
+                font-size: 1.5rem;
+            }
+
+            .stat-label {
+                font-size: 0.8rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .chart-container {
+                height: 250px;
+            }
+
+            .summary-cards {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0.5rem;
+            }
+
+            .summary-card {
+                padding: 0.75rem;
             }
         }
         
         @media (max-width: 768px) {
+            .main-content {
+                padding: 0.75rem;
+            }
+
             .stats-grid {
                 grid-template-columns: 1fr;
             }
-            
-            .main-content {
-                padding: 1rem;
+
+            .chart-container {
+                height: 200px;
+            }
+
+            .message-board {
+                max-height: 300px;
+            }
+
+            .message-item {
+                padding: 0.75rem;
+            }
+
+            .form-control, .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            .summary-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-buttons {
+                justify-content: center;
+            }
+
+            .filter-btn {
+                flex: 1;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .welcome-text h1 {
+                font-size: 1.3rem;
+            }
+
+            .dashboard-card {
+                border-radius: 8px;
+            }
+
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+            }
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .filter-btn, .nav-link, .mobile-menu-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            .stat-card:hover {
+                transform: none;
             }
         }
         
@@ -469,8 +705,22 @@ function timeAgo($datetime) {
     </style>
 </head>
 <body>
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-brand">
+            ASRT Admin
+        </div>
+        <div></div>
+    </div>
+
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
                 <i class="fas fa-crown"></i>
@@ -479,6 +729,13 @@ function timeAgo($datetime) {
         </div>
         
         <div class="sidebar-nav">
+            <div class="nav-item">
+                <a href="dashboard.php" class="nav-link active">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+            </div>
+            
             <div class="nav-item">
                 <a href="manage_user.php" class="nav-link">
                     <i class="fas fa-users"></i>
@@ -557,7 +814,7 @@ function timeAgo($datetime) {
                 <h1>Welcome back, Admin</h1>
                 <p>Here's what's happening with your properties today</p>
             </div>
-            <div class="header-actions">
+            <div class="header-actions d-none d-md-block">
                 <span class="text-muted"><?= date('l, F j, Y') ?></span>
             </div>
         </div>
@@ -601,8 +858,8 @@ function timeAgo($datetime) {
                 <span>Activity Overview</span>
             </div>
             <div class="card-body">
-                <form class="row g-3 align-items-center mb-4" method="get">
-                    <div class="col-md-3">
+                <form class="row g-3 align-items-end mb-4" method="get">
+                    <div class="col-md-4 col-6">
                         <label for="month" class="form-label">Month</label>
                         <select id="month" name="month" class="form-select">
                             <option value="">All Months</option>
@@ -613,7 +870,7 @@ function timeAgo($datetime) {
                             <?php endfor; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-4 col-6">
                         <label for="year" class="form-label">Year</label>
                         <select id="year" name="year" class="form-select">
                             <option value="">All Years</option>
@@ -624,13 +881,29 @@ function timeAgo($datetime) {
                             <?php endfor; ?>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label d-block">&nbsp;</label>
-                        <button class="btn btn-primary" type="submit">Apply Filter</button>
+                    <div class="col-md-4 col-12">
+                        <button class="btn btn-primary w-100" type="submit">Apply Filter</button>
                     </div>
                 </form>
                 
-                <div class="row mb-4">
+                <!-- Mobile Summary Cards -->
+                <div class="summary-cards d-md-none">
+                    <div class="summary-card">
+                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_rentals']) ?></div>
+                        <div class="text-muted small">New Rentals</div>
+                    </div>
+                    <div class="summary-card warning">
+                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_maintenance']) ?></div>
+                        <div class="text-muted small">Maintenance</div>
+                    </div>
+                    <div class="summary-card info">
+                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_messages']) ?></div>
+                        <div class="text-muted small">Messages</div>
+                    </div>
+                </div>
+
+                <!-- Desktop Summary -->
+                <div class="row mb-4 d-none d-md-flex">
                     <div class="col-md-6">
                         <h6 class="text-primary mb-3">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
                         <div class="d-flex flex-wrap gap-4">
@@ -652,6 +925,13 @@ function timeAgo($datetime) {
                         <div class="chart-container">
                             <canvas id="activityChart"></canvas>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Mobile Chart -->
+                <div class="d-md-none">
+                    <div class="chart-container">
+                        <canvas id="activityChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -686,8 +966,8 @@ function timeAgo($datetime) {
                     </div>
                     <div class="card-body">
                         <div class="filter-buttons">
-                            <button type="button" class="filter-btn bg-light" id="filterRecentBtn">Recent</button>
-                            <button type="button" class="filter-btn bg-light" id="filterAllBtn">All Messages</button>
+                            <button type="button" class="filter-btn" id="filterRecentBtn">Recent</button>
+                            <button type="button" class="filter-btn" id="filterAllBtn">All Messages</button>
                         </div>
                         <div class="message-board" id="messageBoardContainer">
                             <!-- Messages will be loaded here via AJAX -->
@@ -706,6 +986,37 @@ function timeAgo($datetime) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    // Mobile menu functionality
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const sidebar = document.getElementById('sidebar');
+    const mobileOverlay = document.getElementById('mobileOverlay');
+
+    function toggleMobileMenu() {
+        sidebar.classList.toggle('active');
+        mobileOverlay.classList.toggle('active');
+    }
+
+    mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+    mobileOverlay.addEventListener('click', toggleMobileMenu);
+
+    // Close mobile menu when clicking on nav links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 992) {
+                sidebar.classList.remove('active');
+                mobileOverlay.classList.remove('active');
+            }
+        });
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 992) {
+            sidebar.classList.remove('active');
+            mobileOverlay.classList.remove('active');
+        }
+    });
+
     // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
     function fetchDashboardCounts() {
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
@@ -717,167 +1028,218 @@ function timeAgo($datetime) {
                     document.getElementById('unpaidInvoicesCount').textContent = data.unpaid_invoices ?? 0;
                     document.getElementById('overdueInvoicesCount').textContent = data.unpaid_due_invoices ?? 0;
                 }
-            });
+            })
+            .catch(err => console.log('Error fetching dashboard counts:', err));
     }
+
     function fetchLatestRequests() {
         fetch('../AJAX/ajax_admin_dashboard_latest_requests.php')
             .then(res => res.text())
             .then(html => {
                 document.getElementById('latestRequestsContainer').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('latestRequestsContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
             });
     }
+
     let messageFilter = 'recent';
     function fetchMessages() {
         fetch('../AJAX/ajax_admin_dashboard_messages.php?filter=' + messageFilter)
             .then(res => res.text())
             .then(html => {
                 document.getElementById('messageBoardContainer').innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById('messageBoardContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading messages</p></div>';
             });
     }
-    setInterval(() => {
-        fetchDashboardCounts();
-        fetchLatestRequests();
-        fetchMessages();
-    }, 10000); // every 10s
+
+    // Initial load and set up polling
     document.addEventListener('DOMContentLoaded', () => {
         fetchDashboardCounts();
         fetchLatestRequests();
         fetchMessages();
-        document.getElementById('filterRecentBtn').addEventListener('click', function() {
+        
+        // Set up filter buttons
+        const recentBtn = document.getElementById('filterRecentBtn');
+        const allBtn = document.getElementById('filterAllBtn');
+        
+        recentBtn.addEventListener('click', function() {
             messageFilter = 'recent';
             this.classList.add('active');
-            document.getElementById('filterAllBtn').classList.remove('active');
+            allBtn.classList.remove('active');
             fetchMessages();
         });
-        document.getElementById('filterAllBtn').addEventListener('click', function() {
+        
+        allBtn.addEventListener('click', function() {
             messageFilter = 'all';
             this.classList.add('active');
-            document.getElementById('filterRecentBtn').classList.remove('active');
+            recentBtn.classList.remove('active');
             fetchMessages();
         });
+        
         // Set initial filter button state
-        document.getElementById('filterRecentBtn').classList.add('active');
+        recentBtn.classList.add('active');
     });
-    // --- LIVE ADMIN: AJAX Polling for Dashboard Stats ---
-    function fetchDashboardCounts() {
-        fetch('../AJAX/ajax_admin_dashboard_counts.php')
-            .then(res => res.json())
-            .then(data => {
-                if (data) {
-                    document.getElementById('pendingRentalsCount').textContent = data.pending_rentals ?? 0;
-                    document.getElementById('pendingMaintenanceCount').textContent = data.pending_maintenance ?? 0;
-                    document.getElementById('unpaidInvoicesCount').textContent = data.unpaid_invoices ?? 0;
-                    document.getElementById('overdueInvoicesCount').textContent = data.unpaid_due_invoices ?? 0;
-                }
-            });
-    }
-    setInterval(fetchDashboardCounts, 10000); // every 10s
-    document.addEventListener('DOMContentLoaded', fetchDashboardCounts);
-        const chartData = <?= json_encode($chartData) ?>;
-        const ctx = document.getElementById('activityChart').getContext('2d');
 
-        let lastFocusedIndex = null;
-        const activityChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: chartData.labels,
-                datasets: [
-                    {
-                        label: 'New Rentals',
-                        data: chartData.new_rentals,
-                        borderColor: '#6366f1',
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        tension: 0.3,
-                        fill: true
-                    },
-                    {
-                        label: 'Maintenance Requests',
-                        data: chartData.new_maintenance,
-                        borderColor: '#f59e0b',
-                        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                        tension: 0.3,
-                        fill: true
-                    },
-                    {
-                        label: 'Messages',
-                        data: chartData.new_messages,
-                        borderColor: '#06b6d4',
-                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                        tension: 0.3,
-                        fill: true
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { 
-                    legend: { 
-                        position: 'top',
-                        labels: { 
-                            color: '#374151',
-                            usePointStyle: true,
-                            padding: 20
+    // Poll every 10 seconds
+    setInterval(() => {
+        fetchDashboardCounts();
+        fetchLatestRequests();
+        fetchMessages();
+    }, 10000);
+
+    // Chart initialization
+    const chartData = <?= json_encode($chartData) ?>;
+    const ctx = document.getElementById('activityChart').getContext('2d');
+
+    let lastFocusedIndex = null;
+    const activityChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [
+                {
+                    label: 'New Rentals',
+                    data: chartData.new_rentals,
+                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Maintenance Requests',
+                    data: chartData.new_maintenance,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: 'Messages',
+                    data: chartData.new_messages,
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    position: 'top',
+                    labels: { 
+                        color: '#374151',
+                        usePointStyle: true,
+                        padding: window.innerWidth <= 768 ? 10 : 20,
+                        font: {
+                            size: window.innerWidth <= 768 ? 10 : 12
                         }
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        titleColor: '#1f2937',
-                        bodyColor: '#374151',
-                        borderColor: '#e5e7eb',
-                        borderWidth: 1,
-                        padding: 10,
-                        cornerRadius: 8
                     }
                 },
-                interaction: {
-                    mode: 'nearest',
-                    axis: 'x',
-                    intersect: false
-                },
-                scales: {
-                    x: { 
-                        grid: { display: false },
-                        ticks: { color: '#6b7280' }
-                    },
-                    y: { 
-                        beginAtZero: true,
-                        grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                        ticks: { color: '#6b7280' }
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    titleColor: '#1f2937',
+                    bodyColor: '#374151',
+                    borderColor: '#e5e7eb',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            },
+            scales: {
+                x: { 
+                    grid: { display: false },
+                    ticks: { 
+                        color: '#6b7280',
+                        font: {
+                            size: window.innerWidth <= 768 ? 10 : 11
+                        }
                     }
                 },
-                elements: {
-                    point: {
-                        radius: 4,
-                        hoverRadius: 6
+                y: { 
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                    ticks: { 
+                        color: '#6b7280',
+                        font: {
+                            size: window.innerWidth <= 768 ? 10 : 11
+                        }
                     }
                 }
+            },
+            elements: {
+                point: {
+                    radius: window.innerWidth <= 768 ? 2 : 4,
+                    hoverRadius: window.innerWidth <= 768 ? 4 : 6
+                }
             }
-        });
+        }
+    });
 
-        // Click anywhere outside the chart to reset to showing all datasets
-        document.addEventListener('click', function(e) {
-            const chartBox = ctx.canvas.getBoundingClientRect();
-            // Detect if click is within the chart area
-            if (
-                e.target === ctx.canvas ||
-                (e.clientX >= chartBox.left && e.clientX <= chartBox.right && 
-                 e.clientY >= chartBox.top && e.clientY <= chartBox.bottom)
-            ) {
-                // Click was inside chart area, do nothing
-                return;
+    // Handle window resize for chart responsiveness
+    window.addEventListener('resize', () => {
+        if (activityChart) {
+            const isMobile = window.innerWidth <= 768;
+            activityChart.options.plugins.legend.labels.padding = isMobile ? 10 : 20;
+            activityChart.options.plugins.legend.labels.font.size = isMobile ? 10 : 12;
+            activityChart.options.scales.x.ticks.font.size = isMobile ? 10 : 11;
+            activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
+            activityChart.options.elements.point.radius = isMobile ? 2 : 4;
+            activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
+            activityChart.update();
+        }
+    });
+
+    // Click anywhere outside the chart to reset to showing all datasets
+    document.addEventListener('click', function(e) {
+        const chartBox = ctx.canvas.getBoundingClientRect();
+        // Detect if click is within the chart area
+        if (
+            e.target === ctx.canvas ||
+            (e.clientX >= chartBox.left && e.clientX <= chartBox.right && 
+             e.clientY >= chartBox.top && e.clientY <= chartBox.bottom)
+        ) {
+            // Click was inside chart area, do nothing
+            return;
+        }
+        // Click was outside, reset if focused
+        if (lastFocusedIndex !== null) {
+            activityChart.data.datasets.forEach((ds, i) => {
+                activityChart.setDatasetVisibility(i, true);
+            });
+            lastFocusedIndex = null;
+            activityChart.update();
+        }
+    });
+
+    // Auto-hide notifications after 5 seconds
+    document.querySelectorAll('.alert').forEach(alert => {
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 300);
             }
-            // Click was outside, reset if focused
-            if (lastFocusedIndex !== null) {
-                activityChart.data.datasets.forEach((ds, i) => {
-                    activityChart.setDatasetVisibility(i, true);
-                });
-                lastFocusedIndex = null;
-                activityChart.update();
-            }
-        });
+        }, 5000);
+    });
     </script>
 </body>
 </html>
