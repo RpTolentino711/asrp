@@ -773,6 +773,15 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
         <?= $msg ?>
         
         <!-- Clients Card -->
+        <form method="get" class="mb-3 d-flex align-items-center gap-2" id="clientUnitFilterForm">
+            <label for="clientUnitFilter" class="form-label mb-0">Filter:</label>
+            <select name="unit_filter" id="clientUnitFilter" class="form-select form-select-sm w-auto">
+                <option value="all"<?= (!isset($_GET['unit_filter']) || $_GET['unit_filter']==='all') ? ' selected' : '' ?>>All Clients</option>
+                <option value="with"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='with') ? ' selected' : '' ?>>With Unit</option>
+                <option value="without"<?= (isset($_GET['unit_filter']) && $_GET['unit_filter']==='without') ? ' selected' : '' ?>>Without Unit</option>
+            </select>
+            <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+        </form>
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-users"></i>
@@ -780,7 +789,17 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                 <span class="badge bg-primary ms-2"><?= count($clients) ?></span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($clients)): ?>
+                <?php
+                // Filter logic for clients with/without unit
+                $unit_filter = isset($_GET['unit_filter']) ? $_GET['unit_filter'] : 'all';
+                $filtered_clients = array_filter($clients, function($c) use ($unit_filter) {
+                    $has_unit = !empty($c['SpaceName']);
+                    if ($unit_filter === 'with') return $has_unit;
+                    if ($unit_filter === 'without') return !$has_unit;
+                    return true;
+                });
+                ?>
+                <?php if (!empty($filtered_clients)): ?>
                     <div class="table-container">
                         <table class="custom-table">
                             <thead>
@@ -795,7 +814,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($clients as $c): ?>
+                                <?php foreach ($filtered_clients as $c): ?>
                                 <?php $client_has_unit = !empty($c['SpaceName']); ?>
                                 <tr>
                                     <td>
