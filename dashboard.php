@@ -344,6 +344,35 @@ try {
 <!doctype html>
 <html lang="en">
 <head>
+    <style>
+    .notification-badge {
+        position: absolute;
+        top: 0.2em;
+        right: -0.7em;
+        background: #ef4444;
+        color: #fff;
+        font-size: 0.75em;
+        font-weight: bold;
+        border-radius: 50%;
+        padding: 0.2em 0.55em;
+        min-width: 1.5em;
+        min-height: 1.5em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(239,68,68,0.15);
+        z-index: 10;
+        transition: all 0.2s;
+        pointer-events: none;
+        border: 2px solid #fff;
+        animation: pulse-badge 1.2s infinite;
+    }
+    @keyframes pulse-badge {
+        0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+        70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+        100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+    }
+    </style>
     <meta charset="utf-8">
     <title>Client Dashboard - ASRT Commercial Spaces</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
