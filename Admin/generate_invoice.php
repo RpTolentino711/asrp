@@ -149,7 +149,7 @@ function renderCountdown($due_date) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
     <title>Invoice Management | ASRT Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
@@ -182,6 +182,60 @@ function renderCountdown($due_date) {
             background: linear-gradient(to right, #f8fafc, #f1f5f9);
             color: #374151;
             min-height: 100vh;
+            position: relative;
+        }
+
+        /* Mobile Menu Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
         }
         
         /* Sidebar Styling */
@@ -233,6 +287,7 @@ function renderCountdown($due_date) {
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
+            font-size: 0.95rem;
         }
         
         .nav-link:hover, .nav-link.active {
@@ -286,6 +341,10 @@ function renderCountdown($due_date) {
             color: var(--dark);
             margin-bottom: 0;
         }
+
+        .page-title p {
+            font-size: 0.9rem;
+        }
         
         .title-icon {
             width: 50px;
@@ -337,6 +396,7 @@ function renderCountdown($due_date) {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
+            min-width: 700px;
         }
         
         .custom-table th {
@@ -346,12 +406,14 @@ function renderCountdown($due_date) {
             text-align: left;
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
         }
         
         .custom-table td {
             padding: 1rem;
             border-bottom: 1px solid #f3f4f6;
             vertical-align: middle;
+            font-size: 0.9rem;
         }
         
         .custom-table tr:last-child td {
@@ -444,6 +506,7 @@ function renderCountdown($due_date) {
             display: flex;
             gap: 0.5rem;
             margin-bottom: 1rem;
+            flex-wrap: wrap;
         }
         
         .filter-btn {
@@ -452,11 +515,25 @@ function renderCountdown($due_date) {
             font-weight: 500;
             font-size: 0.9rem;
             transition: var(--transition);
+            text-decoration: none;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
         }
         
         .filter-btn.active {
             background: var(--primary);
             color: white;
+            border-color: var(--primary);
+        }
+
+        .filter-btn:not(.active) {
+            background: #f8f9fa;
+            color: #6b7280;
+        }
+
+        .filter-btn:not(.active):hover {
+            background: #e9ecef;
+            color: var(--dark);
         }
         
         /* Action Buttons */
@@ -469,6 +546,8 @@ function renderCountdown($due_date) {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
+            text-decoration: none;
+            cursor: pointer;
         }
         
         .btn-chat {
@@ -513,8 +592,95 @@ function renderCountdown($due_date) {
             margin-bottom: 1rem;
             opacity: 0.5;
         }
+
+        /* Mobile Card Layout */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-card.overdue {
+            border-left-color: var(--danger);
+        }
+
+        .mobile-card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .mobile-card.completed {
+            border-left-color: var(--secondary);
+        }
+
+        .mobile-card-header {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            align-items: flex-start;
+        }
+
+        .mobile-card-detail .label {
+            font-weight: 500;
+            color: #6b7280;
+            min-width: 80px;
+        }
+
+        .mobile-card-detail .value {
+            color: var(--dark);
+            text-align: right;
+            flex: 1;
+        }
+
+        .mobile-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .mobile-actions .btn-action {
+            flex: 1;
+            justify-content: center;
+            min-width: 120px;
+        }
+
+        /* Chat Mobile Optimizations */
+        .mobile-chat-meta {
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-chat-form {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+        }
+
+        /* Hide desktop table on mobile */
+        .table-mobile {
+            display: none;
+        }
         
-        /* Responsive */
+        /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -524,33 +690,150 @@ function renderCountdown($due_date) {
             .sidebar.active {
                 transform: translateX(0);
             }
+
+            .mobile-header {
+                display: flex;
+            }
             
             .main-content {
                 margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .page-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .title-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .custom-table {
+                display: none;
+            }
+
+            .table-mobile {
+                display: block;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .chat-container {
+                padding: 1rem;
+            }
+
+            .chat-messages {
+                max-height: 300px;
+            }
+
+            .chat-message {
+                max-width: 95%;
+            }
+
+            .filter-buttons {
+                justify-content: center;
             }
         }
         
         @media (max-width: 768px) {
             .main-content {
-                padding: 1rem;
+                padding: 0.75rem;
             }
-            
-            .dashboard-header {
+
+            .chat-form .row {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
             }
-            
+
+            .chat-form .col-md-8,
+            .chat-form .col-md-2 {
+                margin-bottom: 0.5rem;
+            }
+
+            .form-control, .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            .mobile-actions {
+                flex-direction: column;
+            }
+
+            .mobile-actions .btn-action {
+                min-width: auto;
+            }
+
             .filter-buttons {
-                flex-wrap: wrap;
+                flex-direction: column;
             }
-            
-            .custom-table {
-                font-size: 0.875rem;
+
+            .filter-btn {
+                text-align: center;
             }
-            
+
+            .chat-image {
+                max-width: 150px;
+                max-height: 100px;
+            }
+
+            .chat-meta .row {
+                flex-direction: column;
+            }
+
+            .chat-meta .col-md-6:last-child {
+                text-align: left;
+                margin-top: 0.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .dashboard-card {
+                border-radius: 8px;
+            }
+
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+            }
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+
+            .chat-messages {
+                max-height: 250px;
+                padding: 0.75rem;
+            }
+
             .chat-message {
-                max-width: 90%;
+                padding: 0.5rem 0.75rem;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-action, .nav-link, .mobile-menu-btn, .filter-btn {
+                min-height: 44px;
+                min-width: 44px;
             }
         }
         
@@ -563,11 +846,46 @@ function renderCountdown($due_date) {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Loading state */
+        .loading-state {
+            text-align: center;
+            padding: 2rem;
+            color: #6b7280;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-brand">
+            ASRT Admin
+        </div>
+        <div></div>
+    </div>
+
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
                 <i class="fas fa-crown"></i>
@@ -654,10 +972,6 @@ function renderCountdown($due_date) {
                     <p class="text-muted mb-0">Manage invoices and communicate with clients</p>
                 </div>
             </div>
-            
-            <div class="header-actions">
-                
-            </div>
         </div>
         
         <!-- Info Alert -->
@@ -669,7 +983,7 @@ function renderCountdown($due_date) {
         <?php if ($show_chat && $invoice): ?>
             <!-- Chat Interface -->
             <div class="chat-container animate-fade-in">
-                <div class="chat-meta">
+                <div class="chat-meta d-none d-md-block">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="fw-bold">Client: <?= htmlspecialchars($invoice['Client_fn'] ?? '') . ' ' . htmlspecialchars($invoice['Client_ln'] ?? '') ?></div>
@@ -684,10 +998,30 @@ function renderCountdown($due_date) {
                         </div>
                     </div>
                 </div>
+
+                <!-- Mobile Chat Meta -->
+                <div class="mobile-chat-meta d-md-none">
+                    <div class="fw-bold mb-2">Client: <?= htmlspecialchars($invoice['Client_fn'] ?? '') . ' ' . htmlspecialchars($invoice['Client_ln'] ?? '') ?></div>
+                    <div class="text-muted small mb-2">Unit: <?= htmlspecialchars($invoice['UnitName'] ?? '') ?></div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="small">Issued: <?= htmlspecialchars($invoice['InvoiceDate'] ?? '') ?></div>
+                            <div class="small">Due: <?= htmlspecialchars($invoice['EndDate'] ?? $invoice['InvoiceDate'] ?? '') ?></div>
+                        </div>
+                        <div>
+                            <?= isset($invoice['EndDate']) ? renderCountdown($invoice['EndDate']) : '' ?>
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="chat-messages" id="adminChatMessages">
                     <!-- Chat messages will be loaded here by JavaScript -->
+                    <div class="loading-state">
+                        <div class="loading-spinner"></div>
+                        <p class="mt-2">Loading messages...</p>
+                    </div>
                 </div>
+
 <script>
 // Live admin chat message loader with client typing bubble
 let clientTyping = false;
@@ -706,7 +1040,7 @@ async function loadAdminChatMessages() {
             return;
         }
         if (data.length === 0) {
-            chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='bi bi-chat-dots fs-1 mb-3 d-block'></i><h5>No messages yet</h5><p>Start a conversation about this invoice.</p></div>`;
+            chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='fas fa-comments fa-3x mb-3 d-block opacity-50'></i><h5>No messages yet</h5><p>Start a conversation about this invoice.</p></div>`;
             return;
         }
         data.forEach(msg => {
@@ -730,7 +1064,7 @@ async function loadAdminChatMessages() {
         if (clientTyping) {
             let typingHtml = `<div class='chat-message client'>` +
                 `<div class='message-sender'>Client</div>` +
-                `<div class='message-text' style='opacity:0.7;'><span class='me-2'><i class='bi bi-three-dots'></i></span>Client is typing...</div>` +
+                `<div class='message-text' style='opacity:0.7;'><span class='me-2'><i class='fas fa-ellipsis-h'></i></span>Client is typing...</div>` +
                 `<div class='message-time'></div></div>`;
             chatMessages.innerHTML += typingHtml;
         }
@@ -762,15 +1096,15 @@ setInterval(() => {
 }, 5000); // Refresh every 5 seconds
 </script>
                 
-                <form method="post" enctype="multipart/form-data" class="chat-form">
-                    <div class="row g-2 align-items-end">
-                        <div class="col-md-8">
+                <form method="post" enctype="multipart/form-data" class="chat-form mobile-chat-form">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-8">
                             <textarea name="message_text" class="form-control admin-chat-textarea" rows="2" placeholder="Type your message..."></textarea>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-md-2">
                             <input type="file" name="image_file" accept="image/*" class="form-control">
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-12 col-md-2">
                             <input type="hidden" name="invoice_id" value="<?= $chat_invoice_id ?>">
                             <button type="submit" name="send_message" class="btn btn-primary w-100">
                                 <i class="fas fa-paper-plane me-1"></i> Send
@@ -801,18 +1135,19 @@ setInterval(() => {
                 </div>
                 <div class="card-body p-0">
                     <div class="filter-buttons p-3 border-bottom">
-                        <a href="?status=new" class="filter-btn <?= $status_filter === 'new' ? 'active' : 'bg-light' ?>">
+                        <a href="?status=new" class="filter-btn <?= $status_filter === 'new' ? 'active' : '' ?>">
                             New Invoices
                         </a>
-                        <a href="?status=done" class="filter-btn <?= $status_filter === 'done' ? 'active' : 'bg-light' ?>">
+                        <a href="?status=done" class="filter-btn <?= $status_filter === 'done' ? 'active' : '' ?>">
                             Completed
                         </a>
-                        <a href="?status=all" class="filter-btn <?= $status_filter === 'all' ? 'active' : 'bg-light' ?>">
+                        <a href="?status=all" class="filter-btn <?= $status_filter === 'all' ? 'active' : '' ?>">
                             All Invoices
                         </a>
                     </div>
                     
                     <?php if (!empty($invoices)): ?>
+                        <!-- Desktop Table -->
                         <div class="table-container">
                             <table class="custom-table">
                                 <thead>
@@ -859,6 +1194,69 @@ setInterval(() => {
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- Mobile Card Layout -->
+                        <div class="table-mobile">
+                            <?php $ctr = 1; foreach ($invoices as $row): 
+                                $isOverdue = false;
+                                $isWarning = false;
+                                $isCompleted = false;
+                                
+                                if (isset($row['Flow_Status']) && strtolower($row['Flow_Status']) === 'done') {
+                                    $isCompleted = true;
+                                } elseif (isset($row['EndDate'])) {
+                                    $due = strtotime($row['EndDate']);
+                                    $now = time();
+                                    $diff = $due - $now;
+                                    if ($diff <= 0) {
+                                        $isOverdue = true;
+                                    } elseif ($diff < 86400 * 3) { // 3 days
+                                        $isWarning = true;
+                                    }
+                                }
+                                
+                                $cardClass = 'mobile-card';
+                                if ($isOverdue) $cardClass .= ' overdue';
+                                elseif ($isWarning) $cardClass .= ' warning';
+                                elseif ($isCompleted) $cardClass .= ' completed';
+                            ?>
+                            <div class="<?= $cardClass ?>">
+                                <div class="mobile-card-header">
+                                    <div>
+                                        <strong><?= htmlspecialchars(($row['Client_fn'] ?? '') . ' ' . ($row['Client_ln'] ?? '')) ?></strong>
+                                        <span class="badge bg-primary ms-2">#<?= $ctr++ ?></span>
+                                    </div>
+                                    <div>
+                                        <?php
+                                        if ($isCompleted) {
+                                            echo '<span class="badge bg-success">Completed</span>';
+                                        } elseif (isset($row['EndDate'])) {
+                                            echo renderCountdown($row['EndDate']);
+                                        } else {
+                                            echo '<span class="text-muted">N/A</span>';
+                                        }
+                                        ?>
+                                    </div>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Unit:</span>
+                                    <span class="value"><?= htmlspecialchars($row['UnitName'] ?? '') ?></span>
+                                </div>
+                                
+                                <div class="mobile-card-detail">
+                                    <span class="label">Due Date:</span>
+                                    <span class="value"><?= isset($row['EndDate']) ? htmlspecialchars($row['EndDate']) : '<span class="text-muted">N/A</span>' ?></span>
+                                </div>
+
+                                <div class="mobile-actions">
+                                    <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat">
+                                        <i class="fas fa-comments"></i> Open Chat
+                                    </a>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
                     <?php else: ?>
                         <div class="empty-state">
                             <i class="fas fa-file-invoice"></i>
@@ -873,6 +1271,37 @@ setInterval(() => {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Mobile menu functionality
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+
+        function toggleMobileMenu() {
+            sidebar.classList.toggle('active');
+            mobileOverlay.classList.toggle('active');
+        }
+
+        mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+        mobileOverlay.addEventListener('click', toggleMobileMenu);
+
+        // Close mobile menu when clicking on nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('active');
+                    mobileOverlay.classList.remove('active');
+                }
+            });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('active');
+                mobileOverlay.classList.remove('active');
+            }
+        });
+
         function confirmPaid(button) {
             Swal.fire({
                 title: 'Are you sure?',
@@ -888,40 +1317,54 @@ setInterval(() => {
                 }
             });
         }
-    </script>
-    <script>
-    // Admin typing indicator AJAX
-    document.addEventListener('DOMContentLoaded', function() {
-        const textarea = document.querySelector('.admin-chat-textarea');
-        const invoiceId = <?= json_encode($chat_invoice_id) ?>;
-        let typing = false;
-        let typingTimeout = null;
-        if (textarea && invoiceId) {
-            textarea.addEventListener('input', function() {
-                if (!typing) {
-                    typing = true;
-                    sendTypingStatus(1);
-                }
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
+
+        // Admin typing indicator AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            const textarea = document.querySelector('.admin-chat-textarea');
+            const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+            let typing = false;
+            let typingTimeout = null;
+            if (textarea && invoiceId) {
+                textarea.addEventListener('input', function() {
+                    if (!typing) {
+                        typing = true;
+                        sendTypingStatus(1);
+                    }
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(() => {
+                        typing = false;
+                        sendTypingStatus(0);
+                    }, 3000); // 3 seconds after last input
+                });
+                // On blur, clear typing
+                textarea.addEventListener('blur', function() {
                     typing = false;
                     sendTypingStatus(0);
-                }, 3000); // 3 seconds after last input
-            });
-            // On blur, clear typing
-            textarea.addEventListener('blur', function() {
-                typing = false;
-                sendTypingStatus(0);
-            });
-        }
-        function sendTypingStatus(isTyping) {
-            fetch('../AJAX/invoice_admin_typing.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
-            });
-        }
-    });
+                });
+            }
+            function sendTypingStatus(isTyping) {
+                fetch('../AJAX/invoice_admin_typing.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
+                });
+            }
+        });
+
+        // Auto-hide alerts after 5 seconds
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        });
     </script>
 </body>
 </html>
