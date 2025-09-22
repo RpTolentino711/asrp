@@ -766,7 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
           </div>
           <div class="mb-3 text-end">
-            <a href="#" id="forgotPasswordLink" class="link-primary small" style="text-decoration:underline;">Forgot Password?</a>
+            <a href="#" id="forgotPasswordModal" class="link-primary small" style="text-decoration:underline;">Forgot Password?</a>
           </div>
           <div class="d-grid">
             <button type="submit" class="modern-btn modern-btn-primary">
