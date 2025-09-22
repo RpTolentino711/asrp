@@ -106,6 +106,8 @@ if (isset($_GET['chat_invoice_id'])) {
     $chat_invoice_id = intval($_GET['chat_invoice_id']);
 }
 if ($show_chat && $chat_invoice_id) {
+    // Mark all messages as read for admin
+    $db->executeStatement('UPDATE invoice_chat SET is_read_admin = 1 WHERE Invoice_ID = ?', [$chat_invoice_id]);
     $invoice = $db->getSingleInvoiceForDisplay($chat_invoice_id);
     $chat_messages = $db->getInvoiceChatMessagesForClient($chat_invoice_id);
 }
