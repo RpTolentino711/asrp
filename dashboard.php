@@ -959,6 +959,40 @@ try {
                     <li class="nav-item">
                         <a class="nav-link" href="invoice_history.php">
                             <i class="bi bi-credit-card me-1"></i>Payment
+                            <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
+<script>
+// Live poll unread admin messages for client (Payment nav badge)
+function pollClientUnreadAdminBadge() {
+    // Only run if client is logged in
+    <?php if (isset($_SESSION['client_id'])): ?>
+    fetch('AJAX/get_unread_admin_chat_counts.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+    })
+    .then(res => res.json())
+    .then(counts => {
+        // Sum all unread admin messages across all invoices
+        let total = 0;
+        Object.values(counts).forEach(cnt => { total += cnt; });
+        const badge = document.getElementById('client-unread-admin-badge');
+        if (badge) {
+            if (total > 0) {
+                badge.textContent = total;
+                badge.classList.remove('d-none');
+            } else {
+                badge.textContent = '';
+                badge.classList.add('d-none');
+            }
+        }
+    });
+    <?php endif; ?>
+}
+document.addEventListener('DOMContentLoaded', function() {
+    pollClientUnreadAdminBadge();
+    setInterval(pollClientUnreadAdminBadge, 5000);
+});
+</script>
                         </a>
                     </li>
                     <li class="nav-item">
