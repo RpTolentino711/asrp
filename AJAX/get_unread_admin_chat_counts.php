@@ -2,21 +2,21 @@
 // Get unread admin message count for each invoice for a client
 require_once '../database/database.php';
 
-if (!isset($_POST['client_id']) || !isset($_POST['invoice_ids'])) {
+if (!isset($_POST['client_id'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'Missing parameters']);
+    echo json_encode(['error' => 'Missing client_id']);
     exit;
 }
 
 $client_id = intval($_POST['client_id']);
-$invoice_ids = $_POST['invoice_ids'];
-if (!is_array($invoice_ids)) {
-    $invoice_ids = json_decode($invoice_ids, true);
-}
-
 $db = new Database();
+
+// Get all invoice IDs for this client
+$invoices = $db->getClientInvoiceHistory($client_id);
 $results = [];
-foreach ($invoice_ids as $invoice_id) {
+foreach ($invoices as $inv) {
+    $invoice_id = $inv['Invoice_ID'];
+    // Count unread admin messages for this invoice
     $sql = "SELECT COUNT(*) as unread_count FROM invoice_chat WHERE Invoice_ID = ? AND Sender_Type = 'admin' AND is_read_client = 0";
     $row = $db->getRow($sql, [$invoice_id]);
     $results[$invoice_id] = intval($row['unread_count'] ?? 0);
