@@ -1200,12 +1200,31 @@ document.addEventListener('DOMContentLoaded', function() {
   if (forgotPasswordLink) {
     forgotPasswordLink.addEventListener('click', function(e) {
       e.preventDefault();
-      const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-      if (loginModal) loginModal.hide();
-      setTimeout(() => {
-        const forgotModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
+      // Always try to hide login modal if open, but show forgot password modal regardless
+      let loginModalEl = document.getElementById('loginModal');
+      let forgotModalEl = document.getElementById('forgotPasswordModal');
+      let showForgot = function() {
+        // Reset form fields and error
+        if (forgotModalEl) {
+          let form = forgotModalEl.querySelector('form');
+          if (form) form.reset();
+          let err = forgotModalEl.querySelector('#forgotEmailErrorMsg');
+          if (err) err.textContent = '';
+        }
+        let forgotModal = bootstrap.Modal.getOrCreateInstance(forgotModalEl);
         forgotModal.show();
-      }, 400);
+      };
+      if (loginModalEl) {
+        let loginModal = bootstrap.Modal.getInstance(loginModalEl);
+        if (loginModal) {
+          loginModal.hide();
+          setTimeout(showForgot, 400);
+        } else {
+          showForgot();
+        }
+      } else {
+        showForgot();
+      }
     });
   }
 
