@@ -782,13 +782,14 @@ $show_kicked_message_in_chat = $is_kicked;
                             <label class="selector-label">
                                 <i class="bi bi-exclamation-circle me-2 text-warning"></i>Outstanding Invoices
                             </label>
-                            <select name="invoice_id" class="modern-select" onchange="this.form.submit()">
+                            <select name="invoice_id" class="modern-select" onchange="this.form.submit()" id="dueInvoiceSelect">
                                 <?php if (empty($due_invoices)): ?>
                                     <option value="">No outstanding invoices</option>
                                 <?php else: ?>
                                     <?php foreach ($due_invoices as $inv): ?>
                                         <option value="<?= $inv['Invoice_ID'] ?>"
-                                            <?= $inv['Invoice_ID'] == ($selected_invoice_id ?? 0) ? 'selected' : '' ?>>
+                                            <?= $inv['Invoice_ID'] == ($selected_invoice_id ?? 0) ? 'selected' : '' ?>
+                                            data-invoice-id="<?= $inv['Invoice_ID'] ?>">
                                             <?= htmlspecialchars($inv['SpaceName']) ?> - <?= htmlspecialchars($inv['InvoiceDate']) ?>
                                             (<?= strtoupper($inv['Status']) ?>)
                                         </option>
@@ -804,17 +805,19 @@ $show_kicked_message_in_chat = $is_kicked;
                             <label class="selector-label">
                                 <i class="bi bi-archive me-2 text-success"></i>Completed & Archived
                             </label>
-                            <select name="invoice_id" class="modern-select" onchange="this.form.submit()">
+                            <select name="invoice_id" class="modern-select" onchange="this.form.submit()" id="archivedInvoiceSelect">
                                 <option value="">-- Select Invoice --</option>
                                 <?php foreach ($paid_invoices as $inv): ?>
                                     <option value="<?= $inv['Invoice_ID'] ?>"
-                                        <?= $inv['Invoice_ID'] == ($selected_invoice_id ?? 0) ? 'selected' : '' ?>>
+                                        <?= $inv['Invoice_ID'] == ($selected_invoice_id ?? 0) ? 'selected' : '' ?>
+                                        data-invoice-id="<?= $inv['Invoice_ID'] ?>">
                                         <?= htmlspecialchars($inv['SpaceName']) ?> - <?= htmlspecialchars($inv['InvoiceDate']) ?> (PAID)
                                     </option>
                                 <?php endforeach; ?>
                                 <?php foreach ($kicked_invoices as $inv): ?>
                                     <option value="<?= $inv['Invoice_ID'] ?>"
-                                        <?= $inv['Invoice_ID'] == ($selected_invoice_id ?? 0) ? 'selected' : '' ?>>
+                                        <?= $inv['Invoice_ID'] == ($selected_invoice_id ?? 0) ? 'selected' : '' ?>
+                                        data-invoice-id="<?= $inv['Invoice_ID'] ?>">
                                         <?= htmlspecialchars($inv['SpaceName']) ?> - <?= htmlspecialchars($inv['InvoiceDate']) ?> (ARCHIVED)
                                     </option>
                                 <?php endforeach; ?>
@@ -832,6 +835,42 @@ $show_kicked_message_in_chat = $is_kicked;
                 <!-- Chat messages will be loaded here by JavaScript -->
             </div>
 <script>
+// Show unread badge for invoices with unread admin messages
+document.addEventListener('DOMContentLoaded', function() {
+    const clientId = <?= json_encode($client_id) ?>;
+    const invoiceOptions = [
+        ...document.querySelectorAll('#dueInvoiceSelect option[data-invoice-id]'),
+        ...document.querySelectorAll('#archivedInvoiceSelect option[data-invoice-id]')
+    ];
+    const invoiceIds = invoiceOptions.map(opt => opt.getAttribute('data-invoice-id'));
+    if (invoiceIds.length === 0) return;
+    fetch('AJAX/get_unread_admin_chat_counts.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'client_id=' + encodeURIComponent(clientId) + '&invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
+    })
+    .then(res => res.json())
+    .then(counts => {
+        invoiceOptions.forEach(opt => {
+            const id = opt.getAttribute('data-invoice-id');
+            if (counts[id] && counts[id] > 0) {
+                opt.textContent += ' \uD83D\uDD14'; // Bell emoji as badge
+            }
+        });
+    });
+});
+// Mark all admin messages as read for client
+async function markChatReadClient(invoiceId) {
+    if (!invoiceId) return;
+    try {
+        await fetch('AJAX/mark_invoice_chat_read_client.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'invoice_id=' + encodeURIComponent(invoiceId)
+        });
+    } catch (e) {}
+}
+
 // Live chat message loader with admin typing bubble
 let adminTyping = false;
 let lastTypingBubble = null;
@@ -898,6 +937,18 @@ async function pollAdminTyping() {
         adminTyping = false;
     }
 }
+
+// On page load and invoice change, mark as read
+document.addEventListener('DOMContentLoaded', function() {
+    const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+    if (invoiceId) markChatReadClient(invoiceId);
+    // Also mark as read on invoice selector change
+    document.querySelectorAll('select[name="invoice_id"]').forEach(sel => {
+        sel.addEventListener('change', function() {
+            if (this.value) markChatReadClient(this.value);
+        });
+    });
+});
 
 loadChatMessages();
 pollAdminTyping();

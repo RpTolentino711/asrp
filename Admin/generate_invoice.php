@@ -106,6 +106,8 @@ if (isset($_GET['chat_invoice_id'])) {
     $chat_invoice_id = intval($_GET['chat_invoice_id']);
 }
 if ($show_chat && $chat_invoice_id) {
+    // Mark all messages as read for admin
+    $db->executeStatement('UPDATE invoice_chat SET is_read_admin = 1 WHERE Invoice_ID = ?', [$chat_invoice_id]);
     $invoice = $db->getSingleInvoiceForDisplay($chat_invoice_id);
     $chat_messages = $db->getInvoiceChatMessagesForClient($chat_invoice_id);
 }
@@ -1185,8 +1187,20 @@ setInterval(() => {
                                             ?>
                                         </td>
                                         <td>
-                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat">
+                                            <?php
+                                            // Count unread client messages for admin
+                                            $unread = 0;
+                                            try {
+                                                $stmt = $db->pdo->prepare('SELECT COUNT(*) FROM invoice_chat WHERE Invoice_ID = ? AND is_read_admin = 0 AND Sender_Type = "client"');
+                                                $stmt->execute([$row['Invoice_ID']]);
+                                                $unread = $stmt->fetchColumn();
+                                            } catch (Exception $e) {}
+                                            ?>
+                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative">
                                                 <i class="fas fa-comments"></i> Chat
+                                                <?php if ($unread > 0): ?>
+                                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"><?= $unread ?></span>
+                                                <?php endif; ?>
                                             </a>
                                         </td>
                                     </tr>

@@ -325,9 +325,12 @@ public function updateInvoiceFlowStatus($invoice_id, $status) {
 // Get all invoices by flow status, e.g. 'new'
 
 public function sendInvoiceChat($invoice_id, $sender_type, $sender_id, $message, $image_path = null) {
-    $sql = "INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At)
-            VALUES (?, ?, ?, ?, ?, NOW())";
-    return $this->executeStatement($sql, [$invoice_id, $sender_type, $sender_id, $message, $image_path]);
+    // Set unread/read flags
+    $is_read_admin = ($sender_type === 'admin' || $sender_type === 'system') ? 1 : 0;
+    $is_read_client = ($sender_type === 'client') ? 1 : 0;
+    $sql = "INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At, is_read_admin, is_read_client)
+            VALUES (?, ?, ?, ?, ?, NOW(), ?, ?)";
+    return $this->executeStatement($sql, [$invoice_id, $sender_type, $sender_id, $message, $image_path, $is_read_admin, $is_read_client]);
 }
 
 public function getInvoiceHistoryForClient($client_id) {
