@@ -1275,6 +1275,7 @@ setInterval(() => {
     <script>
     // Live poll unread client messages for admin (desktop and mobile)
     function pollAdminUnreadBadges() {
+        console.log('Polling for unread badges...');
         const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
         const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
         if (invoiceIds.length === 0) return;
@@ -1314,6 +1315,7 @@ setInterval(() => {
         });
     }
     document.addEventListener('DOMContentLoaded', function() {
+        alert('Live badge polling script loaded!');
         pollAdminUnreadBadges();
         setInterval(pollAdminUnreadBadges, 5000);
     });
