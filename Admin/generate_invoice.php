@@ -1280,7 +1280,7 @@ setInterval(() => {
         const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
         const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
         if (invoiceIds.length === 0) return;
-        fetch('AJAX/get_unread_client_chat_counts.php', {
+        fetch('../AJAX/get_unread_client_chat_counts.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
@@ -1324,7 +1324,7 @@ setInterval(() => {
             link.addEventListener('click', function(e) {
                 const invoiceId = this.getAttribute('data-invoice-id');
                 if (!invoiceId) return;
-                fetch('AJAX/mark_admin_chat_read.php', {
+                fetch('../AJAX/mark_admin_chat_read.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: 'invoice_id=' + encodeURIComponent(invoiceId)
