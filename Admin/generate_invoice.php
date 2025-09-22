@@ -1185,9 +1185,22 @@ setInterval(() => {
                                             ?>
                                         </td>
                                         <td>
-                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative" data-invoice-id="<?= $row['Invoice_ID'] ?>">
+                                            <?php
+                                            // Count unread client messages for admin (server-side)
+                                            $unread = 0;
+                                            try {
+                                                $sql = 'SELECT COUNT(*) FROM invoice_chat WHERE Invoice_ID = ? AND is_read_admin = 0 AND Sender_Type = "client"';
+                                                $result = $db->getRow($sql, [$row['Invoice_ID']]);
+                                                if ($result && is_array($result)) {
+                                                    $unread = array_values($result)[0];
+                                                }
+                                            } catch (Exception $e) {}
+                                            ?>
+                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative">
                                                 <i class="fas fa-comments"></i> Chat
-                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="unread-badge-<?= $row['Invoice_ID'] ?>"></span>
+                                                <?php if ($unread > 0): ?>
+                                                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"><?= $unread ?></span>
+                                                <?php endif; ?>
                                             </a>
                                         </td>
                                     </tr>
@@ -1251,9 +1264,22 @@ setInterval(() => {
                                 </div>
 
                                 <div class="mobile-actions">
-                                    <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative" data-invoice-id="<?= $row['Invoice_ID'] ?>">
+                                    <?php
+                                    // Count unread client messages for admin (server-side, mobile)
+                                    $unread = 0;
+                                    try {
+                                        $sql = 'SELECT COUNT(*) FROM invoice_chat WHERE Invoice_ID = ? AND is_read_admin = 0 AND Sender_Type = "client"';
+                                        $result = $db->getRow($sql, [$row['Invoice_ID']]);
+                                        if ($result && is_array($result)) {
+                                            $unread = array_values($result)[0];
+                                        }
+                                    } catch (Exception $e) {}
+                                    ?>
+                                    <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative">
                                         <i class="fas fa-comments"></i> Open Chat
-                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="unread-badge-mobile-<?= $row['Invoice_ID'] ?>"></span>
+                                        <?php if ($unread > 0): ?>
+                                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"><?= $unread ?></span>
+                                        <?php endif; ?>
                                     </a>
                                 </div>
                             </div>
@@ -1272,53 +1298,8 @@ setInterval(() => {
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
-    // Live poll unread client messages for admin (desktop and mobile)
-    function pollAdminUnreadBadges() {
-        console.log('Polling for unread badges...');
-        const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
-        const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
-        if (invoiceIds.length === 0) return;
-        fetch('AJAX/get_unread_client_chat_counts.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
-        })
-        .then(res => res.json())
-        .then(counts => {
-            invoiceIds.forEach(id => {
-                // Desktop badge
-                const badge = document.getElementById('unread-badge-' + id);
-                if (badge) {
-                    const count = counts[id] || 0;
-                    if (count > 0) {
-                        badge.textContent = count;
-                        badge.classList.remove('d-none');
-                    } else {
-                        badge.textContent = '';
-                        badge.classList.add('d-none');
-                    }
-                }
-                // Mobile badge
-                const badgeMobile = document.getElementById('unread-badge-mobile-' + id);
-                if (badgeMobile) {
-                    const count = counts[id] || 0;
-                    if (count > 0) {
-                        badgeMobile.textContent = count;
-                        badgeMobile.classList.remove('d-none');
-                    } else {
-                        badgeMobile.textContent = '';
-                        badgeMobile.classList.add('d-none');
-                    }
-                }
-            });
-        });
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-        alert('Live badge polling script loaded!');
-        pollAdminUnreadBadges();
-        setInterval(pollAdminUnreadBadges, 5000);
-    });
         // Mobile menu functionality
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const sidebar = document.getElementById('sidebar');
