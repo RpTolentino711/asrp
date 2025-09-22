@@ -106,8 +106,6 @@ if (isset($_GET['chat_invoice_id'])) {
     $chat_invoice_id = intval($_GET['chat_invoice_id']);
 }
 if ($show_chat && $chat_invoice_id) {
-    // Mark all messages as read for admin
-    $db->executeStatement('UPDATE invoice_chat SET is_read_admin = 1 WHERE Invoice_ID = ?', [$chat_invoice_id]);
     $invoice = $db->getSingleInvoiceForDisplay($chat_invoice_id);
     $chat_messages = $db->getInvoiceChatMessagesForClient($chat_invoice_id);
 }
@@ -122,46 +120,25 @@ function renderCountdown($due_date) {
     }
     $id = 'countdown_' . uniqid();
     return '<span id="'.$id.'" class="badge bg-warning text-dark" data-duedate="'.$due_date.'"></span>
-                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative" data-invoice-id="<?= $row['Invoice_ID'] ?>">
-                                                <i class="fas fa-comments"></i> Chat
-                                                <span class="badge bg-danger badge-notification position-absolute top-0 start-100 translate-middle p-1 d-none" id="unread-badge-<?= $row['Invoice_ID'] ?>"></span>
-                                            </a>
-</tbody>
-</table>
-</div>
 <script>
-
-// Live poll unread client messages for admin
-function pollAdminUnreadBadges() {
-    const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
-    const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
-    if (invoiceIds.length === 0) return;
-    fetch('AJAX/get_unread_client_chat_counts.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
-    })
-    .then(res => res.json())
-    .then(counts => {
-        invoiceIds.forEach(id => {
-            const badge = document.getElementById('unread-badge-' + id);
-            if (!badge) return;
-            const count = counts[id] || 0;
-            if (count > 0) {
-                badge.textContent = count;
-                badge.classList.remove('d-none');
-            } else {
-                badge.textContent = '';
-                badge.classList.add('d-none');
-            }
-        });
-    });
-}
-document.addEventListener('DOMContentLoaded', function() {
-    pollAdminUnreadBadges();
-    setInterval(pollAdminUnreadBadges, 5000);
-});
-</script>
+(function(){
+    function updateCountdown_'.$id.'() {
+        var due = new Date("'.$due_date.'T23:59:59").getTime();
+        var now = new Date().getTime();
+        var diff = due - now;
+        var el = document.getElementById("'.$id.'");
+        if (!el) return;
+        if (diff <= 0) {
+            el.textContent = "OVERDUE";
+            el.className = "badge bg-danger";
+            return;
+        }
+        var d = Math.floor(diff / (1000*60*60*24));
+        var h = Math.floor((diff%(1000*60*60*24))/(1000*60*60));
+        var m = Math.floor((diff%(1000*60*60))/(1000*60));
+        var s = Math.floor((diff%(1000*60))/1000);
+        el.textContent = "Due in " + (d>0?d + "d ":"") + (h>0?h + "h ":"") + (m>0?m + "m ":"") + s + "s";
+        setTimeout(updateCountdown_'.$id.', 1000);
     }
     updateCountdown_'.$id.'();
 })();
@@ -1208,9 +1185,8 @@ setInterval(() => {
                                             ?>
                                         </td>
                                         <td>
-                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative" data-invoice-id="<?= $row['Invoice_ID'] ?>">
+                                            <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat">
                                                 <i class="fas fa-comments"></i> Chat
-                                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="unread-badge-<?= $row['Invoice_ID'] ?>"></span>
                                             </a>
                                         </td>
                                     </tr>
@@ -1274,56 +1250,9 @@ setInterval(() => {
                                 </div>
 
                                 <div class="mobile-actions">
-                                    <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative" data-invoice-id="<?= $row['Invoice_ID'] ?>">
+                                    <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat">
                                         <i class="fas fa-comments"></i> Open Chat
-                                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="unread-badge-mobile-<?= $row['Invoice_ID'] ?>"></span>
                                     </a>
-<script>
-// Live poll unread client messages for admin (desktop and mobile)
-function pollAdminUnreadBadges() {
-    const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
-    const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
-    if (invoiceIds.length === 0) return;
-    fetch('AJAX/get_unread_client_chat_counts.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
-    })
-    .then(res => res.json())
-    .then(counts => {
-        invoiceIds.forEach(id => {
-            // Desktop badge
-            const badge = document.getElementById('unread-badge-' + id);
-            if (badge) {
-                const count = counts[id] || 0;
-                if (count > 0) {
-                    badge.textContent = count;
-                    badge.classList.remove('d-none');
-                } else {
-                    badge.textContent = '';
-                    badge.classList.add('d-none');
-                }
-            }
-            // Mobile badge
-            const badgeMobile = document.getElementById('unread-badge-mobile-' + id);
-            if (badgeMobile) {
-                const count = counts[id] || 0;
-                if (count > 0) {
-                    badgeMobile.textContent = count;
-                    badgeMobile.classList.remove('d-none');
-                } else {
-                    badgeMobile.textContent = '';
-                    badgeMobile.classList.add('d-none');
-                }
-            }
-        });
-    });
-}
-document.addEventListener('DOMContentLoaded', function() {
-    pollAdminUnreadBadges();
-    setInterval(pollAdminUnreadBadges, 5000);
-});
-</script>
                                 </div>
                             </div>
                             <?php endforeach; ?>
