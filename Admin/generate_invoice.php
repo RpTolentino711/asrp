@@ -1191,9 +1191,11 @@ setInterval(() => {
                                             // Count unread client messages for admin
                                             $unread = 0;
                                             try {
-                                                $stmt = $db->pdo->prepare('SELECT COUNT(*) FROM invoice_chat WHERE Invoice_ID = ? AND is_read_admin = 0 AND Sender_Type = "client"');
-                                                $stmt->execute([$row['Invoice_ID']]);
-                                                $unread = $stmt->fetchColumn();
+                                                $sql = 'SELECT COUNT(*) FROM invoice_chat WHERE Invoice_ID = ? AND is_read_admin = 0 AND Sender_Type = "client"';
+                                                $result = $db->getRow($sql, [$row['Invoice_ID']]);
+                                                if ($result && is_array($result)) {
+                                                    $unread = array_values($result)[0];
+                                                }
                                             } catch (Exception $e) {}
                                             ?>
                                             <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat position-relative">
