@@ -1,5 +1,5 @@
 <?php
-// Get unread client message count for each invoice for admin (AJAX endpoint)
+// Get unread client message count for each invoice for admin
 require_once '../database/database.php';
 
 if (!isset($_POST['invoice_ids'])) {
