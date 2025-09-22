@@ -1849,4 +1849,4 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         <?php endif; ?>
     </script>
 </body>
-</html>
+</html>     
