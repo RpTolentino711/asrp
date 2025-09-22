@@ -1408,7 +1408,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
                     if (isOnline) {
                         // Refresh data when back online
-                        fetchPendingRequests(true);
+                        fetchPendingRequests();
                     }
                 }
             }
@@ -1449,7 +1449,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 document.addEventListener('touchend', function(e) {
                     if (isPulling && pullDistance > 80) {
                         pullRefresh.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
-                        fetchPendingRequests(true).then(() => {
+                        fetchPendingRequests().then(() => {
                             setTimeout(() => {
                                 pullRefresh.classList.remove('show');
                             }, 1000);
@@ -1467,29 +1467,13 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             let isLoading = false;
             let pollInterval;
             let lastUpdateTime = Date.now();
-            let pausePolling = false;
 
-            async function fetchPendingRequests(force = false) {
-                if (isLoading || (pausePolling && !force)) return;
-                
-                // Don't update if user is actively interacting with forms
-                const activeElement = document.activeElement;
-                const isFormActive = activeElement && (
-                    activeElement.tagName === 'BUTTON' ||
-                    activeElement.tagName === 'INPUT' ||
-                    activeElement.tagName === 'SELECT' ||
-                    activeElement.closest('.mobile-card') ||
-                    activeElement.closest('form')
-                );
-                
-                if (isFormActive && !force) {
-                    console.log('Skipping update - user is interacting with form');
-                    return;
-                }
+            async function fetchPendingRequests() {
+                if (isLoading) return;
                 
                 isLoading = true;
                 const mainLoader = document.getElementById('mainLoader');
-                if (force) mainLoader.classList.add('show');
+                mainLoader.classList.add('show');
                 
                 try {
                     const response = await fetch('../AJAX/ajax_admin_pending_requests.php', {
@@ -1506,31 +1490,9 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                     
                     const html = await response.text();
                     
-                    // Store current scroll position
-                    const scrollY = window.scrollY;
-                    
-                    // Check if content actually changed before updating
+                    // Update container with animation
                     const container = document.getElementById('pendingRequestsContainer');
-                    const currentHTML = container.innerHTML.replace(/animate-\w+/g, '').replace(/style="[^"]*"/g, '');
-                    const newHTML = html.replace(/animate-\w+/g, '').replace(/style="[^"]*"/g, '');
-                    
-                    if (currentHTML !== newHTML) {
-                        // Update container with animation
-                        container.innerHTML = html;
-                        
-                        // Restore scroll position
-                        window.scrollTo(0, scrollY);
-                        
-                        // Add animations to new elements
-                        const cards = container.querySelectorAll('.mobile-card');
-                        cards.forEach((card, index) => {
-                            card.classList.add('animate-slide-up');
-                            card.style.animationDelay = `${index * 0.1}s`;
-                        });
-                        
-                        // Bind event handlers to new buttons
-                        bindActionHandlers();
-                    }
+                    container.innerHTML = html;
                     
                     // Update count badges
                     const match = html.match(/data-count="(\d+)"/);
@@ -1546,17 +1508,22 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                         sidebarBadge.style.display = 'none';
                     }
                     
-                    lastUpdateTime = Date.now();
+                    // Add animations to new elements
+                    const cards = container.querySelectorAll('.mobile-card');
+                    cards.forEach((card, index) => {
+                        card.classList.add('animate-slide-up');
+                        card.style.animationDelay = `${index * 0.1}s`;
+                    });
                     
-                    if (force) {
-                        showToast(`Updated ${count} pending request${count !== '1' ? 's' : ''}`, 'success', 2000);
-                    }
+                    // Bind event handlers to new buttons
+                    bindActionHandlers();
+                    
+                    lastUpdateTime = Date.now();
+                    showToast(`Updated ${count} pending request${count !== '1' ? 's' : ''}`, 'success', 2000);
                     
                 } catch (error) {
                     console.error('Failed to fetch pending requests:', error);
-                    if (force) {
-                        showToast('Failed to update requests. Retrying...', 'error');
-                    }
+                    showToast('Failed to update requests. Retrying...', 'error');
                     
                     // Show offline message if appropriate
                     if (!navigator.onLine) {
@@ -1565,7 +1532,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                                 <i class="fas fa-wifi-slash"></i>
                                 <h4>You're offline</h4>
                                 <p>Check your connection and try again.</p>
-                                <button class="refresh-btn" onclick="fetchPendingRequests(true)">
+                                <button class="refresh-btn" onclick="fetchPendingRequests()">
                                     <i class="fas fa-sync-alt"></i> Retry
                                 </button>
                             </div>
@@ -1579,35 +1546,12 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
             // Bind action handlers to dynamically loaded content
             function bindActionHandlers() {
-                // Pause polling when user interacts with buttons
-                document.querySelectorAll('.btn-accept, .mobile-btn-accept, .btn-reject, .mobile-btn-reject').forEach(btn => {
-                    btn.addEventListener('mousedown', () => pausePolling = true);
-                    btn.addEventListener('touchstart', () => pausePolling = true, { passive: true });
-                    btn.addEventListener('focus', () => pausePolling = true);
-                });
-
                 document.querySelectorAll('.btn-accept, .mobile-btn-accept').forEach(btn => {
                     btn.addEventListener('click', handleAcceptRequest);
                 });
                 
                 document.querySelectorAll('.btn-reject, .mobile-btn-reject').forEach(btn => {
                     btn.addEventListener('click', handleRejectRequest);
-                });
-
-                // Add hover/focus event listeners to mobile cards to pause polling
-                document.querySelectorAll('.mobile-card').forEach(card => {
-                    card.addEventListener('mouseenter', () => pausePolling = true);
-                    card.addEventListener('mouseleave', () => {
-                        setTimeout(() => pausePolling = false, 2000); // Resume after 2 seconds
-                    });
-                    card.addEventListener('touchstart', () => pausePolling = true, { passive: true });
-                });
-
-                // Resume polling after user interaction ends
-                document.addEventListener('click', (e) => {
-                    if (!e.target.closest('.mobile-card') && !e.target.closest('.btn-accept') && !e.target.closest('.btn-reject')) {
-                        setTimeout(() => pausePolling = false, 1000);
-                    }
                 });
             }
 
@@ -1685,8 +1629,8 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                             showConfirmButton: false
                         });
                         
-                        // Refresh the data after successful action
-                        await fetchPendingRequests(true);
+                        // Refresh the data
+                        await fetchPendingRequests();
                     } else {
                         throw new Error(result.message || 'Unknown error occurred');
                     }
@@ -1753,7 +1697,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             // Visibility change handler
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible') {
-                    fetchPendingRequests(true); // Immediate refresh when becoming visible
+                    fetchPendingRequests(); // Immediate refresh when becoming visible
                 }
                 startPolling(); // Adjust polling interval
             });
@@ -1768,7 +1712,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 // F5 or Ctrl/Cmd + R to refresh
                 if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
                     e.preventDefault();
-                    fetchPendingRequests(true);
+                    fetchPendingRequests();
                 }
             });
 
@@ -1788,7 +1732,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             });
 
             // Initialize
-            fetchPendingRequests(true);
+            fetchPendingRequests();
             startPolling();
 
             // Service Worker for offline support (if available)
