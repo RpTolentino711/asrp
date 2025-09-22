@@ -1201,6 +1201,8 @@ document.addEventListener('DOMContentLoaded', function() {
   if (forgotPasswordLink) {
     forgotPasswordLink.addEventListener('click', function(e) {
       e.preventDefault();
+      console.log('Forgot Password link clicked');
+      alert('Forgot Password link clicked');
       // Always try to hide login modal if open, but show forgot password modal regardless
       let loginModalEl = document.getElementById('loginModal');
       let forgotModalEl = document.getElementById('forgotPasswordModal');
