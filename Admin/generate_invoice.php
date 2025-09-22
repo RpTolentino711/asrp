@@ -839,7 +839,15 @@ setInterval(() => {
                                             <?= isset($row['EndDate']) ? htmlspecialchars($row['EndDate']) : '<span class="text-muted">N/A</span>' ?>
                                         </td>
                                         <td>
-                                            <?= isset($row['EndDate']) ? renderCountdown($row['EndDate']) : '<span class="text-muted">N/A</span>' ?>
+                                            <?php
+                                            if (isset($row['Flow_Status']) && strtolower($row['Flow_Status']) === 'done') {
+                                                echo '<span class="badge bg-success">Completed</span>';
+                                            } elseif (isset($row['EndDate'])) {
+                                                echo renderCountdown($row['EndDate']);
+                                            } else {
+                                                echo '<span class="text-muted">N/A</span>';
+                                            }
+                                            ?>
                                         </td>
                                         <td>
                                             <a href="generate_invoice.php?chat_invoice_id=<?= $row['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>" class="btn-action btn-chat">
