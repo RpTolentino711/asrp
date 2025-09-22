@@ -642,36 +642,63 @@ $is_logged_in = isset($_SESSION['client_id']);
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'invoice_history.php' ? 'active' : '' ?>" href="invoice_history.php" style="position: relative;">
             <i class="bi bi-credit-card me-2"></i>Payment
-            <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
+            <?php
+            // Only show badge if client is logged in and has a unit
+            $show_payment_badge = false;
+            if (isset($_SESSION['client_id'])) {
+                // Check if client has at least one unit (assuming getClientInfo returns unit info or add a method)
+                $client_info = $db->getClientInfo($_SESSION['client_id']);
+                if ($client_info && !empty($client_info['Unit_ID'])) {
+                    $show_payment_badge = true;
+                }
+            }
+            ?>
+            <span class="notification-badge<?= $show_payment_badge ? '' : ' d-none' ?>" id="client-unread-admin-badge"></span>
           </a>
         </li>
 <script>
 // Live poll unread admin messages for client (Payment nav badge)
 function pollClientUnreadAdminBadge() {
-  // Only run if client is logged in
-  <?php if (isset($_SESSION['client_id'])): ?>
-  fetch('AJAX/get_unread_admin_chat_counts.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
-  })
-  .then(res => res.json())
-  .then(counts => {
-    // Sum all unread admin messages across all invoices
-    let total = 0;
-    Object.values(counts).forEach(cnt => { total += cnt; });
+  // Only run if client is logged in and has a unit
+  <?php
+  $js_show_payment_badge = 'false';
+  if (isset($_SESSION['client_id'])) {
+      $client_info = $db->getClientInfo($_SESSION['client_id']);
+      if ($client_info && !empty($client_info['Unit_ID'])) {
+          $js_show_payment_badge = 'true';
+      }
+  }
+  ?>
+  if (<?= $js_show_payment_badge ?>) {
+    fetch('AJAX/get_unread_admin_chat_counts.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+    })
+    .then(res => res.json())
+    .then(counts => {
+      // Sum all unread admin messages across all invoices
+      let total = 0;
+      Object.values(counts).forEach(cnt => { total += cnt; });
+      const badge = document.getElementById('client-unread-admin-badge');
+      if (badge) {
+        if (total > 0) {
+          badge.textContent = total;
+          badge.classList.remove('d-none');
+        } else {
+          badge.textContent = '';
+          badge.classList.add('d-none');
+        }
+      }
+    });
+  } else {
+    // Hide badge if not eligible
     const badge = document.getElementById('client-unread-admin-badge');
     if (badge) {
-      if (total > 0) {
-        badge.textContent = total;
-        badge.classList.remove('d-none');
-      } else {
-        badge.textContent = '';
-        badge.classList.add('d-none');
-      }
+      badge.textContent = '';
+      badge.classList.add('d-none');
     }
-  });
-  <?php endif; ?>
+  }
 }
 document.addEventListener('DOMContentLoaded', function() {
   pollClientUnreadAdminBadge();
@@ -1330,7 +1357,7 @@ document.addEventListener('DOMContentLoaded', function() {
   // Intercept registration form submit
   const regForm = document.getElementById('registerForm');
   if (regForm) {
-    regForm.addEventListener('submit', function(e) {
+    regForm.addEventListener('submit', function)(e) {
       e.preventDefault();
       
       // Check live validation before proceeding
@@ -1346,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', function() {
           text: 'Please resolve the email/username errors before registering.',
           timer: 3000
         });
+      }
         return;
       }
       
