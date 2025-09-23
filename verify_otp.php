@@ -262,7 +262,7 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
                         </div>
                         <div class='feature-item'>
                             <div class='feature-icon'>📞</div>
-                            <div class='feature-text'>24/7 Customer Support</div>
+                            <div class='feature-text'>Customer Support</div>
                         </div>
                         <div class='feature-item'>
                             <div class='feature-icon'>📊</div>
