@@ -645,251 +645,6 @@ $is_logged_in = isset($_SESSION['client_id']);
             <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
           </a>
         </li>
-<script>
-// Reset Password Submission (Forgot Password Flow)
-document.addEventListener('DOMContentLoaded', function() {
-  const resetForm = document.getElementById('resetPasswordForm');
-  if (resetForm) {
-    resetForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const pass = document.getElementById('resetPasswordInput').value;
-      const confirm = document.getElementById('resetConfirmPasswordInput').value;
-      const errorMsg = document.getElementById('resetPasswordErrorMsg');
-      errorMsg.textContent = '';
-      if (!pass || !confirm) {
-        errorMsg.textContent = 'All fields are required.';
-        return;
-      }
-      if (pass !== confirm) {
-        errorMsg.textContent = 'Passwords do not match.';
-        return;
-      }
-      if (pass.length < 6) {
-        errorMsg.textContent = 'Password must be at least 6 characters.';
-        return;
-      }
-      fetch('reset_password.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'password=' + encodeURIComponent(pass) + '&confirm_password=' + encodeURIComponent(confirm)
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal')).hide();
-          Swal.fire({ icon: 'success', title: 'Password Reset', text: 'Your password has been updated. You can now log in.' });
-        } else {
-          errorMsg.textContent = data.message || 'Failed to reset password.';
-        }
-      })
-      .catch(() => {
-        errorMsg.textContent = 'Could not reset password. Please try again.';
-      });
-    });
-  }
-});
-// Live poll unread admin messages for client (Payment nav badge)
-function pollClientUnreadAdminBadge() {
-  // Only run if client is logged in
-  <?php if (isset($_SESSION['client_id'])): ?>
-  fetch('AJAX/get_unread_admin_chat_counts.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
-  })
-  .then(res => res.json())
-  .then(counts => {
-    // Sum all unread admin messages across all invoices
-    let total = 0;
-    Object.values(counts).forEach(cnt => { total += cnt; });
-    const badge = document.getElementById('client-unread-admin-badge');
-    if (badge) {
-      if (total > 0) {
-        badge.textContent = total;
-        badge.classList.remove('d-none');
-      } else {
-        badge.textContent = '';
-        badge.classList.add('d-none');
-      }
-    }
-  });
-  <?php endif; ?>
-}
-document.addEventListener('DOMContentLoaded', function() {
-  pollClientUnreadAdminBadge();
-  setInterval(pollClientUnreadAdminBadge, 5000);
-});
-// Forgot Password Flow
-document.addEventListener('DOMContentLoaded', function() {
-  const forgotLink = document.getElementById('forgotPasswordLink');
-  if (forgotLink) {
-    forgotLink.addEventListener('click', function(e) {
-      e.preventDefault();
-      const forgotModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
-      document.getElementById('forgotEmailInput').value = '';
-      document.getElementById('forgotEmailErrorMsg').textContent = '';
-      forgotModal.show();
-    });
-  }
-
-  const forgotForm = document.getElementById('forgotPasswordForm');
-  if (forgotForm) {
-    forgotForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const email = document.getElementById('forgotEmailInput').value.trim();
-      const errorMsg = document.getElementById('forgotEmailErrorMsg');
-      errorMsg.textContent = '';
-      if (!email) {
-        errorMsg.textContent = 'Please enter your email.';
-        return;
-      }
-      fetch('send_forgot_otp.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'email=' + encodeURIComponent(email)
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          // Hide forgot modal, show OTP modal
-          bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal')).hide();
-          showForgotOtpModal(data.expires_at);
-        } else {
-          errorMsg.textContent = data.message || 'Failed to send OTP.';
-        }
-      })
-      .catch(() => {
-        errorMsg.textContent = 'Could not send OTP. Please try again.';
-      });
-    });
-  }
-});
-
-// Show OTP modal for forgot password
-function showForgotOtpModal(expiresAt) {
-  if (window.forgotOtpTimerInterval) clearInterval(window.forgotOtpTimerInterval);
-  document.getElementById('forgotOtpInput').value = '';
-  document.getElementById('forgotOtpErrorMsg').textContent = '';
-  window.forgotOtpExpiresAt = expiresAt;
-  updateForgotOtpTimer();
-  const modal = new bootstrap.Modal(document.getElementById('forgotOtpModal'));
-  modal.show();
-  window.forgotOtpTimerInterval = setInterval(updateForgotOtpTimer, 1000);
-}
-function updateForgotOtpTimer() {
-  if (!window.forgotOtpExpiresAt) return;
-  const now = Math.floor(Date.now() / 1000);
-  const secondsLeft = window.forgotOtpExpiresAt - now;
-  const timerSpan = document.getElementById('forgotOtpTimer');
-  if (secondsLeft > 0) {
-    const min = Math.floor(secondsLeft / 60);
-    const sec = secondsLeft % 60;
-    timerSpan.textContent = `Expires in ${min}:${sec.toString().padStart(2, '0')}`;
-    document.getElementById('forgotResendOtpBtn').disabled = true;
-  } else {
-    timerSpan.textContent = 'OTP expired. Please resend.';
-    document.getElementById('forgotResendOtpBtn').disabled = false;
-    clearInterval(window.forgotOtpTimerInterval);
-    window.forgotOtpTimerInterval = null;
-  }
-}
-// Forgot Password OTP Verification
-document.addEventListener('DOMContentLoaded', function() {
-  const forgotOtpForm = document.getElementById('forgotOtpForm');
-  if (forgotOtpForm) {
-    forgotOtpForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const otp = document.getElementById('forgotOtpInput').value.trim();
-      const errorMsg = document.getElementById('forgotOtpErrorMsg');
-      errorMsg.textContent = '';
-      if (!/^\d{6}$/.test(otp)) {
-        errorMsg.textContent = 'Please enter a valid 6-digit code.';
-        return;
-      }
-      fetch('verify_forgot_otp.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'otp=' + encodeURIComponent(otp)
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          bootstrap.Modal.getInstance(document.getElementById('forgotOtpModal')).hide();
-          showResetPasswordModal();
-        } else {
-          errorMsg.textContent = data.message || 'Invalid OTP.';
-        }
-      })
-      .catch(() => {
-        errorMsg.textContent = 'Could not verify OTP. Please try again.';
-      });
-    });
-  }
-});
-
-// Show Reset Password Modal
-function showResetPasswordModal() {
-  document.getElementById('resetPasswordInput').value = '';
-  document.getElementById('resetConfirmPasswordInput').value = '';
-  document.getElementById('resetPasswordErrorMsg').textContent = '';
-  const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
-  modal.show();
-}
-</script>
-<!-- Reset Password Modal -->
-<div class="modal fade modern-modal" id="resetPasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form id="resetPasswordForm" autocomplete="off">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-key-fill me-2 text-primary"></i>Reset Password</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="resetPasswordInput" class="form-label">New Password</label>
-            <input type="password" class="form-control" id="resetPasswordInput" name="password" placeholder="Enter new password" required>
-          </div>
-          <div class="mb-3">
-            <label for="resetConfirmPasswordInput" class="form-label">Confirm New Password</label>
-            <input type="password" class="form-control" id="resetConfirmPasswordInput" name="confirm_password" placeholder="Confirm new password" required>
-          </div>
-          <div class="form-text text-danger" id="resetPasswordErrorMsg"></div>
-          <div class="d-grid mt-3">
-            <button type="submit" class="modern-btn modern-btn-primary">Reset Password</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-<!-- Forgot Password OTP Modal -->
-<div class="modal fade modern-modal" id="forgotOtpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form id="forgotOtpForm" autocomplete="off">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Enter OTP</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="forgotOtpInput" class="form-label">Enter the 6-digit code sent to your email</label>
-            <input type="text" class="form-control text-center" id="forgotOtpInput" name="otp" maxlength="6" pattern="\d{6}" required autofocus autocomplete="one-time-code">
-            <div class="form-text text-danger" id="forgotOtpErrorMsg"></div>
-          </div>
-          <div class="mb-2 text-end">
-            <button type="button" class="btn btn-link p-0" id="forgotResendOtpBtn">Resend OTP</button>
-            <span id="forgotOtpTimer" class="text-muted small"></span>
-          </div>
-          <div class="d-grid">
-            <button type="submit" class="modern-btn modern-btn-primary">Verify OTP</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'handyman_type.php' ? 'active' : '' ?>" href="handyman_type.php">
@@ -980,29 +735,6 @@ function showResetPasswordModal() {
           <div class="mb-2 text-end">
             <a href="#" id="forgotPasswordLink" class="small text-primary">Forgot Password?</a>
           </div>
-<!-- Forgot Password Modal -->
-<div class="modal fade modern-modal" id="forgotPasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form id="forgotPasswordForm" autocomplete="off">
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-envelope-lock me-2 text-primary"></i>Forgot Password</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="forgotEmailInput" class="form-label">Enter your registered email address</label>
-            <input type="email" class="form-control" id="forgotEmailInput" name="email" placeholder="your@email.com" autofocus>
-            <div class="form-text text-danger" id="forgotEmailErrorMsg"></div>
-          </div>
-          <div class="d-grid">
-            <button type="submit" class="modern-btn modern-btn-primary">Send OTP</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
           <div class="d-grid">
             <button type="submit" class="modern-btn modern-btn-primary">
               <i class="bi bi-box-arrow-in-right me-2"></i>Login
@@ -1018,7 +750,7 @@ function showResetPasswordModal() {
 <div class="modal fade modern-modal" id="registerModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
-      <form id="registerForm" method="POST" action="register.php" onsubmit="return false;">
+      <form id="registerForm" method="POST" action="register.php">
         <div class="modal-header">
           <h5 class="modal-title d-flex align-items-center">
             <i class="bi bi-person-plus-fill fs-3 me-2 text-primary"></i> 
@@ -1078,8 +810,11 @@ function showResetPasswordModal() {
                   <i class="bi bi-at"></i>
                 </span>
                 <input type="text" class="form-control<?php if(isset($_SESSION['register_duplicate']) && $_SESSION['register_duplicate']==='username') echo ' is-invalid'; ?>" name="username" id="reg_username" placeholder="Choose username" required value="<?= isset($_SESSION['register_backup']['username']) ? htmlspecialchars($_SESSION['register_backup']['username']) : '' ?>">
-<?php if (isset($_SESSION['register_backup'])) unset($_SESSION['register_backup']); ?>
-<?php if (isset($_SESSION['register_duplicate'])) unset($_SESSION['register_duplicate']); ?>
+<?php 
+// Clear backup data after displaying
+if (isset($_SESSION['register_backup'])) unset($_SESSION['register_backup']); 
+if (isset($_SESSION['register_duplicate'])) unset($_SESSION['register_duplicate']); 
+?>
               </div>
               <div class="form-text text-danger" id="username_msg"></div>
             </div>
@@ -1119,6 +854,9 @@ function showResetPasswordModal() {
           </div>
         </div>
       </form>
+    </div>
+  </div>
+</div>
 
 <!-- OTP Modal -->
 <div class="modal fade modern-modal" id="otpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
@@ -1147,6 +885,83 @@ function showResetPasswordModal() {
     </div>
   </div>
 </div>
+
+<!-- Forgot Password Modal -->
+<div class="modal fade modern-modal" id="forgotPasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="forgotPasswordForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-envelope-lock me-2 text-primary"></i>Forgot Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="forgotEmailInput" class="form-label">Enter your registered email address</label>
+            <input type="email" class="form-control" id="forgotEmailInput" name="email" placeholder="your@email.com" autofocus>
+            <div class="form-text text-danger" id="forgotEmailErrorMsg"></div>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="modern-btn modern-btn-primary">Send OTP</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Forgot Password OTP Modal -->
+<div class="modal fade modern-modal" id="forgotOtpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="forgotOtpForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Enter OTP</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="forgotOtpInput" class="form-label">Enter the 6-digit code sent to your email</label>
+            <input type="text" class="form-control text-center" id="forgotOtpInput" name="otp" maxlength="6" pattern="\d{6}" required autofocus autocomplete="one-time-code">
+            <div class="form-text text-danger" id="forgotOtpErrorMsg"></div>
+          </div>
+          <div class="mb-2 text-end">
+            <button type="button" class="btn btn-link p-0" id="forgotResendOtpBtn">Resend OTP</button>
+            <span id="forgotOtpTimer" class="text-muted small"></span>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="modern-btn modern-btn-primary">Verify OTP</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade modern-modal" id="resetPasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="resetPasswordForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-key-fill me-2 text-primary"></i>Reset Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="resetPasswordInput" class="form-label">New Password</label>
+            <input type="password" class="form-control" id="resetPasswordInput" name="password" placeholder="Enter new password" required>
+          </div>
+          <div class="mb-3">
+            <label for="resetConfirmPasswordInput" class="form-label">Confirm New Password</label>
+            <input type="password" class="form-control" id="resetConfirmPasswordInput" name="confirm_password" placeholder="Confirm new password" required>
+          </div>
+          <div class="form-text text-danger" id="resetPasswordErrorMsg"></div>
+          <div class="d-grid mt-3">
+            <button type="submit" class="modern-btn modern-btn-primary">Reset Password</button>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -1347,291 +1162,582 @@ let otpExpiresAt = null;
 let otpTimerInterval = null;
 
 function showOtpModal(expiresAt) {
-  if (otpTimerInterval) clearInterval(otpTimerInterval);
+    if (otpTimerInterval) clearInterval(otpTimerInterval);
 
-  otpExpiresAt = expiresAt;
-  document.getElementById('otpInput').value = '';
-  document.getElementById('otpErrorMsg').textContent = '';
-  updateOtpTimer();
+    otpExpiresAt = expiresAt;
+    document.getElementById('otpInput').value = '';
+    document.getElementById('otpErrorMsg').textContent = '';
+    updateOtpTimer();
 
-  const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
-  otpModal.show();
+    const otpModal = new bootstrap.Modal(document.getElementById('otpModal'));
+    otpModal.show();
 
-  otpTimerInterval = setInterval(updateOtpTimer, 1000);
+    otpTimerInterval = setInterval(updateOtpTimer, 1000);
 }
 
 function updateOtpTimer() {
-  if (!otpExpiresAt) return;
-  const now = Math.floor(Date.now() / 1000);
-  const secondsLeft = otpExpiresAt - now;
-  const timerSpan = document.getElementById('otpTimer');
+    if (!otpExpiresAt) return;
+    const now = Math.floor(Date.now() / 1000);
+    const secondsLeft = otpExpiresAt - now;
+    const timerSpan = document.getElementById('otpTimer');
 
-  if (secondsLeft > 0) {
-    const min = Math.floor(secondsLeft / 60);
-    const sec = secondsLeft % 60;
-    timerSpan.textContent = `Expires in ${min}:${sec.toString().padStart(2, '0')}`;
-    document.getElementById('resendOtpBtn').disabled = true;
-  } else {
-    timerSpan.textContent = 'OTP expired. Please resend.';
-    document.getElementById('resendOtpBtn').disabled = false;
-    clearInterval(otpTimerInterval);
-    otpTimerInterval = null;
-  }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  // ========== LIVE VALIDATION SETUP ==========
-  // Email field validation
-  const emailField = document.getElementById('reg_email');
-  if (emailField) {
-    emailField.addEventListener('input', function() {
-      const email = this.value.trim();
-      debouncedEmailValidation(email, 'reg_email', 'email_msg');
-    });
-
-    emailField.addEventListener('focus', function() {
-      if (!this.value.trim()) {
-        clearValidationFeedback('reg_email', 'email_msg');
-        toggleSubmitButton();
-      }
-    });
-  }
-
-  // Username field validation
-  const usernameField = document.getElementById('reg_username');
-  if (usernameField) {
-    usernameField.addEventListener('input', function() {
-      const username = this.value.trim();
-      debouncedUsernameValidation(username, 'reg_username', 'username_msg');
-    });
-
-    usernameField.addEventListener('focus', function() {
-      if (!this.value.trim()) {
-        clearValidationFeedback('reg_username', 'username_msg');
-        toggleSubmitButton();
-      }
-    });
-  }
-
-  // Monitor all form fields for submit button state
-  const formFields = ['fname', 'lname', 'reg_phone', 'reg_password', 'reg_confirm_password'];
-  formFields.forEach(fieldName => {
-    const field = document.querySelector(`[name="${fieldName}"], #${fieldName}`);
-    if (field) {
-      field.addEventListener('input', toggleSubmitButton);
-    }
-  });
-  
-  // Clean up timer when OTP modal is closed
-  const otpModalEl = document.getElementById('otpModal');
-  if (otpModalEl) {
-    otpModalEl.addEventListener('hidden.bs.modal', function() {
-      if (otpTimerInterval) {
+    if (secondsLeft > 0) {
+        const min = Math.floor(secondsLeft / 60);
+        const sec = secondsLeft % 60;
+        timerSpan.textContent = `Expires in ${min}:${sec.toString().padStart(2, '0')}`;
+        document.getElementById('resendOtpBtn').disabled = true;
+    } else {
+        timerSpan.textContent = 'OTP expired. Please resend.';
+        document.getElementById('resendOtpBtn').disabled = false;
         clearInterval(otpTimerInterval);
         otpTimerInterval = null;
-      }
-    });
-  }
+    }
+}
 
-  // Intercept registration form submit
-  const regForm = document.getElementById('registerForm');
-  if (regForm) {
-    regForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      // Check live validation before proceeding
-      const emailField = document.getElementById('reg_email');
-      const usernameField = document.getElementById('reg_username');
-      const hasEmailError = emailField && emailField.classList.contains('is-invalid');
-      const hasUsernameError = usernameField && usernameField.classList.contains('is-invalid');
-      
-      if (hasEmailError || hasUsernameError) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Please Fix Errors',
-          text: 'Please resolve the email/username errors before registering.',
-          timer: 3000
+// ========== FORGOT PASSWORD OTP LOGIC ==========
+let forgotOtpExpiresAt = null;
+let forgotOtpTimerInterval = null;
+
+function showForgotOtpModal(expiresAt) {
+    if (forgotOtpTimerInterval) clearInterval(forgotOtpTimerInterval);
+
+    forgotOtpExpiresAt = expiresAt;
+    document.getElementById('forgotOtpInput').value = '';
+    document.getElementById('forgotOtpErrorMsg').textContent = '';
+    updateForgotOtpTimer();
+
+    const modal = new bootstrap.Modal(document.getElementById('forgotOtpModal'));
+    modal.show();
+
+    forgotOtpTimerInterval = setInterval(updateForgotOtpTimer, 1000);
+}
+
+function updateForgotOtpTimer() {
+    if (!forgotOtpExpiresAt) return;
+    const now = Math.floor(Date.now() / 1000);
+    const secondsLeft = forgotOtpExpiresAt - now;
+    const timerSpan = document.getElementById('forgotOtpTimer');
+
+    if (secondsLeft > 0) {
+        const min = Math.floor(secondsLeft / 60);
+        const sec = secondsLeft % 60;
+        timerSpan.textContent = `Expires in ${min}:${sec.toString().padStart(2, '0')}`;
+        document.getElementById('forgotResendOtpBtn').disabled = true;
+    } else {
+        timerSpan.textContent = 'OTP expired. Please resend.';
+        document.getElementById('forgotResendOtpBtn').disabled = false;
+        clearInterval(forgotOtpTimerInterval);
+        forgotOtpTimerInterval = null;
+    }
+}
+
+function showResetPasswordModal() {
+    document.getElementById('resetPasswordInput').value = '';
+    document.getElementById('resetConfirmPasswordInput').value = '';
+    document.getElementById('resetPasswordErrorMsg').textContent = '';
+    const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+    modal.show();
+}
+
+// ========== MAIN EVENT LISTENERS ==========
+document.addEventListener('DOMContentLoaded', function() {
+    // ========== LIVE VALIDATION SETUP ==========
+    // Email field validation
+    const emailField = document.getElementById('reg_email');
+    if (emailField) {
+        emailField.addEventListener('input', function() {
+            const email = this.value.trim();
+            debouncedEmailValidation(email, 'reg_email', 'email_msg');
         });
-        return;
-      }
-      
-      if (!checkRegisterForm()) return;
 
-      const submitBtn = document.getElementById('registerSubmitBtn');
-      submitBtn.disabled = true;
-      submitBtn.classList.add('loading');
-
-      const formData = new FormData(regForm);
-      fetch('register.php', {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('loading');
-        if (data.success && data.pending_verification) {
-          showOtpModal(data.expires_at);
-        } else if (!data.success) {
-          Swal.fire({ icon: 'error', title: 'Registration Failed', text: data.message });
-        }
-      })
-      .catch(() => {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('loading');
-        Swal.fire({ icon: 'error', title: 'Error', text: 'Could not process registration.' });
-      });
-    });
-  }
-
-  // OTP input field: restrict to numbers only, max 6
-  const otpInput = document.getElementById('otpInput');
-  if (otpInput) {
-    otpInput.addEventListener('input', function() {
-      this.value = this.value.replace(/\D/g, '').slice(0, 6);
-      if (this.value.length === 6) {
-        document.getElementById('otpForm').requestSubmit();
-      }
-    });
-  }
-
-  // OTP form submit
-  const otpForm = document.getElementById('otpForm');
-  if (otpForm) {
-    otpForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const otp = document.getElementById('otpInput').value.trim();
-      if (!/^\d{6}$/.test(otp)) {
-        document.getElementById('otpErrorMsg').textContent = 'Please enter a valid 6-digit code.';
-        return;
-      }
-
-      document.getElementById('otpErrorMsg').textContent = '';
-      const submitOtpBtn = otpForm.querySelector('button[type="submit"]');
-      submitOtpBtn.disabled = true;
-
-      fetch('verify_otp.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'otp=' + encodeURIComponent(otp)
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          const otpModal = bootstrap.Modal.getInstance(document.getElementById('otpModal'));
-          otpModal.hide();
-          Swal.fire({ icon: 'success', title: 'Registration Complete', text: data.message || 'You can now log in.' });
-          setTimeout(() => window.location.reload(), 1500);
-        } else {
-          document.getElementById('otpErrorMsg').textContent = data.message || 'Invalid OTP.';
-        }
-      })
-      .catch(() => {
-        document.getElementById('otpErrorMsg').textContent = 'Could not verify OTP. Please try again.';
-      })
-      .finally(() => {
-        submitOtpBtn.disabled = false;
-      });
-    });
-  }
-
-  // Resend OTP
-  const resendBtn = document.getElementById('resendOtpBtn');
-  if (resendBtn) {
-    resendBtn.addEventListener('click', function() {
-      resendBtn.disabled = true;
-      fetch('resend_otp.php', { method: 'POST' })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            otpExpiresAt = data.expires_at;
-            updateOtpTimer();
-            Swal.fire({ icon: 'success', title: 'OTP Resent', text: 'A new code has been sent to your email.' });
-          } else {
-            Swal.fire({ icon: 'error', title: 'Error', text: data.message || 'Could not resend OTP.' });
-          }
-        })
-        .catch(() => {
-          Swal.fire({ icon: 'error', title: 'Error', text: 'Could not resend OTP.' });
-        })
-        .finally(() => {
-          resendBtn.disabled = false;
+        emailField.addEventListener('focus', function() {
+            if (!this.value.trim()) {
+                clearValidationFeedback('reg_email', 'email_msg');
+                toggleSubmitButton();
+            }
         });
+    }
+
+    // Username field validation
+    const usernameField = document.getElementById('reg_username');
+    if (usernameField) {
+        usernameField.addEventListener('input', function() {
+            const username = this.value.trim();
+            debouncedUsernameValidation(username, 'reg_username', 'username_msg');
+        });
+
+        usernameField.addEventListener('focus', function() {
+            if (!this.value.trim()) {
+                clearValidationFeedback('reg_username', 'username_msg');
+                toggleSubmitButton();
+            }
+        });
+    }
+
+    // Monitor all form fields for submit button state
+    const formFields = ['fname', 'lname', 'reg_phone', 'reg_password', 'reg_confirm_password'];
+    formFields.forEach(fieldName => {
+        const field = document.querySelector(`[name="${fieldName}"], #${fieldName}`);
+        if (field) {
+            field.addEventListener('input', toggleSubmitButton);
+        }
     });
-  }
+
+    // Clean up timers when modals are closed
+    const otpModalEl = document.getElementById('otpModal');
+    if (otpModalEl) {
+        otpModalEl.addEventListener('hidden.bs.modal', function() {
+            if (otpTimerInterval) {
+                clearInterval(otpTimerInterval);
+                otpTimerInterval = null;
+            }
+        });
+    }
+
+    const forgotOtpModalEl = document.getElementById('forgotOtpModal');
+    if (forgotOtpModalEl) {
+        forgotOtpModalEl.addEventListener('hidden.bs.modal', function() {
+            if (forgotOtpTimerInterval) {
+                clearInterval(forgotOtpTimerInterval);
+                forgotOtpTimerInterval = null;
+            }
+        });
+    }
+
+    // ========== REGISTRATION FORM HANDLING ==========
+    const regForm = document.getElementById('registerForm');
+    if (regForm) {
+        regForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Check live validation before proceeding
+            const emailField = document.getElementById('reg_email');
+            const usernameField = document.getElementById('reg_username');
+            const hasEmailError = emailField && emailField.classList.contains('is-invalid');
+            const hasUsernameError = usernameField && usernameField.classList.contains('is-invalid');
+            
+            if (hasEmailError || hasUsernameError) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Please Fix Errors',
+                    text: 'Please resolve the email/username errors before registering.',
+                    timer: 3000
+                });
+                return;
+            }
+            
+            if (!checkRegisterForm()) return;
+
+            const submitBtn = document.getElementById('registerSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('loading');
+
+            const formData = new FormData(regForm);
+            
+            fetch('register.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                
+                if (data.success && data.pending_verification) {
+                    // Hide register modal and show OTP modal
+                    bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
+                    showOtpModal(data.expires_at);
+                } else if (!data.success) {
+                    Swal.fire({ 
+                        icon: 'error', 
+                        title: 'Registration Failed', 
+                        text: data.message 
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Registration error:', error);
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('loading');
+                Swal.fire({ 
+                    icon: 'error', 
+                    title: 'Error', 
+                    text: 'Could not process registration.' 
+                });
+            });
+        });
+    }
+
+    // ========== OTP HANDLING ==========
+    const otpInput = document.getElementById('otpInput');
+    if (otpInput) {
+        otpInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').slice(0, 6);
+            if (this.value.length === 6) {
+                document.getElementById('otpForm').requestSubmit();
+            }
+        });
+    }
+
+    const otpForm = document.getElementById('otpForm');
+    if (otpForm) {
+        otpForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const otp = document.getElementById('otpInput').value.trim();
+            
+            if (!/^\d{6}$/.test(otp)) {
+                document.getElementById('otpErrorMsg').textContent = 'Please enter a valid 6-digit code.';
+                return;
+            }
+
+            document.getElementById('otpErrorMsg').textContent = '';
+            const submitOtpBtn = otpForm.querySelector('button[type="submit"]');
+            submitOtpBtn.disabled = true;
+
+            fetch('verify_otp.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'otp=' + encodeURIComponent(otp)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const otpModal = bootstrap.Modal.getInstance(document.getElementById('otpModal'));
+                    otpModal.hide();
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'Registration Complete', 
+                        text: data.message || 'You can now log in.' 
+                    });
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    document.getElementById('otpErrorMsg').textContent = data.message || 'Invalid OTP.';
+                }
+            })
+            .catch(error => {
+                console.error('OTP verification error:', error);
+                document.getElementById('otpErrorMsg').textContent = 'Could not verify OTP. Please try again.';
+            })
+            .finally(() => {
+                submitOtpBtn.disabled = false;
+            });
+        });
+    }
+
+    // Resend OTP
+    const resendBtn = document.getElementById('resendOtpBtn');
+    if (resendBtn) {
+        resendBtn.addEventListener('click', function() {
+            resendBtn.disabled = true;
+            
+            fetch('resend_otp.php', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        otpExpiresAt = data.expires_at;
+                        updateOtpTimer();
+                        Swal.fire({ 
+                            icon: 'success', 
+                            title: 'OTP Resent', 
+                            text: 'A new code has been sent to your email.' 
+                        });
+                    } else {
+                        Swal.fire({ 
+                            icon: 'error', 
+                            title: 'Error', 
+                            text: data.message || 'Could not resend OTP.' 
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Resend OTP error:', error);
+                    Swal.fire({ 
+                        icon: 'error', 
+                        title: 'Error', 
+                        text: 'Could not resend OTP.' 
+                    });
+                })
+                .finally(() => {
+                    resendBtn.disabled = false;
+                });
+        });
+    }
+
+    // ========== FORGOT PASSWORD HANDLING ==========
+    const forgotLink = document.getElementById('forgotPasswordLink');
+    if (forgotLink) {
+        forgotLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            const forgotModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
+            document.getElementById('forgotEmailInput').value = '';
+            document.getElementById('forgotEmailErrorMsg').textContent = '';
+            forgotModal.show();
+        });
+    }
+
+    const forgotForm = document.getElementById('forgotPasswordForm');
+    if (forgotForm) {
+        forgotForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('forgotEmailInput').value.trim();
+            const errorMsg = document.getElementById('forgotEmailErrorMsg');
+            
+            errorMsg.textContent = '';
+            
+            if (!email) {
+                errorMsg.textContent = 'Please enter your email.';
+                return;
+            }
+            
+            fetch('send_forgot_otp.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'email=' + encodeURIComponent(email)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal')).hide();
+                    showForgotOtpModal(data.expires_at);
+                } else {
+                    errorMsg.textContent = data.message || 'Failed to send OTP.';
+                }
+            })
+            .catch(error => {
+                console.error('Forgot password error:', error);
+                errorMsg.textContent = 'Could not send OTP. Please try again.';
+            });
+        });
+    }
+
+    // Forgot Password OTP Verification
+    const forgotOtpForm = document.getElementById('forgotOtpForm');
+    if (forgotOtpForm) {
+        forgotOtpForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const otp = document.getElementById('forgotOtpInput').value.trim();
+            const errorMsg = document.getElementById('forgotOtpErrorMsg');
+            
+            errorMsg.textContent = '';
+            
+            if (!/^\d{6}$/.test(otp)) {
+                errorMsg.textContent = 'Please enter a valid 6-digit code.';
+                return;
+            }
+            
+            fetch('verify_forgot_otp.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'otp=' + encodeURIComponent(otp)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('forgotOtpModal')).hide();
+                    showResetPasswordModal();
+                } else {
+                    errorMsg.textContent = data.message || 'Invalid OTP.';
+                }
+            })
+            .catch(error => {
+                console.error('Forgot OTP verification error:', error);
+                errorMsg.textContent = 'Could not verify OTP. Please try again.';
+            });
+        });
+    }
+
+    // Forgot Password Resend OTP
+    const forgotResendBtn = document.getElementById('forgotResendOtpBtn');
+    if (forgotResendBtn) {
+        forgotResendBtn.addEventListener('click', function() {
+            forgotResendBtn.disabled = true;
+            
+            fetch('resend_forgot_otp.php', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        forgotOtpExpiresAt = data.expires_at;
+                        updateForgotOtpTimer();
+                        Swal.fire({ 
+                            icon: 'success', 
+                            title: 'OTP Resent', 
+                            text: 'A new code has been sent to your email.' 
+                        });
+                    } else {
+                        Swal.fire({ 
+                            icon: 'error', 
+                            title: 'Error', 
+                            text: data.message || 'Could not resend OTP.' 
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Resend forgot OTP error:', error);
+                    Swal.fire({ 
+                        icon: 'error', 
+                        title: 'Error', 
+                        text: 'Could not resend OTP.' 
+                    });
+                })
+                .finally(() => {
+                    forgotResendBtn.disabled = false;
+                });
+        });
+    }
+
+    // Reset Password Form
+    const resetForm = document.getElementById('resetPasswordForm');
+    if (resetForm) {
+        resetForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const pass = document.getElementById('resetPasswordInput').value;
+            const confirm = document.getElementById('resetConfirmPasswordInput').value;
+            const errorMsg = document.getElementById('resetPasswordErrorMsg');
+            
+            errorMsg.textContent = '';
+            
+            if (!pass || !confirm) {
+                errorMsg.textContent = 'All fields are required.';
+                return;
+            }
+            
+            if (pass !== confirm) {
+                errorMsg.textContent = 'Passwords do not match.';
+                return;
+            }
+            
+            if (pass.length < 6) {
+                errorMsg.textContent = 'Password must be at least 6 characters.';
+                return;
+            }
+            
+            fetch('reset_password.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'password=' + encodeURIComponent(pass) + '&confirm_password=' + encodeURIComponent(confirm)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal')).hide();
+                    Swal.fire({ 
+                        icon: 'success', 
+                        title: 'Password Reset', 
+                        text: 'Your password has been updated. You can now log in.' 
+                    });
+                } else {
+                    errorMsg.textContent = data.message || 'Failed to reset password.';
+                }
+            })
+            .catch(error => {
+                console.error('Reset password error:', error);
+                errorMsg.textContent = 'Could not reset password. Please try again.';
+            });
+        });
+    }
+
+    // ========== NOTIFICATION BADGE POLLING ==========
+    function pollClientUnreadAdminBadge() {
+        <?php if (isset($_SESSION['client_id'])): ?>
+        fetch('AJAX/get_unread_admin_chat_counts.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+        })
+        .then(response => response.json())
+        .then(counts => {
+            let total = 0;
+            Object.values(counts).forEach(cnt => { total += cnt; });
+            const badge = document.getElementById('client-unread-admin-badge');
+            if (badge) {
+                if (total > 0) {
+                    badge.textContent = total;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('d-none');
+                }
+            }
+        })
+        .catch(error => console.error('Badge polling error:', error));
+        <?php endif; ?>
+    }
+
+    // Start polling for notification badges
+    pollClientUnreadAdminBadge();
+    setInterval(pollClientUnreadAdminBadge, 5000);
 });
+
+// ========== UTILITY FUNCTIONS ==========
 
 // Navbar scroll effect
 window.addEventListener('scroll', function() {
-  const navbar = document.querySelector('.modern-navbar');
-  if (window.scrollY > 50) {
-    navbar.classList.add('scrolled');
-  } else {
-    navbar.classList.remove('scrolled');
-  }
+    const navbar = document.querySelector('.modern-navbar');
+    if (window.scrollY > 50) {
+        navbar.classList.add('scrolled');
+    } else {
+        navbar.classList.remove('scrolled');
+    }
 });
 
 // Mobile navbar auto-close
 document.addEventListener('DOMContentLoaded', function() {
-  const navbarCollapse = document.getElementById('navbarNav');
-  if (navbarCollapse) {
-    navbarCollapse.addEventListener('click', function(e) {
-      const clickedElement = e.target.closest('.modern-nav-link, .modern-btn');
-      if (clickedElement && window.innerWidth < 992) {
-        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
-        bsCollapse.hide();
-      }
-    });
-  }
+    const navbarCollapse = document.getElementById('navbarNav');
+    if (navbarCollapse) {
+        navbarCollapse.addEventListener('click', function(e) {
+            const clickedElement = e.target.closest('.modern-nav-link, .modern-btn');
+            if (clickedElement && window.innerWidth < 992) {
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
+                bsCollapse.hide();
+            }
+        });
+    }
 });
 
 // Password toggle functionality
 function togglePassword(inputId, button) {
-  const input = document.getElementById(inputId);
-  const icon = button.querySelector('i');
-  
-  if (input.type === "password") {
-    input.type = "text";
-    icon.classList.remove("bi-eye");
-    icon.classList.add("bi-eye-slash");
-  } else {
-    input.type = "password";
-    icon.classList.remove("bi-eye-slash");
-    icon.classList.add("bi-eye");
-  }
+    const input = document.getElementById(inputId);
+    const icon = button.querySelector('i');
+    
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove("bi-eye");
+        icon.classList.add("bi-eye-slash");
+    } else {
+        input.type = "password";
+        icon.classList.remove("bi-eye-slash");
+        icon.classList.add("bi-eye");
+    }
 }
 
 // Form submission validation
 function checkRegisterForm() {
-  const phoneInput = document.getElementById('reg_phone');
-  const passwordInput = document.getElementById('reg_password');
-  const confirmPasswordInput = document.getElementById('reg_confirm_password');
-  
-  if (phoneInput && phoneInput.value.length !== 11) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Invalid Phone Number',
-      text: 'Phone number must be exactly 11 digits.'
-    });
-    phoneInput.focus();
-    return false;
-  }
-
-  if (passwordInput && confirmPasswordInput) {
-    if (passwordInput.value !== confirmPasswordInput.value) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Passwords Do Not Match',
-        text: 'Please make sure your passwords match.'
-      });
-      confirmPasswordField.focus();
-      return false;
+    const phoneInput = document.getElementById('reg_phone');
+    const passwordInput = document.getElementById('reg_password');
+    const confirmPasswordInput = document.getElementById('reg_confirm_password');
+    
+    if (phoneInput && phoneInput.value.length !== 11) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Invalid Phone Number',
+            text: 'Phone number must be exactly 11 digits.'
+        });
+        phoneInput.focus();
+        return false;
     }
-  }
-  
-  return true;
+
+    if (passwordInput && confirmPasswordInput) {
+        if (passwordInput.value !== confirmPasswordInput.value) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Passwords Do Not Match',
+                text: 'Please make sure your passwords match.'
+            });
+            confirmPasswordInput.focus();
+            return false;
+        }
+    }
+    
+    return true;
 }
 </script>
-
-
-
