@@ -60,6 +60,34 @@ public function executeStatement($sql, $params = []) {
         return (bool)$result;
     }
 
+
+
+
+
+
+
+public function getUserByEmail($email) {
+    $stmt = $this->pdo->prepare("SELECT * FROM client WHERE Client_Email = ?");
+    $stmt->execute([$email]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+public function updatePasswordByEmail($email, $hashedPassword) {
+    $stmt = $this->pdo->prepare("UPDATE client SET C_password = ? WHERE Client_Email = ?");
+    return $stmt->execute([$hashedPassword, $email]);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 public function getUnitPhotosForClient($client_id) {
     try {
         $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
