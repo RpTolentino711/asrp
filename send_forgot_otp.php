@@ -19,15 +19,17 @@ function debugLog($message, $data = null) {
 }
 
 try {
-    debugLog("Script started", ["POST" => $_POST, "SESSION" => array_keys($_SESSION)]);
+    debugLog("Script started", ["POST" => $_POST, "SESSION" => $_SESSION]);
     
     // Check if request method is POST
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        debugLog("Invalid request method", ["method" => $_SERVER['REQUEST_METHOD']]);
         throw new Exception('Invalid request method.');
     }
 
     // Validate email input
     if (empty($_POST['email'])) {
+        debugLog("Email is empty", ["POST" => $_POST]);
         throw new Exception('Email is required.');
     }
 
@@ -36,6 +38,7 @@ try {
 
     // Validate email format
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        debugLog("Invalid email format", ["email" => $email]);
         throw new Exception('Invalid email format.');
     }
 
@@ -67,16 +70,17 @@ try {
     // Use your existing database class
     $db = new Database();
     debugLog("Database initialized");
-    
-    // Check if user exists with this email using your method
-    $user = $db->getUserByEmail($email);
-    
+    try {
+        $user = $db->getUserByEmail($email);
+    } catch (Exception $e) {
+        debugLog("Database error", ["error" => $e->getMessage()]);
+        throw new Exception('Database error: ' . $e->getMessage());
+    }
     if (!$user) {
         debugLog("No user found", ["email" => $email]);
         throw new Exception('No account found with that email address.');
     }
-    
-    debugLog("User found", ["user_exists" => true, "has_fname" => isset($user['Client_fn'])]);
+    debugLog("User found", ["user_exists" => true, "user_data" => $user]);
 
     // Update rate limiting
     $_SESSION['last_forgot_otp_sent'] = time();
@@ -112,7 +116,7 @@ try {
     // Initialize PHPMailer with enhanced error handling
     $mail = new PHPMailer(true); // Enable exceptions
     $mail->CharSet = 'UTF-8';
-    
+    $debugMailLog = [];
     try {
         // SMTP Configuration
         $mail->isSMTP();
@@ -120,18 +124,15 @@ try {
         $mail->Port = 587;
         $mail->SMTPAuth = true;
         $mail->SMTPSecure = 'tls';
-        
         // Enhanced debugging for development
         $mail->SMTPDebug = 2;
-        $mail->Debugoutput = function ($str, $level) {
+        $mail->Debugoutput = function ($str, $level) use (&$debugMailLog) {
+            $debugMailLog[] = "PHPMailer [$level]: $str";
             debugLog("PHPMailer [$level]", $str);
         };
-        
         $mail->Username = 'management@asrt.space';
         $mail->Password = '@Pogilameg10';
-        
-        // Connection timeout and options
-        $mail->Timeout = 30; // Increased timeout
+        $mail->Timeout = 30;
         $mail->SMTPOptions = array(
             'ssl' => array(
                 'verify_peer' => false,
@@ -140,17 +141,13 @@ try {
                 'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
             ),
         );
-        
         debugLog("SMTP configured");
-
         // Email setup
         $mail->setFrom('management@asrt.space', 'ASRT Spaces');
         $mail->addReplyTo('management@asrt.space', 'ASRT Spaces');
         $mail->addAddress($email);
-
         $mail->isHTML(true);
         $mail->Subject = 'ASRT Spaces - Password Reset Code';
-        
         // Get user's name with fallback
         $safeName = 'User';
         if (isset($user['Client_fn']) && !empty($user['Client_fn'])) {
@@ -158,9 +155,7 @@ try {
         } elseif (isset($user['fname']) && !empty($user['fname'])) {
             $safeName = htmlspecialchars($user['fname'], ENT_QUOTES, 'UTF-8');
         }
-        
         debugLog("Email content prepared", ["recipient" => $email, "name" => $safeName]);
-
         // Enhanced email body
         $mail->Body = "
         <!DOCTYPE html>
@@ -176,7 +171,6 @@ try {
                     <h1 style='color: white; margin: 0; font-size: 28px; font-weight: bold;'>ASRT Spaces</h1>
                     <p style='color: white; margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;'>Password Reset Request</p>
                 </div>
-                
                 <div style='padding: 40px 30px; background: white;'>
                     <p style='font-size: 16px; margin-bottom: 20px; color: #333;'>Hi {$safeName},</p>
                     
@@ -221,29 +215,40 @@ try {
         $mail->AltBody = "Hi {$safeName},\n\nYou requested to reset your password for your ASRT Spaces account.\n\nYour verification code is: {$otp}\n\nThis code expires in 5 minutes.\n\nIf you did not request this password reset, you can safely ignore this email.\n\nBest regards,\nASRT Spaces Team";
 
         debugLog("Attempting to send email");
-        
         // Send the email
         if ($mail->send()) {
             debugLog("Email sent successfully");
             echo json_encode([
                 'success' => true,
                 'message' => 'Password reset code has been sent to your email.',
-                'expires_at' => $expires_at
+                'expires_at' => $expires_at,
+                'debug' => $debugMailLog
             ]);
         } else {
-            throw new Exception('Failed to send email: ' . $mail->ErrorInfo);
+            debugLog("PHPMailer send failed", ["error" => $mail->ErrorInfo, "debug" => $debugMailLog]);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Failed to send email: ' . $mail->ErrorInfo,
+                'debug' => $debugMailLog
+            ]);
         }
-
     } catch (Exception $e) {
-        debugLog("PHPMailer exception", ["error" => $e->getMessage()]);
-        throw new Exception('Failed to send OTP email: ' . $e->getMessage());
+        debugLog("PHPMailer exception", ["error" => $e->getMessage(), "debug" => $debugMailLog]);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to send OTP email: ' . $e->getMessage(),
+            'debug' => $debugMailLog
+        ]);
     }
 
 } catch (Exception $e) {
-    debugLog("Script exception", ["error" => $e->getMessage()]);
+    debugLog("Script exception", ["error" => $e->getMessage(), "POST" => $_POST, "SESSION" => $_SESSION]);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => $e->getMessage(),
+        'debug' => isset($debugMailLog) ? $debugMailLog : null,
+        'post' => $_POST,
+        'session' => $_SESSION
     ]);
 }
 ?>
