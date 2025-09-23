@@ -646,6 +646,48 @@ $is_logged_in = isset($_SESSION['client_id']);
           </a>
         </li>
 <script>
+// Reset Password Submission (Forgot Password Flow)
+document.addEventListener('DOMContentLoaded', function() {
+  const resetForm = document.getElementById('resetPasswordForm');
+  if (resetForm) {
+    resetForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const pass = document.getElementById('resetPasswordInput').value;
+      const confirm = document.getElementById('resetConfirmPasswordInput').value;
+      const errorMsg = document.getElementById('resetPasswordErrorMsg');
+      errorMsg.textContent = '';
+      if (!pass || !confirm) {
+        errorMsg.textContent = 'All fields are required.';
+        return;
+      }
+      if (pass !== confirm) {
+        errorMsg.textContent = 'Passwords do not match.';
+        return;
+      }
+      if (pass.length < 6) {
+        errorMsg.textContent = 'Password must be at least 6 characters.';
+        return;
+      }
+      fetch('reset_password.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'password=' + encodeURIComponent(pass) + '&confirm_password=' + encodeURIComponent(confirm)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal')).hide();
+          Swal.fire({ icon: 'success', title: 'Password Reset', text: 'Your password has been updated. You can now log in.' });
+        } else {
+          errorMsg.textContent = data.message || 'Failed to reset password.';
+        }
+      })
+      .catch(() => {
+        errorMsg.textContent = 'Could not reset password. Please try again.';
+      });
+    });
+  }
+});
 // Live poll unread admin messages for client (Payment nav badge)
 function pollClientUnreadAdminBadge() {
   // Only run if client is logged in
@@ -677,7 +719,177 @@ document.addEventListener('DOMContentLoaded', function() {
   pollClientUnreadAdminBadge();
   setInterval(pollClientUnreadAdminBadge, 5000);
 });
+// Forgot Password Flow
+document.addEventListener('DOMContentLoaded', function() {
+  const forgotLink = document.getElementById('forgotPasswordLink');
+  if (forgotLink) {
+    forgotLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      const forgotModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
+      document.getElementById('forgotEmailInput').value = '';
+      document.getElementById('forgotEmailErrorMsg').textContent = '';
+      forgotModal.show();
+    });
+  }
+
+  const forgotForm = document.getElementById('forgotPasswordForm');
+  if (forgotForm) {
+    forgotForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.getElementById('forgotEmailInput').value.trim();
+      const errorMsg = document.getElementById('forgotEmailErrorMsg');
+      errorMsg.textContent = '';
+      if (!email) {
+        errorMsg.textContent = 'Please enter your email.';
+        return;
+      }
+      fetch('send_forgot_otp.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'email=' + encodeURIComponent(email)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // Hide forgot modal, show OTP modal
+          bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal')).hide();
+          showForgotOtpModal(data.expires_at);
+        } else {
+          errorMsg.textContent = data.message || 'Failed to send OTP.';
+        }
+      })
+      .catch(() => {
+        errorMsg.textContent = 'Could not send OTP. Please try again.';
+      });
+    });
+  }
+});
+
+// Show OTP modal for forgot password
+function showForgotOtpModal(expiresAt) {
+  if (window.forgotOtpTimerInterval) clearInterval(window.forgotOtpTimerInterval);
+  document.getElementById('forgotOtpInput').value = '';
+  document.getElementById('forgotOtpErrorMsg').textContent = '';
+  window.forgotOtpExpiresAt = expiresAt;
+  updateForgotOtpTimer();
+  const modal = new bootstrap.Modal(document.getElementById('forgotOtpModal'));
+  modal.show();
+  window.forgotOtpTimerInterval = setInterval(updateForgotOtpTimer, 1000);
+}
+function updateForgotOtpTimer() {
+  if (!window.forgotOtpExpiresAt) return;
+  const now = Math.floor(Date.now() / 1000);
+  const secondsLeft = window.forgotOtpExpiresAt - now;
+  const timerSpan = document.getElementById('forgotOtpTimer');
+  if (secondsLeft > 0) {
+    const min = Math.floor(secondsLeft / 60);
+    const sec = secondsLeft % 60;
+    timerSpan.textContent = `Expires in ${min}:${sec.toString().padStart(2, '0')}`;
+    document.getElementById('forgotResendOtpBtn').disabled = true;
+  } else {
+    timerSpan.textContent = 'OTP expired. Please resend.';
+    document.getElementById('forgotResendOtpBtn').disabled = false;
+    clearInterval(window.forgotOtpTimerInterval);
+    window.forgotOtpTimerInterval = null;
+  }
+}
+// Forgot Password OTP Verification
+document.addEventListener('DOMContentLoaded', function() {
+  const forgotOtpForm = document.getElementById('forgotOtpForm');
+  if (forgotOtpForm) {
+    forgotOtpForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const otp = document.getElementById('forgotOtpInput').value.trim();
+      const errorMsg = document.getElementById('forgotOtpErrorMsg');
+      errorMsg.textContent = '';
+      if (!/^\d{6}$/.test(otp)) {
+        errorMsg.textContent = 'Please enter a valid 6-digit code.';
+        return;
+      }
+      fetch('verify_forgot_otp.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'otp=' + encodeURIComponent(otp)
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          bootstrap.Modal.getInstance(document.getElementById('forgotOtpModal')).hide();
+          showResetPasswordModal();
+        } else {
+          errorMsg.textContent = data.message || 'Invalid OTP.';
+        }
+      })
+      .catch(() => {
+        errorMsg.textContent = 'Could not verify OTP. Please try again.';
+      });
+    });
+  }
+});
+
+// Show Reset Password Modal
+function showResetPasswordModal() {
+  document.getElementById('resetPasswordInput').value = '';
+  document.getElementById('resetConfirmPasswordInput').value = '';
+  document.getElementById('resetPasswordErrorMsg').textContent = '';
+  const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+  modal.show();
+}
 </script>
+<!-- Reset Password Modal -->
+<div class="modal fade modern-modal" id="resetPasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="resetPasswordForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-key-fill me-2 text-primary"></i>Reset Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="resetPasswordInput" class="form-label">New Password</label>
+            <input type="password" class="form-control" id="resetPasswordInput" name="password" placeholder="Enter new password" required>
+          </div>
+          <div class="mb-3">
+            <label for="resetConfirmPasswordInput" class="form-label">Confirm New Password</label>
+            <input type="password" class="form-control" id="resetConfirmPasswordInput" name="confirm_password" placeholder="Confirm new password" required>
+          </div>
+          <div class="form-text text-danger" id="resetPasswordErrorMsg"></div>
+          <div class="d-grid mt-3">
+            <button type="submit" class="modern-btn modern-btn-primary">Reset Password</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Forgot Password OTP Modal -->
+<div class="modal fade modern-modal" id="forgotOtpModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="forgotOtpForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-shield-lock-fill me-2 text-primary"></i>Enter OTP</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="forgotOtpInput" class="form-label">Enter the 6-digit code sent to your email</label>
+            <input type="text" class="form-control text-center" id="forgotOtpInput" name="otp" maxlength="6" pattern="\d{6}" required autofocus autocomplete="one-time-code">
+            <div class="form-text text-danger" id="forgotOtpErrorMsg"></div>
+          </div>
+          <div class="mb-2 text-end">
+            <button type="button" class="btn btn-link p-0" id="forgotResendOtpBtn">Resend OTP</button>
+            <span id="forgotOtpTimer" class="text-muted small"></span>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="modern-btn modern-btn-primary">Verify OTP</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'handyman_type.php' ? 'active' : '' ?>" href="handyman_type.php">
@@ -765,6 +977,32 @@ document.addEventListener('DOMContentLoaded', function() {
               </button>
             </div>
           </div>
+          <div class="mb-2 text-end">
+            <a href="#" id="forgotPasswordLink" class="small text-primary">Forgot Password?</a>
+          </div>
+<!-- Forgot Password Modal -->
+<div class="modal fade modern-modal" id="forgotPasswordModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form id="forgotPasswordForm" autocomplete="off">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-envelope-lock me-2 text-primary"></i>Forgot Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="forgotEmailInput" class="form-label">Enter your registered email address</label>
+            <input type="email" class="form-control" id="forgotEmailInput" name="email" placeholder="your@email.com" required autofocus>
+            <div class="form-text text-danger" id="forgotEmailErrorMsg"></div>
+          </div>
+          <div class="d-grid">
+            <button type="submit" class="modern-btn modern-btn-primary">Send OTP</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
           <div class="d-grid">
             <button type="submit" class="modern-btn modern-btn-primary">
               <i class="bi bi-box-arrow-in-right me-2"></i>Login
