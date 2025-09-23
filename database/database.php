@@ -67,7 +67,7 @@ public function executeStatement($sql, $params = []) {
 
 
 public function getUserByEmail($email) {
-    $stmt = $this->pdo->prepare("SELECT * FROM client WHERE Client_Email = ?");
+    $stmt = $this->pdo->prepare("SELECT * FROM client WHERE LOWER(Client_Email) = LOWER(?)");
     $stmt->execute([$email]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
