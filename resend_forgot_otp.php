@@ -2,181 +2,207 @@
 session_start();
 header('Content-Type: application/json');
 
-// Disable error display to prevent breaking JSON
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
-
-require_once 'class.phpmailer.php';
 require_once 'database/database.php';
+require_once __DIR__ . '/class.phpmailer.php';
+require_once __DIR__ . '/class.smtp.php';
 
-try {
-    // Check if there's an active forgot password session
-    if (!isset($_SESSION['forgot_otp_email'])) {
-        throw new Exception('No active password reset session. Please start the process again.');
+// Configuration
+define('FORGOT_OTP_EXPIRY_MINUTES', 10);
+define('FORGOT_OTP_COOLDOWN_SECONDS', 60);
+
+function checkForgotResendSession() {
+    if (!isset($_SESSION['forgot_email'])) {
+        return ['success' => false, 'message' => 'Session expired. Please start the password reset process again.'];
     }
+    return ['success' => true];
+}
 
-    $email = $_SESSION['forgot_otp_email'];
-
-    // Rate limiting - 60 second cooldown
-    if (isset($_SESSION['last_forgot_otp_sent']) && (time() - $_SESSION['last_forgot_otp_sent']) < 60) {
-        $wait = 60 - (time() - $_SESSION['last_forgot_otp_sent']);
-        throw new Exception("Please wait {$wait} seconds before requesting a new OTP.");
+function checkForgotResendRateLimit() {
+    if (isset($_SESSION['last_forgot_otp_sent'])) {
+        $timeSinceLastSent = time() - $_SESSION['last_forgot_otp_sent'];
+        if ($timeSinceLastSent < FORGOT_OTP_COOLDOWN_SECONDS) {
+            $wait = FORGOT_OTP_COOLDOWN_SECONDS - $timeSinceLastSent;
+            return [
+                'success' => false, 
+                'message' => "Please wait {$wait} seconds before requesting another code."
+            ];
+        }
     }
+    return ['success' => true];
+}
 
-    // Additional rate limiting by IP
-    $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-    $ip_key = "forgot_otp_resend_ip_{$client_ip}";
-    
-    if (!isset($_SESSION[$ip_key])) {
-        $_SESSION[$ip_key] = [];
-    }
-    
-    // Clean old IP attempts
-    $_SESSION[$ip_key] = array_filter($_SESSION[$ip_key], function($timestamp) {
-        return (time() - $timestamp) < 3600; // 1 hour
-    });
-    
-    // Check IP rate limit (max 3 resends per hour)
-    if (count($_SESSION[$ip_key]) >= 3) {
-        throw new Exception('Too many resend attempts. Please try again later.');
-    }
+function generateForgotOTP() {
+    return str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+}
 
-    // Check if user still exists
-    $db = new Database();
-    $user = $db->getUserByEmail($email);
-    
-    if (!$user) {
-        throw new Exception('Account no longer exists.');
-    }
-
-    // Update rate limiting
-    $_SESSION['last_forgot_otp_sent'] = time();
-    $_SESSION[$ip_key][] = time();
-
-    // Generate new OTP
-    try {
-        $otp = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-    } catch (Exception $e) {
-        $otp = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT);
-    }
-    
-    $expires_at = time() + (5 * 60); // 5 minutes
-
-    // Update session data
-    $_SESSION['forgot_otp'] = $otp;
-    $_SESSION['forgot_otp_expires'] = $expires_at;
-    $_SESSION['forgot_otp_attempts'] = 0; // Reset attempts
-    unset($_SESSION['forgot_otp_locked_until']); // Remove any lockout
-
-    // Send new OTP via email
-    $mail = new PHPMailer(true);
+function setupForgotResendMailer() {
+    $mail = new PHPMailer;
     $mail->CharSet = 'UTF-8';
     $mail->isSMTP();
     $mail->Host = 'smtp.hostinger.com';
     $mail->Port = 587;
     $mail->SMTPAuth = true;
     $mail->SMTPSecure = 'tls';
+    
     $mail->Username = 'management@asrt.space';
-    $mail->Password = '@Pogilameg10';
+    $mail->Password = '@Pogilameg10'; // Move to environment variable
     
     $mail->Timeout = 30;
-    $mail->SMTPOptions = array(
-        'ssl' => array(
+    $mail->SMTPOptions = [
+        'ssl' => [
             'verify_peer' => false,
             'verify_peer_name' => false,
             'allow_self_signed' => true,
             'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
-        ),
-    );
-
-    $mail->setFrom('management@asrt.space', 'ASRT Spaces');
-    $mail->addReplyTo('management@asrt.space', 'ASRT Spaces');
-    $mail->addAddress($email);
-
-    $mail->isHTML(true);
-    $mail->Subject = 'ASRT Spaces - New Password Reset Code';
+        ],
+    ];
     
-    $safeName = isset($user['Client_fn']) && !empty($user['Client_fn']) 
-        ? htmlspecialchars($user['Client_fn'], ENT_QUOTES, 'UTF-8') 
-        : 'User';
+    return $mail;
+}
 
+function sendForgotResendOTPEmail($email, $firstName, $otp) {
+    $mail = setupForgotResendMailer();
+    
+    $mail->setFrom($mail->Username, 'ASRT Spaces Security');
+    $mail->addReplyTo('no-reply@asrt.space', 'ASRT Spaces Security');
+    $mail->addAddress($email);
+    
+    $mail->isHTML(true);
+    $mail->Subject = "New Password Reset Code - ASRT Spaces";
+    
+    $safeName = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
+    $expiryMinutes = FORGOT_OTP_EXPIRY_MINUTES;
+    
     $mail->Body = "
     <!DOCTYPE html>
     <html>
     <head>
-        <meta charset='UTF-8'>
-        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-        <title>New Password Reset Code</title>
+        <style>
+            .container { max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; }
+            .header { background: #ef4444; color: white; padding: 20px; text-align: center; }
+            .content { padding: 30px; background: #f8fafc; }
+            .otp-code { 
+                font-size: 32px; 
+                font-weight: bold; 
+                color: #ef4444; 
+                text-align: center; 
+                padding: 20px; 
+                background: white; 
+                border: 2px dashed #ef4444;
+                margin: 20px 0;
+                letter-spacing: 5px;
+            }
+            .warning { 
+                background: #fef2f2; 
+                border-left: 4px solid #ef4444; 
+                padding: 15px; 
+                margin: 20px 0;
+                color: #991b1b;
+            }
+            .footer { padding: 20px; text-align: center; color: #64748b; font-size: 12px; }
+        </style>
     </head>
-    <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;'>
-        <div style='max-width: 600px; margin: 0 auto; background-color: white;'>
-            <div style='background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px 20px; text-align: center;'>
-                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: bold;'>ASRT Spaces</h1>
-                <p style='color: white; margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;'>New Password Reset Code</p>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <h1>ASRT Spaces</h1>
+                <p>New Password Reset Code</p>
             </div>
-            
-            <div style='padding: 40px 30px; background: white;'>
-                <p style='font-size: 16px; margin-bottom: 20px; color: #333;'>Hi {$safeName},</p>
-                
-                <p style='font-size: 16px; margin-bottom: 30px; color: #333; line-height: 1.5;'>
-                    You requested a new password reset code. Here's your fresh verification code:
-                </p>
-                
-                <div style='text-align: center; margin: 40px 0;'>
-                    <div style='display: inline-block; background: #f8fafc; border: 2px dashed #059669; border-radius: 8px; padding: 20px 30px;'>
-                        <span style='font-size: 36px; font-weight: bold; color: #059669; letter-spacing: 4px; font-family: monospace;'>
-                            {$otp}
-                        </span>
-                    </div>
+            <div class='content'>
+                <p>Hi {$safeName},</p>
+                <p>Here's your new password reset verification code:</p>
+                <div class='otp-code'>{$otp}</div>
+                <div class='warning'>
+                    <strong>Security Notice:</strong>
+                    <ul>
+                        <li>This is a <strong>new code</strong> - previous codes are now invalid</li>
+                        <li>Code expires in <strong>{$expiryMinutes} minutes</strong></li>
+                        <li>Never share this code with anyone</li>
+                        <li>Use this code to reset your ASRT Spaces password</li>
+                    </ul>
                 </div>
-                
-                <div style='background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 15px; margin: 30px 0; text-align: center;'>
-                    <p style='color: #dc2626; font-weight: 600; margin: 0; font-size: 14px;'>
-                        ⚠️ This new code expires in 5 minutes
-                    </p>
-                </div>
-                
-                <div style='background: #fffbeb; border: 1px solid #fed7aa; border-radius: 6px; padding: 15px; margin: 20px 0;'>
-                    <p style='color: #d97706; font-weight: 500; margin: 0; font-size: 14px;'>
-                        📝 Note: This replaces your previous code, which is no longer valid.
-                    </p>
-                </div>
-                
-                <p style='font-size: 14px; color: #666; margin-top: 30px; line-height: 1.5;'>
-                    If you did not request this new code, you can safely ignore this email.
-                </p>
-                
-                <p style='font-size: 14px; color: #666; margin-top: 20px;'>
-                    Best regards,<br>
-                    <strong>ASRT Spaces Team</strong>
-                </p>
+                <p>If you didn't request this code, please ignore this email and ensure your account is secure.</p>
             </div>
-            
-            <div style='background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #666;'>
-                <p style='margin: 0;'>This is an automated message. Please do not reply to this email.</p>
+            <div class='footer'>
+                <p>This is an automated security message from ASRT Spaces</p>
             </div>
         </div>
     </body>
     </html>";
+    
+    $mail->AltBody = "Hi {$safeName},\n\nHere's your new password reset code: {$otp}\n\nThis code expires in {$expiryMinutes} minutes.\n\nPrevious codes are now invalid.\n\nIf you didn't request this, please ignore this email.\n\nRegards,\nASRT Spaces Security Team";
+    
+    return $mail->send();
+}
 
-    $mail->AltBody = "Hi {$safeName},\n\nYou requested a new password reset code for your ASRT Spaces account.\n\nYour new verification code is: {$otp}\n\nThis code expires in 5 minutes and replaces your previous code.\n\nBest regards,\nASRT Spaces Team";
-
-    if ($mail->send()) {
-        error_log("Forgot password OTP resent successfully to: " . $email);
+try {
+    // Check session
+    $sessionCheck = checkForgotResendSession();
+    if (!$sessionCheck['success']) {
+        echo json_encode($sessionCheck);
+        exit;
+    }
+    
+    // Check rate limiting
+    $rateLimitCheck = checkForgotResendRateLimit();
+    if (!$rateLimitCheck['success']) {
+        echo json_encode($rateLimitCheck);
+        exit;
+    }
+    
+    // Get user data from database using your PDO method
+    $email = $_SESSION['forgot_email'];
+    $db = new Database();
+    $user = $db->getUserByEmail($email);
+    
+    if (!$user || $user['Status'] !== 'Active') {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Session invalid. Please start the password reset process again.'
+        ]);
+        exit;
+    }
+    
+    // Generate new OTP
+    $otp = generateForgotOTP();
+    
+    // Update session with new OTP
+    $_SESSION['forgot_otp'] = $otp;
+    $_SESSION['forgot_otp_expires'] = time() + (FORGOT_OTP_EXPIRY_MINUTES * 60);
+    $_SESSION['forgot_otp_attempts'] = 0;
+    $_SESSION['last_forgot_otp_sent'] = time();
+    
+    // Clear previous verification status and lockout
+    unset($_SESSION['forgot_otp_verified']);
+    unset($_SESSION['forgot_otp_locked_until']);
+    
+    // Send email
+    $firstName = $user['Client_fn'] ?: 'User';
+    
+    if (sendForgotResendOTPEmail($email, $firstName, $otp)) {
+        error_log("Forgot password OTP resent to: " . $email);
+        
         echo json_encode([
             'success' => true,
             'message' => 'A new password reset code has been sent to your email.',
-            'expires_at' => $expires_at
+            'expires_at' => $_SESSION['forgot_otp_expires']
         ]);
     } else {
-        throw new Exception('Failed to send new OTP email: ' . $mail->ErrorInfo);
+        error_log("Failed to resend forgot password OTP to: " . $email);
+        
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to send new password reset code. Please try again later.'
+        ]);
     }
-
+    
 } catch (Exception $e) {
-    error_log("Error in resend_forgot_otp.php: " . $e->getMessage());
+    error_log("Forgot Password Resend OTP Error: " . $e->getMessage());
+    
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => 'An unexpected error occurred. Please try again later.'
     ]);
 }
-?>
+
+exit;

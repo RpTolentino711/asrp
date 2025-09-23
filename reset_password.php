@@ -1,88 +1,128 @@
 <?php
-// reset_password.php: Handles password reset after OTP verification
 session_start();
 header('Content-Type: application/json');
 
-// Check request method
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
-    exit;
-}
-
 require_once 'database/database.php';
 
-try {
-    $db = new Database();
-    
-    // Verify OTP session exists and is verified
-    $email = isset($_SESSION['forgot_otp_email']) ? $_SESSION['forgot_otp_email'] : null;
-    if (!isset($_SESSION['forgot_otp_verified']) || !$_SESSION['forgot_otp_verified'] || !$email) {
-        echo json_encode(['success' => false, 'message' => 'OTP verification required. Please verify your OTP first.']);
-        exit;
+function validateResetSession() {
+    if (!isset($_SESSION['forgot_otp_verified']) || $_SESSION['forgot_otp_verified'] !== true) {
+        return ['success' => false, 'message' => 'Unauthorized. Please verify your email first.'];
     }
     
-    // Get and validate password inputs
-    $password = isset($_POST['password']) ? trim($_POST['password']) : '';
-    $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : '';
-    
-    if (empty($password)) {
-        echo json_encode(['success' => false, 'message' => 'Password is required.']);
-        exit;
+    if (!isset($_SESSION['forgot_email'])) {
+        return ['success' => false, 'message' => 'Session expired. Please start the password reset process again.'];
     }
     
-    if (empty($confirm_password)) {
-        echo json_encode(['success' => false, 'message' => 'Password confirmation is required.']);
-        exit;
+    if (!isset($_SESSION['reset_token'])) {
+        return ['success' => false, 'message' => 'Invalid session. Please verify your email again.'];
     }
     
-    if ($password !== $confirm_password) {
-        echo json_encode(['success' => false, 'message' => 'Passwords do not match.']);
-        exit;
+    return ['success' => true];
+}
+
+function validatePasswordInput($password, $confirmPassword) {
+    if (empty($password) || empty($confirmPassword)) {
+        return ['success' => false, 'message' => 'Please fill in both password fields.'];
     }
     
-    // Password strength validation
+    if ($password !== $confirmPassword) {
+        return ['success' => false, 'message' => 'Passwords do not match.'];
+    }
+    
     if (strlen($password) < 6) {
-        echo json_encode(['success' => false, 'message' => 'Password must be at least 6 characters long.']);
+        return ['success' => false, 'message' => 'Password must be at least 6 characters long.'];
+    }
+    
+    // Enhanced password validation
+    if (!preg_match('/[A-Z]/', $password)) {
+        return ['success' => false, 'message' => 'Password must contain at least one uppercase letter.'];
+    }
+    
+    if (!preg_match('/[!@#$%^&*(),.?":{}|<>]/', $password)) {
+        return ['success' => false, 'message' => 'Password must contain at least one special character.'];
+    }
+    
+    return ['success' => true];
+}
+
+function updateClientPassword($email, $newPassword) {
+    try {
+        $db = new Database();
+        
+        // Hash the new password
+        $hashedPassword = password_hash($newPassword, PASSWORD_DEFAULT);
+        
+        // Update password using your PDO method
+        if ($db->updatePasswordByEmail($email, $hashedPassword)) {
+            return ['success' => true, 'message' => 'Password updated successfully.'];
+        } else {
+            return ['success' => false, 'message' => 'Failed to update password. Please try again.'];
+        }
+        
+    } catch (Exception $e) {
+        error_log("Password update error: " . $e->getMessage());
+        return ['success' => false, 'message' => 'Database error. Please try again later.'];
+    }
+}
+
+function clearForgotPasswordSession() {
+    // Clear all forgot password related session data
+    unset($_SESSION['forgot_otp_verified']);
+    unset($_SESSION['forgot_email']);
+    unset($_SESSION['reset_token']);
+    unset($_SESSION['last_forgot_otp_sent']);
+}
+
+try {
+    // Validate session
+    $sessionValidation = validateResetSession();
+    if (!$sessionValidation['success']) {
+        echo json_encode($sessionValidation);
         exit;
     }
     
-    // Hash the new password
-    $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+    // Get password inputs
+    $password = $_POST['password'] ?? '';
+    $confirmPassword = $_POST['confirm_password'] ?? '';
     
-    // Update password in database using correct column names
-    $stmt = $db->getConnection()->prepare('UPDATE client SET C_password = :password WHERE Client_Email = :email');
-    $result = $stmt->execute([':password' => $hashedPassword, ':email' => $email]);
+    // Validate password
+    $passwordValidation = validatePasswordInput($password, $confirmPassword);
+    if (!$passwordValidation['success']) {
+        echo json_encode($passwordValidation);
+        exit;
+    }
     
-    if ($result && $stmt->rowCount() > 0) {
-        // Clear all forgot password session data
-        unset($_SESSION['forgot_otp']);
-        unset($_SESSION['forgot_otp_expires']);
-        unset($_SESSION['forgot_otp_email']);
-        unset($_SESSION['forgot_otp_verified']);
+    // Get email from session
+    $email = $_SESSION['forgot_email'];
+    
+    // Update password in database
+    $updateResult = updateClientPassword($email, $password);
+    
+    if ($updateResult['success']) {
+        // Log successful password reset
+        error_log("Password successfully reset for email: {$email}");
+        
+        // Clear session data
+        clearForgotPasswordSession();
         
         echo json_encode([
-            'success' => true, 
-            'message' => 'Password has been reset successfully. You can now log in with your new password.'
+            'success' => true,
+            'message' => 'Your password has been successfully reset. You can now log in with your new password.'
         ]);
     } else {
-        // Check if user exists
-        $checkStmt = $db->getConnection()->prepare('SELECT Client_Email FROM client WHERE Client_Email = :email');
-        $checkStmt->execute([':email' => $email]);
+        // Log failed password reset
+        error_log("Failed password reset for email: {$email}");
         
-        if ($checkStmt->rowCount() === 0) {
-            echo json_encode(['success' => false, 'message' => 'User account not found.']);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to update password. Please try again.']);
-        }
+        echo json_encode($updateResult);
     }
     
-} catch (PDOException $e) {
-    // Log the actual error for debugging
-    error_log("Database error in reset_password.php: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'Database error occurred. Please try again.']);
 } catch (Exception $e) {
-    // Log any other errors
-    error_log("Error in reset_password.php: " . $e->getMessage());
-    echo json_encode(['success' => false, 'message' => 'An unexpected error occurred. Please try again.']);
+    error_log("Password Reset Error: " . $e->getMessage());
+    
+    echo json_encode([
+        'success' => false,
+        'message' => 'An unexpected error occurred. Please try again later.'
+    ]);
 }
-?>
+
+exit;

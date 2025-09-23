@@ -86,8 +86,6 @@ public function updatePasswordByEmail($email, $hashedPassword) {
 
 
 
-
-
 public function getUnitPhotosForClient($client_id) {
     try {
         $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
