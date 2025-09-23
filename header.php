@@ -992,7 +992,7 @@ function showResetPasswordModal() {
         <div class="modal-body">
           <div class="mb-3">
             <label for="forgotEmailInput" class="form-label">Enter your registered email address</label>
-            <input type="email" class="form-control" id="forgotEmailInput" name="email" placeholder="your@email.com" required autofocus>
+            <input type="email" class="form-control" id="forgotEmailInput" name="email" placeholder="your@email.com" autofocus>
             <div class="form-text text-danger" id="forgotEmailErrorMsg"></div>
           </div>
           <div class="d-grid">
