@@ -10,44 +10,66 @@ require_once 'class.phpmailer.php';
 require_once 'database/database.php';
 
 try {
-    // Check if session has pending forgot password request
+    // Check if there's an active forgot password session
     if (!isset($_SESSION['forgot_otp_email'])) {
-        throw new Exception('Session expired or invalid. Please request password reset again.');
+        throw new Exception('No active password reset session. Please start the process again.');
     }
 
     $email = $_SESSION['forgot_otp_email'];
 
-    // Prevent spamming: 60s cooldown
+    // Rate limiting - 60 second cooldown
     if (isset($_SESSION['last_forgot_otp_sent']) && (time() - $_SESSION['last_forgot_otp_sent']) < 60) {
         $wait = 60 - (time() - $_SESSION['last_forgot_otp_sent']);
         throw new Exception("Please wait {$wait} seconds before requesting a new OTP.");
     }
 
-    $db = new Database();
+    // Additional rate limiting by IP
+    $client_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $ip_key = "forgot_otp_resend_ip_{$client_ip}";
     
-    // Get user info for personalized email
-    $stmt = $db->getConnection()->prepare("SELECT Client_ID, Client_Email, Client_fn FROM client WHERE Client_Email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!isset($_SESSION[$ip_key])) {
+        $_SESSION[$ip_key] = [];
+    }
     
-    if (!$user) {
-        throw new Exception('User account not found.');
+    // Clean old IP attempts
+    $_SESSION[$ip_key] = array_filter($_SESSION[$ip_key], function($timestamp) {
+        return (time() - $timestamp) < 3600; // 1 hour
+    });
+    
+    // Check IP rate limit (max 3 resends per hour)
+    if (count($_SESSION[$ip_key]) >= 3) {
+        throw new Exception('Too many resend attempts. Please try again later.');
     }
 
+    // Check if user still exists
+    $db = new Database();
+    $user = $db->getUserByEmail($email);
+    
+    if (!$user) {
+        throw new Exception('Account no longer exists.');
+    }
+
+    // Update rate limiting
     $_SESSION['last_forgot_otp_sent'] = time();
+    $_SESSION[$ip_key][] = time();
 
     // Generate new OTP
-    $otp = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
+    try {
+        $otp = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+    } catch (Exception $e) {
+        $otp = str_pad(mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT);
+    }
+    
     $expires_at = time() + (5 * 60); // 5 minutes
 
-    // Update session with new OTP
+    // Update session data
     $_SESSION['forgot_otp'] = $otp;
     $_SESSION['forgot_otp_expires'] = $expires_at;
-    $_SESSION['forgot_otp_attempts'] = 0;
-    unset($_SESSION['forgot_otp_locked_until']);
+    $_SESSION['forgot_otp_attempts'] = 0; // Reset attempts
+    unset($_SESSION['forgot_otp_locked_until']); // Remove any lockout
 
-    // Send OTP via PHPMailer (compatible with version 5.x)
-    $mail = new PHPMailer();
+    // Send new OTP via email
+    $mail = new PHPMailer(true);
     $mail->CharSet = 'UTF-8';
     $mail->isSMTP();
     $mail->Host = 'smtp.hostinger.com';
@@ -57,8 +79,7 @@ try {
     $mail->Username = 'management@asrt.space';
     $mail->Password = '@Pogilameg10';
     
-    // Set timeout and options
-    $mail->Timeout = 20;
+    $mail->Timeout = 30;
     $mail->SMTPOptions = array(
         'ssl' => array(
             'verify_peer' => false,
@@ -68,52 +89,88 @@ try {
         ),
     );
 
-    $mail->setFrom('management@asrt.space', 'ASRT Spaces Password Reset');
+    $mail->setFrom('management@asrt.space', 'ASRT Spaces');
     $mail->addReplyTo('management@asrt.space', 'ASRT Spaces');
     $mail->addAddress($email);
 
     $mail->isHTML(true);
-    $mail->Subject = 'ASRT Spaces - Password Reset Code (Resent)';
+    $mail->Subject = 'ASRT Spaces - New Password Reset Code';
     
-    $safeName = htmlspecialchars($user['Client_fn'] ? $user['Client_fn'] : 'User', ENT_QUOTES, 'UTF-8');
-    
+    $safeName = isset($user['Client_fn']) && !empty($user['Client_fn']) 
+        ? htmlspecialchars($user['Client_fn'], ENT_QUOTES, 'UTF-8') 
+        : 'User';
+
     $mail->Body = "
-    <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
-        <div style='background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 20px; text-align: center; border-radius: 8px 8px 0 0;'>
-            <h1 style='color: white; margin: 0; font-size: 24px;'>ASRT Spaces</h1>
-            <p style='color: white; margin: 5px 0 0 0; font-size: 16px;'>Password Reset Request (Resent)</p>
-        </div>
-        <div style='padding: 30px; background: #f8fafc; border-radius: 0 0 8px 8px;'>
-            <p style='font-size: 16px; margin-bottom: 20px;'>Hi {$safeName},</p>
-            <p style='font-size: 16px; margin-bottom: 20px;'>Here's your new password reset verification code:</p>
-            <div style='text-align: center; margin: 30px 0;'>
-                <span style='font-size: 32px; font-weight: bold; color: #1e40af; background: white; padding: 15px 30px; border-radius: 8px; border: 2px solid #e2e8f0; letter-spacing: 3px; display: inline-block;'>
-                    {$otp}
-                </span>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>New Password Reset Code</title>
+    </head>
+    <body style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;'>
+        <div style='max-width: 600px; margin: 0 auto; background-color: white;'>
+            <div style='background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 30px 20px; text-align: center;'>
+                <h1 style='color: white; margin: 0; font-size: 28px; font-weight: bold;'>ASRT Spaces</h1>
+                <p style='color: white; margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;'>New Password Reset Code</p>
             </div>
-            <p style='color: #ef4444; font-weight: 600; text-align: center; margin: 20px 0;'>
-                <strong>This code expires in 5 minutes.</strong>
-            </p>
-            <p style='font-size: 14px; color: #64748b; margin-top: 30px;'>
-                If you did not request this password reset, please ignore this email.
-            </p>
-            <p style='font-size: 14px; color: #64748b; margin-top: 10px;'>
-                Regards,<br>ASRT Spaces Team
-            </p>
+            
+            <div style='padding: 40px 30px; background: white;'>
+                <p style='font-size: 16px; margin-bottom: 20px; color: #333;'>Hi {$safeName},</p>
+                
+                <p style='font-size: 16px; margin-bottom: 30px; color: #333; line-height: 1.5;'>
+                    You requested a new password reset code. Here's your fresh verification code:
+                </p>
+                
+                <div style='text-align: center; margin: 40px 0;'>
+                    <div style='display: inline-block; background: #f8fafc; border: 2px dashed #059669; border-radius: 8px; padding: 20px 30px;'>
+                        <span style='font-size: 36px; font-weight: bold; color: #059669; letter-spacing: 4px; font-family: monospace;'>
+                            {$otp}
+                        </span>
+                    </div>
+                </div>
+                
+                <div style='background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 15px; margin: 30px 0; text-align: center;'>
+                    <p style='color: #dc2626; font-weight: 600; margin: 0; font-size: 14px;'>
+                        ⚠️ This new code expires in 5 minutes
+                    </p>
+                </div>
+                
+                <div style='background: #fffbeb; border: 1px solid #fed7aa; border-radius: 6px; padding: 15px; margin: 20px 0;'>
+                    <p style='color: #d97706; font-weight: 500; margin: 0; font-size: 14px;'>
+                        📝 Note: This replaces your previous code, which is no longer valid.
+                    </p>
+                </div>
+                
+                <p style='font-size: 14px; color: #666; margin-top: 30px; line-height: 1.5;'>
+                    If you did not request this new code, you can safely ignore this email.
+                </p>
+                
+                <p style='font-size: 14px; color: #666; margin-top: 20px;'>
+                    Best regards,<br>
+                    <strong>ASRT Spaces Team</strong>
+                </p>
+            </div>
+            
+            <div style='background: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #666;'>
+                <p style='margin: 0;'>This is an automated message. Please do not reply to this email.</p>
+            </div>
         </div>
-    </div>";
-    
-    $mail->AltBody = "Hi {$safeName}, Your new password reset OTP code is {$otp}. This code expires in 5 minutes. If you did not request this, please ignore this email.";
+    </body>
+    </html>";
 
-    if (!$mail->send()) {
-        throw new Exception('Failed to resend OTP: ' . $mail->ErrorInfo);
+    $mail->AltBody = "Hi {$safeName},\n\nYou requested a new password reset code for your ASRT Spaces account.\n\nYour new verification code is: {$otp}\n\nThis code expires in 5 minutes and replaces your previous code.\n\nBest regards,\nASRT Spaces Team";
+
+    if ($mail->send()) {
+        error_log("Forgot password OTP resent successfully to: " . $email);
+        echo json_encode([
+            'success' => true,
+            'message' => 'A new password reset code has been sent to your email.',
+            'expires_at' => $expires_at
+        ]);
+    } else {
+        throw new Exception('Failed to send new OTP email: ' . $mail->ErrorInfo);
     }
-
-    echo json_encode([
-        'success' => true,
-        'message' => 'A new password reset OTP has been sent to your email.',
-        'expires_at' => $expires_at
-    ]);
 
 } catch (Exception $e) {
     error_log("Error in resend_forgot_otp.php: " . $e->getMessage());
@@ -122,5 +179,4 @@ try {
         'message' => $e->getMessage()
     ]);
 }
-exit;
 ?>
