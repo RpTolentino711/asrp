@@ -1525,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       // Check if email is valid and registered before submitting
-      fetch('AJAX/check_forgot_email.php', {
+      fetch('check_forgot_email.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'email=' + encodeURIComponent(email)
