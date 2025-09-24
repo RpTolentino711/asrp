@@ -496,10 +496,10 @@ $icon_map = [
                     <div class="card-body p-4">
                         <h4 class="card-title mb-3">Need Help Choosing?</h4>
                         <p class="card-text text-muted mb-4">Contact our team for personalized recommendations based on your specific needs.</p>
-                        <a href="mailto:info@asrt.com" class="btn btn-primary btn-lg me-3" style="background: var(--gradient-primary); border: none; border-radius: var(--border-radius-sm);">
+                        <a href="mailto:management@asrt.space" class="btn btn-primary btn-lg me-3" style="background: var(--gradient-primary); border: none; border-radius: var(--border-radius-sm);">
                             <i class="bi bi-envelope me-2"></i>Contact Us
                         </a>
-                        <a href="tel:+639123456789" class="btn btn-outline-primary btn-lg" style="border-radius: var(--border-radius-sm);">
+                        <a href="tel:+09451357685" class="btn btn-outline-primary btn-lg" style="border-radius: var(--border-radius-sm);">
                             <i class="bi bi-telephone me-2"></i>Call Now
                         </a>
                     </div>
