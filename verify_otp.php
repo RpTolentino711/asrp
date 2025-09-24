@@ -296,7 +296,7 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
                 <div class='cta-section'>
                     <div class='cta-title'>Ready to Get Started?</div>
                     <p>Log in to your account now and explore everything ASRT Spaces has to offer!</p>
-                    <a href='#' class='cta-button'>Access Your Dashboard</a>
+                    <a href='https://asrt.space/index.php' class='cta-button'>Access Your Dashboard</a>
                 </div>
                 
                 <div style='margin-top: 30px; padding: 20px; background: #fef7cd; border-radius: 8px; border-left: 4px solid #f59e0b;'>
