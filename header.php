@@ -1641,7 +1641,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ========== NOTIFICATION BADGE POLLING ==========
-    function pollClientUnreadAdminBadge() {
+    function pollChatNotifications() {
         <?php if (isset($_SESSION['client_id'])): ?>
         fetch('AJAX/get_unread_admin_chat_counts.php', {
             method: 'POST',
@@ -1668,8 +1668,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Start polling for notification badges
-    pollClientUnreadAdminBadge();
-    setInterval(pollClientUnreadAdminBadge, 5000);
+   // Start polling for notification badges
+pollChatNotifications();
+setInterval(pollChatNotifications, 5000);
 });
 
 // ========== UTILITY FUNCTIONS ==========

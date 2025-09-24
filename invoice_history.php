@@ -1202,6 +1202,30 @@ setInterval(() => {
         }
     });
     </script>
+
+    
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Mark all chat messages as read when viewing the payment page
+    <?php if (isset($_SESSION['client_id'])): ?>
+    fetch('AJAX/mark_invoice_chat_read.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'client_id=' + encodeURIComponent(<?= $_SESSION['client_id'] ?>)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Chat messages marked as read');
+        } else {
+            console.error('Failed to mark messages as read:', data.error);
+        }
+    })
+    .catch(error => console.error('Error marking messages as read:', error));
+    <?php endif; ?>
+});
+</script>
+
 </body>
 </html>
 
