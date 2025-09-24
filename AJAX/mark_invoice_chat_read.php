@@ -1,30 +1,34 @@
 <?php
+session_start();
+header('Content-Type: application/json');
+
 require_once '../database/database.php';
 
-if (!isset($_POST['client_id'])) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Missing client_id']);
+if (!isset($_SESSION['client_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Not logged in']);
     exit;
 }
 
-$client_id = intval($_POST['client_id']);
+$client_id = $_SESSION['client_id'];
 $db = new Database();
 
-// Mark all admin messages as read for this client's invoices
-$sql = "UPDATE invoice_chat 
-        SET is_read_client = 1 
-        WHERE Sender_Type = 'admin' 
-        AND is_read_client = 0 
-        AND Invoice_ID IN (
-            SELECT Invoice_ID 
-            FROM invoices 
-            WHERE Client_ID = ?
-        )";
-
 try {
-    $result = $db->execute($sql, [$client_id]);
-    echo json_encode(['success' => true, 'affected_rows' => $result]);
+    // Update only unread admin messages
+    $sql = "UPDATE invoice_chat ic
+            JOIN invoice i ON ic.Invoice_ID = i.Invoice_ID 
+            SET ic.is_read_client = 1 
+            WHERE i.Client_ID = ? AND ic.Sender_Type = 'admin' AND ic.is_read_client = 0";
+
+    $success = $db->executeStatement($sql, [$client_id]);
+    if ($success === false) {
+        throw new Exception("Failed to update messages");
+    }
+
+    echo json_encode(['success' => true]);
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log("Error marking messages as read: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Database error']);
 }
 ?>
