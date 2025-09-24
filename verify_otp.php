@@ -1,4 +1,7 @@
 <?php
+// Set Philippine timezone
+date_default_timezone_set('Asia/Manila');
+
 session_start();
 header('Content-Type: application/json');
 
@@ -88,7 +91,9 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
     $safeName = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
     $safeLastName = htmlspecialchars($lastName, ENT_QUOTES, 'UTF-8');
     $safeUsername = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
-    $registrationDate = date('F j, Y \a\t g:i A T');
+    
+    // Format registration date in Philippine time with Philippine-specific format
+    $registrationDate = date('F j, Y \a\t g:i A') . ' (Philippine Time)';
     
     $mail->Body = "
     <!DOCTYPE html>
@@ -203,6 +208,15 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
                 margin: 0 10px; 
                 font-size: 14px;
             }
+            .timezone-note {
+                background: #fef3c7;
+                border: 1px solid #f59e0b;
+                border-radius: 8px;
+                padding: 15px;
+                margin: 20px 0;
+                text-align: center;
+            }
+            .timezone-note strong { color: #92400e; }
             @media (max-width: 600px) {
                 .features-grid { grid-template-columns: 1fr; }
                 .container { margin: 10px; }
@@ -219,7 +233,7 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
             </div>
             
             <div class='content'>
-                <div class='greeting'>Hello {$safeName}!</div>
+                <div class='greeting'>Kumusta {$safeName}!</div>
                 
                 <div class='welcome-message'>
                     Congratulations! Your ASRT Spaces account has been successfully created and verified. We're thrilled to have you join our community of satisfied clients who trust us with their space management needs.
@@ -243,6 +257,10 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
                         <span class='detail-label'>Registration Date:</span>
                         <span class='detail-value'>{$registrationDate}</span>
                     </div>
+                </div>
+                
+                <div class='timezone-note'>
+                    <strong>📍 Philippine Time Zone:</strong> All dates and times are displayed in Philippine Standard Time (PST/PHT) for your convenience.
                 </div>
                 
                 <div class='features-section'>
@@ -296,13 +314,14 @@ function sendWelcomeEmail($email, $firstName, $lastName, $username) {
                     <a href='#' class='social-link'>Contact Us</a>
                 </div>
                 <p>Need assistance? Reach out to us at <span class='support-info'>management@asrt.space</span></p>
+                <p>Operating Hours: Monday - Friday, 8:00 AM - 6:00 PM (Philippine Time)</p>
                 <p style='margin-top: 20px; font-size: 12px;'>© 2025 ASRT Spaces. All rights reserved.</p>
             </div>
         </div>
     </body>
     </html>";
     
-    $mail->AltBody = "Welcome to ASRT Spaces, {$safeName}!\n\nYour account has been successfully created and verified.\n\nAccount Details:\nName: {$safeName} {$safeLastName}\nUsername: {$safeUsername}\nEmail: {$email}\nRegistration: {$registrationDate}\n\nYou can now:\n- Browse available spaces\n- Manage payments and invoices\n- Request maintenance services\n- Access 24/7 customer support\n- Track your service history\n- Manage your account securely\n\nLog in to your account to get started!\n\nIf you need help, contact us at management@asrt.space\n\nThank you for choosing ASRT Spaces!\n\nASRT Spaces Team";
+    $mail->AltBody = "Welcome to ASRT Spaces, {$safeName}!\n\nKumusta! Your account has been successfully created and verified.\n\nAccount Details:\nName: {$safeName} {$safeLastName}\nUsername: {$safeUsername}\nEmail: {$email}\nRegistration: {$registrationDate}\n\nYou can now:\n- Browse available spaces\n- Manage payments and invoices\n- Request maintenance services\n- Access 24/7 customer support\n- Track your service history\n- Manage your account securely\n\nAll times are displayed in Philippine Time (PST/PHT) for your convenience.\n\nLog in to your account to get started!\n\nOperating Hours: Monday - Friday, 8:00 AM - 6:00 PM (Philippine Time)\n\nIf you need help, contact us at management@asrt.space\n\nSalamat for choosing ASRT Spaces!\n\nASRT Spaces Team";
     
     return $mail->send();
 }
@@ -404,16 +423,20 @@ try {
                 );
                 
                 if ($emailSent) {
-                    error_log("Welcome email sent successfully to: " . $userData['email']);
+                    // Log with Philippine time
+                    $currentTime = date('Y-m-d H:i:s T');
+                    error_log("Welcome email sent successfully to: " . $userData['email'] . " at {$currentTime}");
                 } else {
-                    error_log("Failed to send welcome email to: " . $userData['email']);
+                    $currentTime = date('Y-m-d H:i:s T');
+                    error_log("Failed to send welcome email to: " . $userData['email'] . " at {$currentTime}");
                 }
                 
                 // Clear session data
                 clearOTPSession();
                 
-                // Log successful registration
-                error_log("User successfully registered: " . $userData['username'] . " (" . $userData['email'] . ")");
+                // Log successful registration with Philippine time
+                $currentTime = date('Y-m-d H:i:s T');
+                error_log("User successfully registered: " . $userData['username'] . " (" . $userData['email'] . ") at {$currentTime}");
                 
                 echo json_encode([
                     'success' => true, 
@@ -426,7 +449,8 @@ try {
                 ]);
             }
         } catch (Exception $e) {
-            error_log('Registration error: ' . $e->getMessage());
+            $currentTime = date('Y-m-d H:i:s T');
+            error_log("Registration error at {$currentTime}: " . $e->getMessage());
             echo json_encode([
                 'success' => false, 
                 'message' => 'Registration failed. Please try again.',
@@ -436,12 +460,14 @@ try {
     } else {
         // Wrong OTP
         $failureResponse = handleFailedAttempt();
-        error_log("Failed OTP attempt for: " . $_SESSION['otp_email'] . " (Attempt: " . $_SESSION['otp_attempts'] . ")");
+        $currentTime = date('Y-m-d H:i:s T');
+        error_log("Failed OTP attempt for: " . $_SESSION['otp_email'] . " (Attempt: " . $_SESSION['otp_attempts'] . ") at {$currentTime}");
         echo json_encode($failureResponse);
     }
     
 } catch (Exception $e) {
-    error_log("OTP Verification Error: " . $e->getMessage());
+    $currentTime = date('Y-m-d H:i:s T');
+    error_log("OTP Verification Error at {$currentTime}: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'message' => 'An unexpected error occurred. Please try again later.'
