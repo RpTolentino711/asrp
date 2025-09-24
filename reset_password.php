@@ -84,8 +84,10 @@ function sendPasswordResetConfirmationEmail($email, $firstName, $username) {
     
     $safeName = htmlspecialchars($firstName, ENT_QUOTES, 'UTF-8');
     $safeUsername = htmlspecialchars($username, ENT_QUOTES, 'UTF-8');
-    $resetTime = date('F j, Y \a\t g:i A T');
-    
+date_default_timezone_set('Asia/Manila');
+$resetTime = date('F j, Y \a\t g:i A T');    
+
+
     $mail->Body = "
     <!DOCTYPE html>
     <html>
