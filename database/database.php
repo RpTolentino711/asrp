@@ -1283,7 +1283,7 @@ public function insertFreeMessage($name, $email, $phone, $message) {
 }
 
 public function getSingleInvoiceForDisplay($invoice_id) {
-    $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name AS UnitName
+    $sql = "SELECT i.*, c.Client_fn, c.Client_ln, c.Client_Email, s.Name AS UnitName
             FROM invoice i
             LEFT JOIN client c ON i.Client_ID = c.Client_ID
             LEFT JOIN space s ON i.Space_ID = s.Space_ID
@@ -1292,6 +1292,7 @@ public function getSingleInvoiceForDisplay($invoice_id) {
     $result = $this->runQuery($sql, [$invoice_id]);
     return $result;
 }
+
 
     public function getAllUnpaidInvoices() {
         $sql = "SELECT i.Invoice_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName,
