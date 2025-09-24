@@ -1018,10 +1018,10 @@ setInterval(() => {
                         </div>
                         <p class="text-muted mb-3">For urgent matters or technical issues, you can reach us directly.</p>
                         <div class="d-flex gap-2">
-                            <a href="tel:+639123456789" class="btn btn-outline-primary btn-sm">
+                            <a href="tel:+09451357685" class="btn btn-outline-primary btn-sm">
                                 <i class="bi bi-telephone me-1"></i>Call
                             </a>
-                            <a href="mailto:billing@asrt.com" class="btn btn-outline-primary btn-sm">
+                            <a href="mailto:management@asrt.space" class="btn btn-outline-primary btn-sm">
                                 <i class="bi bi-envelope me-1"></i>Email
                             </a>
                         </div>
