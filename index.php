@@ -793,8 +793,8 @@ if (isset($_SESSION['login_error'])) {
                                     <div class="row">
                                         <div class="col-md-6">
                                             <h6 class="fw-bold">Admin Contact:</h6>
-                                            <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:rom_telents@asrt.com">rom_telents@asrt.com</a></p>
-                                            <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+639171234567">+63 917 123 4567</a></p>
+                                            <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:management@asrt.space">management@asrt.space</a></p>
+                                            <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+63 9451357685">+63 9451357685</a></p>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="alert alert-warning">
@@ -1099,7 +1099,7 @@ if (isset($_SESSION['login_error'])) {
                 </div>
                 <h5 class="fw-bold">Call Us</h5>
                 <p class="text-muted mb-2">Speak with our leasing specialists</p>
-                <a href="tel:+639123456789" class="text-decoration-none">+63 912 345 6789</a>
+                <a href="tel:+639123456789" class="text-decoration-none">+63 9451357685</a>
               </div>
             </div>
 
