@@ -1554,40 +1554,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Forgot Password Resend OTP
     const forgotResendBtn = document.getElementById('forgotResendOtpBtn');
     if (forgotResendBtn) {
-        forgotResendBtn.addEventListener('click', function() {
-            forgotResendBtn.disabled = true;
-            
-            fetch('resend_forgot_otp.php', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        forgotOtpExpiresAt = data.expires_at;
-                        updateForgotOtpTimer();
-                        Swal.fire({ 
-                            icon: 'success', 
-                            title: 'OTP Resent', 
-                            text: 'A new code has been sent to your email.' 
-                        });
-                    } else {
-                        Swal.fire({ 
-                            icon: 'error', 
-                            title: 'Error', 
-                            text: data.message || 'Could not resend OTP.' 
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Resend forgot OTP error:', error);
-                    Swal.fire({ 
-                        icon: 'error', 
-                        title: 'Error', 
-                        text: 'Could not resend OTP.' 
-                    });
-                })
-                .finally(() => {
-                    forgotResendBtn.disabled = false;
-                });
+    forgotResendBtn.addEventListener('click', function() {
+      forgotResendBtn.disabled = true;
+      fetch('resend_forgot_otp.php', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            forgotOtpExpiresAt = data.expires_at;
+            // Always clear and restart the timer interval
+            if (forgotOtpTimerInterval) clearInterval(forgotOtpTimerInterval);
+            updateForgotOtpTimer();
+            forgotOtpTimerInterval = setInterval(updateForgotOtpTimer, 1000);
+            Swal.fire({ 
+              icon: 'success', 
+              title: 'OTP Resent', 
+              text: 'A new code has been sent to your email.' 
+            });
+          } else {
+            Swal.fire({ 
+              icon: 'error', 
+              title: 'Error', 
+              text: data.message || 'Could not resend OTP.' 
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Resend forgot OTP error:', error);
+          Swal.fire({ 
+            icon: 'error', 
+            title: 'Error', 
+            text: 'Could not resend OTP.' 
+          });
+        })
+        .finally(() => {
+          forgotResendBtn.disabled = false;
         });
+    });
     }
 
     // Reset Password Form
