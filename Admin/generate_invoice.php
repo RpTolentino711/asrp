@@ -4,9 +4,222 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require '../database/database.php';
+require '../class.phpmailer.php';
+require '../class.smtp.php';
 session_start();
 
 $db = new Database();
+
+// Set Philippine timezone for accurate timestamps
+date_default_timezone_set('Asia/Manila');
+
+// --- Email notification function for admin messages ---
+function sendAdminMessageNotification($clientEmail, $clientFirstName, $adminMessage, $invoiceId, $unitName) {
+    $mail = new PHPMailer;
+    $mail->CharSet = 'UTF-8';
+    $mail->isSMTP();
+    $mail->Host = 'smtp.hostinger.com';
+    $mail->Port = 587;
+    $mail->SMTPAuth = true;
+    $mail->SMTPSecure = 'tls';
+    
+    $mail->Username = 'management@asrt.space';
+    $mail->Password = '@Pogilameg10'; // Move to environment variable
+    
+    $mail->Timeout = 30;
+    $mail->SMTPOptions = [
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
+            'allow_self_signed' => true,
+            'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
+        ],
+    ];
+    
+    $mail->setFrom($mail->Username, 'ASRT Spaces Admin');
+    $mail->addReplyTo('no-reply@asrt.space', 'ASRT Spaces');
+    $mail->addAddress($clientEmail);
+    
+    $mail->isHTML(true);
+    $mail->Subject = "New Message from ASRT Spaces Admin - Invoice #" . $invoiceId;
+    
+    $safeName = htmlspecialchars($clientFirstName, ENT_QUOTES, 'UTF-8');
+    $safeMessage = htmlspecialchars($adminMessage, ENT_QUOTES, 'UTF-8');
+    $safeUnitName = htmlspecialchars($unitName, ENT_QUOTES, 'UTF-8');
+    $messageTime = date('F j, Y \a\t g:i A T');
+    
+    // Truncate message for email preview (show first 100 characters)
+    $messagePreview = strlen($adminMessage) > 100 ? substr($adminMessage, 0, 100) . '...' : $adminMessage;
+    $safeMessagePreview = htmlspecialchars($messagePreview, ENT_QUOTES, 'UTF-8');
+    
+    $mail->Body = "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            .container { max-width: 600px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; }
+            .header { 
+                background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); 
+                color: white; 
+                padding: 30px 20px; 
+                text-align: center; 
+                border-radius: 12px 12px 0 0;
+            }
+            .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+            .subtitle { font-size: 16px; opacity: 0.9; }
+            .content { padding: 30px; background: #f8fafc; }
+            .greeting { font-size: 18px; margin-bottom: 20px; color: #1e293b; font-weight: 600; }
+            .notification-box {
+                background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+                border-left: 4px solid #0ea5e9;
+                padding: 20px;
+                margin: 25px 0;
+                border-radius: 0 8px 8px 0;
+                box-shadow: 0 2px 10px rgba(14, 165, 233, 0.1);
+            }
+            .notification-title { font-weight: bold; color: #0c4a6e; margin-bottom: 10px; font-size: 16px; }
+            .invoice-details {
+                background: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 15px;
+                margin: 15px 0;
+            }
+            .detail-row { 
+                display: flex; 
+                justify-content: space-between; 
+                margin-bottom: 8px;
+                padding: 5px 0;
+                border-bottom: 1px solid #f1f5f9;
+            }
+            .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
+            .detail-label { color: #64748b; font-weight: 500; }
+            .detail-value { color: #1e293b; font-weight: 600; }
+            .message-box {
+                background: white;
+                border: 1px solid #d1d5db;
+                border-radius: 8px;
+                padding: 20px;
+                margin: 20px 0;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            }
+            .message-header { 
+                color: #6366f1; 
+                font-weight: bold; 
+                margin-bottom: 15px;
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .admin-message { 
+                color: #374151; 
+                font-size: 15px; 
+                line-height: 1.6;
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+            .cta-section {
+                background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+                color: white;
+                padding: 25px;
+                border-radius: 8px;
+                text-align: center;
+                margin: 25px 0;
+            }
+            .cta-title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+            .cta-button {
+                display: inline-block;
+                background: white;
+                color: #6366f1;
+                padding: 12px 25px;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: bold;
+                margin-top: 15px;
+                transition: transform 0.2s;
+            }
+            .cta-button:hover { transform: translateY(-2px); }
+            .footer { 
+                padding: 25px 20px; 
+                text-align: center; 
+                background: #1e293b; 
+                color: #94a3b8;
+                border-radius: 0 0 12px 12px;
+            }
+            .footer h3 { color: white; margin-bottom: 15px; font-size: 18px; }
+            .footer p { margin: 6px 0; font-size: 13px; }
+            .support-info { color: #60a5fa; font-weight: 500; }
+            .timestamp { font-size: 12px; color: #64748b; margin-top: 20px; font-style: italic; }
+            @media (max-width: 600px) {
+                .container { margin: 10px; }
+                .content, .header, .footer { padding: 20px 15px; }
+                .detail-row { flex-direction: column; }
+                .detail-value { margin-top: 5px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <div class='logo'>ASRT Spaces</div>
+                <div class='subtitle'>New Message from Admin</div>
+            </div>
+            
+            <div class='content'>
+                <div class='greeting'>Hello {$safeName}!</div>
+                
+                <div class='notification-box'>
+                    <div class='notification-title'>You have a new message from our admin team</div>
+                    <p>Our admin team has sent you a message regarding your rental invoice. Please log in to your account to view the full conversation and respond if needed.</p>
+                </div>
+                
+                <div class='invoice-details'>
+                    <div class='detail-row'>
+                        <span class='detail-label'>Invoice ID:</span>
+                        <span class='detail-value'>#{$invoiceId}</span>
+                    </div>
+                    <div class='detail-row'>
+                        <span class='detail-label'>Unit:</span>
+                        <span class='detail-value'>{$safeUnitName}</span>
+                    </div>
+                    <div class='detail-row'>
+                        <span class='detail-label'>Message Time:</span>
+                        <span class='detail-value'>{$messageTime}</span>
+                    </div>
+                </div>
+                
+                <div class='message-box'>
+                    <div class='message-header'>Admin Message Preview:</div>
+                    <div class='admin-message'>{$safeMessagePreview}</div>
+                </div>
+                
+                <div class='cta-section'>
+                    <div class='cta-title'>Ready to respond?</div>
+                    <p>Log in to your ASRT Spaces account to view the full message and continue the conversation.</p>
+                    <a href='#' class='cta-button'>View Full Message</a>
+                </div>
+                
+                <div style='background: #fef3c7; border: 1px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 6px; color: #92400e; font-size: 14px;'>
+                    <strong>Quick Tip:</strong> You can respond directly through your account dashboard. Our admin team will be notified immediately of your reply.
+                </div>
+                
+                <div class='timestamp'>Message received: {$messageTime}</div>
+            </div>
+            
+            <div class='footer'>
+                <h3>ASRT Spaces</h3>
+                <p>This notification was sent because an admin sent you a message about your rental invoice.</p>
+                <p>Need help? Contact us at <span class='support-info'>management@asrt.space</span></p>
+                <p style='margin-top: 15px; font-size: 11px;'>© 2025 ASRT Spaces. All rights reserved.</p>
+            </div>
+        </div>
+    </body>
+    </html>";
+    
+    $mail->AltBody = "Hello {$safeName}!\n\nYou have a new message from ASRT Spaces Admin.\n\nInvoice Details:\nInvoice ID: #{$invoiceId}\nUnit: {$safeUnitName}\nMessage Time: {$messageTime}\n\nAdmin Message Preview:\n{$messagePreview}\n\nPlease log in to your ASRT Spaces account to view the full message and respond.\n\nBest regards,\nASRT Spaces Admin Team\n\nNeed help? Contact: management@asrt.space";
+    
+    return $mail->send();
+}
 
 // --- Restrict access: Only allow logged in admin ---
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
@@ -14,13 +227,14 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
-// --- Chat functionality ---
+// --- Enhanced Chat functionality with email notification ---
 if (isset($_POST['send_message']) && isset($_POST['invoice_id'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $admin_id = $_SESSION['admin_id'] ?? 0;
     $message_text = trim($_POST['message_text'] ?? '');
     $image_path = null;
 
+    // Handle image upload
     if (!empty($_FILES['image_file']['name'])) {
         $upload_dir = '../uploads/invoice_chat/';
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
@@ -31,7 +245,39 @@ if (isset($_POST['send_message']) && isset($_POST['invoice_id'])) {
         }
     }
 
-    $db->sendInvoiceChat($invoice_id, 'admin', $admin_id, $message_text, $image_path);
+    // Send the chat message
+    $messageSuccess = $db->sendInvoiceChat($invoice_id, 'admin', $admin_id, $message_text, $image_path);
+    
+    // Send email notification to client if message was sent successfully and has content
+    if ($messageSuccess && !empty($message_text)) {
+        try {
+            // Get invoice and client details for email notification
+            $invoice = $db->getSingleInvoiceForDisplay($invoice_id);
+            if ($invoice && !empty($invoice['Client_Email'])) {
+                $clientEmail = $invoice['Client_Email'];
+                $clientFirstName = $invoice['Client_fn'] ?: 'User';
+                $unitName = $invoice['UnitName'] ?: 'Your Unit';
+                
+                // Send email notification
+                $emailSent = sendAdminMessageNotification(
+                    $clientEmail, 
+                    $clientFirstName, 
+                    $message_text, 
+                    $invoice_id, 
+                    $unitName
+                );
+                
+                if ($emailSent) {
+                    error_log("Admin message email notification sent to: " . $clientEmail . " for invoice ID: " . $invoice_id);
+                } else {
+                    error_log("Failed to send admin message email notification to: " . $clientEmail . " for invoice ID: " . $invoice_id);
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Error sending admin message notification email: " . $e->getMessage());
+        }
+    }
+    
     header("Location: generate_invoice.php?chat_invoice_id=" . $invoice_id . "&status=" . ($_GET['status'] ?? 'new'));
     exit();
 }
@@ -979,7 +1225,7 @@ function renderCountdown($due_date) {
         <!-- Info Alert -->
         <div class="alert alert-info animate-fade-in">
             <i class="fas fa-info-circle me-2"></i>
-            Mark an invoice as paid to confirm payment. The system will send a chat message as a receipt and create a new invoice for the next rental period.
+            Mark an invoice as paid to confirm payment. The system will send a chat message as a receipt and create a new invoice for the next rental period. Clients will receive email notifications when you send them messages.
         </div>
         
         <?php if ($show_chat && $invoice): ?>
@@ -1101,7 +1347,7 @@ setInterval(() => {
                 <form method="post" enctype="multipart/form-data" class="chat-form mobile-chat-form">
                     <div class="row g-2">
                         <div class="col-12 col-md-8">
-                            <textarea name="message_text" class="form-control admin-chat-textarea" rows="2" placeholder="Type your message..."></textarea>
+                            <textarea name="message_text" class="form-control admin-chat-textarea" rows="2" placeholder="Type your message... (Client will receive email notification)"></textarea>
                         </div>
                         <div class="col-12 col-md-2">
                             <input type="file" name="image_file" accept="image/*" class="form-control">
@@ -1109,7 +1355,7 @@ setInterval(() => {
                         <div class="col-12 col-md-2">
                             <input type="hidden" name="invoice_id" value="<?= $chat_invoice_id ?>">
                             <button type="submit" name="send_message" class="btn btn-primary w-100">
-                                <i class="fas fa-paper-plane me-1"></i> Send
+                                <i class="fas fa-paper-plane me-1"></i> Send & Notify
                             </button>
                         </div>
                     </div>
@@ -1275,66 +1521,64 @@ setInterval(() => {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // Live poll unread client messages for admin (desktop and mobile)
-    function pollAdminUnreadBadges() {
-        const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
-        const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
-        if (invoiceIds.length === 0) return;
-        fetch('../AJAX/get_unread_client_chat_counts.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
-        })
-        .then(res => res.json())
-        .then(counts => {
-            invoiceIds.forEach(id => {
-                // Desktop badge
-                const badge = document.getElementById('unread-badge-' + id);
-                if (badge) {
-                    const count = counts[id] || 0;
-                    if (count > 0) {
-                        badge.textContent = count;
-                        badge.classList.remove('d-none');
-                    } else {
-                        badge.textContent = '';
-                        badge.classList.add('d-none');
+        // Live poll unread client messages for admin (desktop and mobile)
+        function pollAdminUnreadBadges() {
+            const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
+            const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
+            if (invoiceIds.length === 0) return;
+            fetch('../AJAX/get_unread_client_chat_counts.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
+            })
+            .then(res => res.json())
+            .then(counts => {
+                invoiceIds.forEach(id => {
+                    // Desktop badge
+                    const badge = document.getElementById('unread-badge-' + id);
+                    if (badge) {
+                        const count = counts[id] || 0;
+                        if (count > 0) {
+                            badge.textContent = count;
+                            badge.classList.remove('d-none');
+                        } else {
+                            badge.textContent = '';
+                            badge.classList.add('d-none');
+                        }
                     }
-                }
-                // Mobile badge
-                const badgeMobile = document.getElementById('unread-badge-mobile-' + id);
-                if (badgeMobile) {
-                    const count = counts[id] || 0;
-                    if (count > 0) {
-                        badgeMobile.textContent = count;
-                        badgeMobile.classList.remove('d-none');
-                    } else {
-                        badgeMobile.textContent = '';
-                        badgeMobile.classList.add('d-none');
+                    // Mobile badge
+                    const badgeMobile = document.getElementById('unread-badge-mobile-' + id);
+                    if (badgeMobile) {
+                        const count = counts[id] || 0;
+                        if (count > 0) {
+                            badgeMobile.textContent = count;
+                            badgeMobile.classList.remove('d-none');
+                        } else {
+                            badgeMobile.textContent = '';
+                            badgeMobile.classList.add('d-none');
+                        }
                     }
-                }
+                });
             });
-        });
-    }
-    document.addEventListener('DOMContentLoaded', function() {
-        pollAdminUnreadBadges();
-        setInterval(pollAdminUnreadBadges, 5000);
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            pollAdminUnreadBadges();
+            setInterval(pollAdminUnreadBadges, 5000);
 
-        // Mark messages as read for admin via AJAX when chat is opened
-        document.querySelectorAll('.btn-chat[data-invoice-id]').forEach(link => {
-            link.addEventListener('click', function(e) {
-                const invoiceId = this.getAttribute('data-invoice-id');
-                if (!invoiceId) return;
-                fetch('../AJAX/mark_admin_chat_read.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: 'invoice_id=' + encodeURIComponent(invoiceId)
+            // Mark messages as read for admin via AJAX when chat is opened
+            document.querySelectorAll('.btn-chat[data-invoice-id]').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const invoiceId = this.getAttribute('data-invoice-id');
+                    if (!invoiceId) return;
+                    fetch('../AJAX/mark_admin_chat_read.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'invoice_id=' + encodeURIComponent(invoiceId)
+                    });
                 });
             });
         });
-    });
-    </script>
 
-    <script>
         // Mobile menu functionality
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const sidebar = document.getElementById('sidebar');
