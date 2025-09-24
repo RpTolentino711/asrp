@@ -667,8 +667,13 @@ $is_logged_in = isset($_SESSION['client_id']);
             </a>
           </li>
           <?php endif; ?>
-          <!-- Client dropdown with name, settings, and logout -->
-          <li class="nav-item dropdown">
+          <!-- Show logout as a regular menu item on mobile, dropdown on desktop -->
+          <li class="nav-item d-lg-none">
+            <form action="logout.php" method="post" class="d-block">
+              <button type="submit" class="modern-btn modern-btn-outline w-100 text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
+            </form>
+          </li>
+          <li class="nav-item dropdown d-none d-lg-block">
             <a class="modern-nav-link text-primary fw-semibold dropdown-toggle d-flex align-items-center" href="#" id="clientDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="bi bi-person-circle me-2"></i>
               <?= htmlspecialchars($client_name ?: 'User') ?>
