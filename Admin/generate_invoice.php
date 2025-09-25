@@ -216,6 +216,27 @@ function sendAdminMessageNotification($clientEmail, $clientFirstName, $adminMess
     </body>
     </html>";
     
+    
+if (isset($_POST['update_due_date'], $_POST['invoice_id'], $_POST['new_due_date'])) {
+    require_once '../database/database.php';
+    $db = new Database();
+    $invoice_id = intval($_POST['invoice_id']);
+    $new_due_date = $_POST['new_due_date'];
+    // Validate date
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $new_due_date)) {
+        $db->executeStatement("UPDATE invoice SET EndDate = ? WHERE Invoice_ID = ?", [$new_due_date, $invoice_id]);
+        // Optional: add a system message to chat
+        $db->sendInvoiceChat($invoice_id, 'system', null, "Due date updated by admin to $new_due_date.");
+        header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new') . "&due_updated=1");
+        exit();
+    }
+}
+
+    
+
+
+
+
     $mail->AltBody = "Hello {$safeName}!\n\nYou have a new message from ASRT Spaces Admin.\n\nInvoice Details:\nInvoice ID: #{$invoiceId}\nUnit: {$safeUnitName}\nMessage Time: {$messageTime}\n\nAdmin Message Preview:\n{$messagePreview}\n\nPlease log in to your ASRT Spaces account to view the full message and respond.\n\nBest regards,\nASRT Spaces Admin Team\n\nNeed help? Contact: management@asrt.space";
     
     return $mail->send();
@@ -1395,6 +1416,17 @@ setInterval(() => {
                         <i class="fas fa-arrow-left me-1"></i> Back to Invoices
                     </a>
                 </div>
+                <div class="text-center mt-3">
+                    <form method="post" class="d-inline-block" style="max-width:300px;">
+                        <input type="hidden" name="update_due_date" value="1">
+                        <input type="hidden" name="invoice_id" value="<?= $invoice['Invoice_ID'] ?>">
+                        <div class="input-group">
+                            <input type="date" name="new_due_date" class="form-control" value="<?= htmlspecialchars($invoice['EndDate'] ?? '') ?>" min="<?= date('Y-m-d') ?>" required>
+                            <button type="submit" class="btn btn-warning">Update Due Date</button>
+                        </div>
+                    </form>
+                </div>
+
             </div>
         <?php endif; ?>
 
