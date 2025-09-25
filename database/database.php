@@ -1776,7 +1776,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 
 
-    
 
     // NEW METHOD: Update invoice due date
 public function updateInvoiceDueDate($invoice_id, $new_due_date) {
@@ -1835,7 +1834,6 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
         return false;
     }
 }
-
 
 
 
