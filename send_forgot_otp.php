@@ -105,7 +105,7 @@ function sendForgotOTPEmail($email, $firstName, $otp) {
     <body>
         <div class='container'>
             <div class='header'>
-                <h1>🔒 ASRT Spaces</h1>
+                <h1>ASRT Spaces</h1>
                 <p>Password Reset Request</p>
             </div>
             <div class='content'>
@@ -113,7 +113,7 @@ function sendForgotOTPEmail($email, $firstName, $otp) {
                 <p>We received a request to reset your password. Here's your verification code:</p>
                 <div class='otp-code'>{$otp}</div>
                 <div class='warning'>
-                    <strong>⚠️ Security Notice:</strong>
+                    <strong>Security Notice:</strong>
                     <ul>
                         <li>This code expires in <strong>{$expiryMinutes} minutes</strong></li>
                         <li>Only use this code if you requested a password reset</li>
@@ -153,21 +153,29 @@ try {
         exit;
     }
     
-    // Check if email exists in database using your PDO method
+    // Check if email exists in database using your existing method
     $db = new Database();
     $user = $db->getUserByEmail($email);
     
-    if (!$user || $user['Status'] !== 'Active') {
-        // Don't reveal if email exists or not for security
+    if (!$user) {
+        // Email not found in database - return clear error message
         echo json_encode([
-            'success' => true,
-            'message' => 'If this email is registered, you will receive a password reset code shortly.',
-            'expires_at' => time() + (FORGOT_OTP_EXPIRY_MINUTES * 60)
+            'success' => false,
+            'message' => 'Email address not found. Please check your email or register a new account.'
         ]);
         exit;
     }
     
-    // Generate OTP
+    if ($user['Status'] !== 'Active') {
+        // Account inactive
+        echo json_encode([
+            'success' => false,
+            'message' => 'Account is inactive. Please contact support.'
+        ]);
+        exit;
+    }
+    
+    // Email exists and account is active - proceed with OTP generation
     $otp = generateForgotOTP();
     
     // Store in session
@@ -175,6 +183,7 @@ try {
     $_SESSION['forgot_otp_expires'] = time() + (FORGOT_OTP_EXPIRY_MINUTES * 60);
     $_SESSION['forgot_otp_attempts'] = 0;
     $_SESSION['forgot_email'] = $email;
+    $_SESSION['forgot_client_id'] = $user['Client_ID'];
     $_SESSION['last_forgot_otp_sent'] = time();
     unset($_SESSION['forgot_otp_verified']);
     

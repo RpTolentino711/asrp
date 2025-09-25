@@ -72,6 +72,8 @@ public function getUserByEmail($email) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+
+
 public function updatePasswordByEmail($email, $hashedPassword) {
     $stmt = $this->pdo->prepare("UPDATE client SET C_password = ? WHERE Client_Email = ?");
     return $stmt->execute([$hashedPassword, $email]);
