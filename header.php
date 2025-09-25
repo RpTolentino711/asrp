@@ -1468,49 +1468,217 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ========== FORGOT PASSWORD HANDLING ==========
-    const forgotLink = document.getElementById('forgotPasswordLink');
-    if (forgotLink) {
-        forgotLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            const forgotModal = new bootstrap.Modal(document.getElementById('forgotPasswordModal'));
-            document.getElementById('forgotEmailInput').value = '';
-            document.getElementById('forgotEmailErrorMsg').textContent = '';
-            forgotModal.show();
-        });
+  // Enhanced forgot password form with live email validation
+  document.addEventListener('DOMContentLoaded', function() {
+    const forgotEmailInput = document.getElementById('forgotEmailInput');
+    const forgotEmailErrorMsg = document.getElementById('forgotEmailErrorMsg');
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+        
+    let emailValidationTimeout = null;
+    let isEmailValid = false;
+
+    // Debounced email validation function
+    function validateEmailLive(email) {
+      clearTimeout(emailValidationTimeout);
+      emailValidationTimeout = setTimeout(() => {
+        checkEmailExists(email);
+      }, 1000); // Wait 1 second after user stops typing
     }
 
-    const forgotForm = document.getElementById('forgotPasswordForm');
-    if (forgotForm) {
-        forgotForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const email = document.getElementById('forgotEmailInput').value.trim();
-            const errorMsg = document.getElementById('forgotEmailErrorMsg');
-            errorMsg.textContent = '';
-            if (!email) {
-                errorMsg.textContent = 'Please enter your email.';
-                return;
-            }
-            fetch('send_forgot_otp.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'email=' + encodeURIComponent(email)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal')).hide();
-                    showForgotOtpModal(data.expires_at);
-                } else {
-                    errorMsg.textContent = data.message || 'Failed to send OTP.';
-                }
-            })
-            .catch(error => {
-                console.error('Forgot password error:', error);
-                errorMsg.textContent = 'Could not send OTP. Please try again.';
-            });
+    // Check if email exists in database
+    async function checkEmailExists(email) {
+      if (!email.trim()) {
+        clearEmailValidation();
+        return;
+      }
+
+      // Basic email format validation
+      if (!isValidEmailFormat(email)) {
+        showEmailError('Please enter a valid email address.');
+        isEmailValid = false;
+        return;
+      }
+
+      // Show loading state
+      showEmailLoading();
+
+      try {
+        const response = await fetch('AJAX/check_email.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: 'email=' + encodeURIComponent(email)
         });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          if (data.exists && data.valid && data.active) {
+            // Email exists and account is active
+            showEmailSuccess(data.message);
+            isEmailValid = true;
+          } else if (data.exists && !data.active) {
+            // Email exists but account is inactive
+            showEmailError(data.message);
+            isEmailValid = false;
+          } else {
+            // Email doesn't exist
+            showEmailError(data.message);
+            isEmailValid = false;
+          }
+        } else {
+          // Server error
+          showEmailError(data.message || 'Unable to verify email. Please try again.');
+          isEmailValid = false;
+        }
+      } catch (error) {
+        console.error('Email validation error:', error);
+        showEmailError('Network error. Please check your connection and try again.');
+        isEmailValid = false;
+      }
     }
+
+    // Utility functions for email validation UI
+    function showEmailLoading() {
+      forgotEmailInput.classList.add('validation-loading');
+      forgotEmailInput.classList.remove('is-valid', 'is-invalid');
+      forgotEmailErrorMsg.className = 'form-text text-muted';
+      forgotEmailErrorMsg.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Verifying email...';
+      forgotEmailErrorMsg.style.display = 'block';
+    }
+
+    function showEmailSuccess(message) {
+      forgotEmailInput.classList.remove('validation-loading', 'is-invalid');
+      forgotEmailInput.classList.add('is-valid');
+      forgotEmailErrorMsg.className = 'form-text text-success';
+      forgotEmailErrorMsg.innerHTML = '<i class="bi bi-check-circle me-1"></i>' + message;
+      forgotEmailErrorMsg.style.display = 'block';
+    }
+
+    function showEmailError(message) {
+      forgotEmailInput.classList.remove('validation-loading', 'is-valid');
+      forgotEmailInput.classList.add('is-invalid');
+      forgotEmailErrorMsg.className = 'form-text text-danger';
+      forgotEmailErrorMsg.innerHTML = '<i class="bi bi-x-circle me-1"></i>' + message;
+      forgotEmailErrorMsg.style.display = 'block';
+    }
+
+    function clearEmailValidation() {
+      forgotEmailInput.classList.remove('validation-loading', 'is-valid', 'is-invalid');
+      forgotEmailErrorMsg.innerHTML = '';
+      forgotEmailErrorMsg.style.display = 'none';
+      isEmailValid = false;
+    }
+
+    function isValidEmailFormat(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
+    }
+
+    // Email input event listeners
+    if (forgotEmailInput) {
+      forgotEmailInput.addEventListener('input', function() {
+        const email = this.value.trim();
+        if (email) {
+          validateEmailLive(email);
+        } else {
+          clearEmailValidation();
+        }
+      });
+
+      forgotEmailInput.addEventListener('blur', function() {
+        const email = this.value.trim();
+        if (email) {
+          checkEmailExists(email);
+        }
+      });
+    }
+
+    // Enhanced form submission
+    if (forgotPasswordForm) {
+      forgotPasswordForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+                
+        const email = forgotEmailInput.value.trim();
+        const submitBtn = this.querySelector('button[type="submit"]');
+                
+        // Clear any previous error messages
+        forgotEmailErrorMsg.textContent = '';
+                
+        // Basic validation
+        if (!email) {
+          showEmailError('Please enter your email address.');
+          forgotEmailInput.focus();
+          return;
+        }
+                
+        if (!isValidEmailFormat(email)) {
+          showEmailError('Please enter a valid email address.');
+          forgotEmailInput.focus();
+          return;
+        }
+
+        // Check if email validation passed
+        if (!isEmailValid) {
+          showEmailError('Please verify that your email address is correct and registered.');
+          return;
+        }
+
+        // Show loading state on submit button
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Sending OTP...';
+
+        // Proceed with sending OTP (your existing logic)
+        fetch('send_forgot_otp.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'email=' + encodeURIComponent(email)
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Hide forgot password modal and show OTP modal
+            bootstrap.Modal.getInstance(document.getElementById('forgotPasswordModal')).hide();
+            showForgotOtpModal(data.expires_at);
+                        
+            // Show success message
+            Swal.fire({
+              icon: 'success',
+              title: 'OTP Sent!',
+              text: `A verification code has been sent to ${email}`,
+              timer: 3000,
+              showConfirmButton: false
+            });
+          } else {
+            showEmailError(data.message || 'Failed to send OTP. Please try again.');
+          }
+        })
+        .catch(error => {
+          console.error('Forgot password error:', error);
+          showEmailError('Unable to send OTP. Please check your connection and try again.');
+        })
+        .finally(() => {
+          // Restore button state
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        });
+      });
+    }
+
+    // Reset form when modal is closed
+    const forgotPasswordModal = document.getElementById('forgotPasswordModal');
+    if (forgotPasswordModal) {
+      forgotPasswordModal.addEventListener('hidden.bs.modal', function() {
+        if (forgotPasswordForm) {
+          forgotPasswordForm.reset();
+        }
+        clearEmailValidation();
+        isEmailValid = false;
+      });
+    }
+  });
 
     // Forgot Password OTP Verification
     const forgotOtpForm = document.getElementById('forgotOtpForm');
