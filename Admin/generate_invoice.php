@@ -359,39 +359,64 @@ if ($show_chat && $chat_invoice_id) {
 }
 
 // Helper for countdown (output JS or static string)
+
+
+
+
 function renderCountdown($due_date) {
-    $due = strtotime($due_date);
+    $due = strtotime($due_date . ' 23:59:59');
     $now = time();
     $diff = $due - $now;
+    
     if ($diff <= 0) {
         return '<span class="badge bg-danger">OVERDUE</span>';
     }
+    
     $id = 'countdown_' . uniqid();
-    return '<span id="'.$id.'" class="badge bg-warning text-dark" data-duedate="'.$due_date.'"></span>
+    
+    return '<span id="'.$id.'" class="badge bg-warning text-dark"></span>
 <script>
 (function(){
+    var remaining_'.$id.' = '.$diff.';
+    
     function updateCountdown_'.$id.'() {
-        var due = new Date("'.$due_date.'T23:59:59").getTime();
-        var now = new Date().getTime();
-        var diff = due - now;
         var el = document.getElementById("'.$id.'");
         if (!el) return;
-        if (diff <= 0) {
+        
+        if (remaining_'.$id.' <= 0) {
             el.textContent = "OVERDUE";
             el.className = "badge bg-danger";
             return;
         }
-        var d = Math.floor(diff / (1000*60*60*24));
-        var h = Math.floor((diff%(1000*60*60*24))/(1000*60*60));
-        var m = Math.floor((diff%(1000*60*60))/(1000*60));
-        var s = Math.floor((diff%(1000*60))/1000);
+        
+        var d = Math.floor(remaining_'.$id.' / (24*60*60));
+        var h = Math.floor((remaining_'.$id.' % (24*60*60)) / (60*60));
+        var m = Math.floor((remaining_'.$id.' % (60*60)) / 60);
+        var s = remaining_'.$id.' % 60;
+        
         el.textContent = "Due in " + (d>0?d + "d ":"") + (h>0?h + "h ":"") + (m>0?m + "m ":"") + s + "s";
+        
+        remaining_'.$id.'--;
         setTimeout(updateCountdown_'.$id.', 1000);
     }
     updateCountdown_'.$id.'();
 })();
 </script>';
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
