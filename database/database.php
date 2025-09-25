@@ -607,6 +607,7 @@ public function getHomepageRentedUnits($limit = 12) {
         return $this->executeStatement($sql, [$client_id, $space_id, $start_date, $end_date]);
     }
 
+
     public function getClientSpacesForMaintenance($client_id) {
         $sql = "SELECT s.Space_ID, s.Name
                 FROM clientspace cs
@@ -615,6 +616,8 @@ public function getHomepageRentedUnits($limit = 12) {
                 ORDER BY s.Name";
         return $this->runQuery($sql, [$client_id], true);
     }
+
+
 
     public function hasPendingMaintenanceRequest($client_id, $space_id) {
         $sql = "SELECT 1
@@ -1771,11 +1774,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
         $sql = "SELECT * FROM invoice WHERE Client_ID = ? AND Space_ID = ? AND Flow_Status = 'new' ORDER BY EndDate DESC LIMIT 1";
         return $this->runQuery($sql, [$client_id, $space_id]);
     }
-
-
-
-
-
 
 
 }
