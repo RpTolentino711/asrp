@@ -1775,67 +1775,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 
 
-    
-
-// NEW METHOD: Update invoice due date
-public function updateInvoiceDueDate($invoice_id, $new_due_date) {
-    $sql = "UPDATE invoice SET EndDate = ? WHERE Invoice_ID = ?";  // Note: your table is 'invoice' not 'invoices'
-    return $this->executeStatement($sql, [$new_due_date, $invoice_id]);
-}
-
-// NEW METHOD: Create next invoice with custom due date (references existing function)
-public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custom_due_date) {
-    // Get the current invoice
-    $invoice = $this->runQuery("SELECT * FROM invoice WHERE Invoice_ID = ?", [$invoice_id]);
-    if (!$invoice) return false;
-
-    // Calculate start date based on custom due date
-    $start_date = date('Y-m-d', strtotime($invoice['InvoiceDate'] . ' +1 month'));
-    $end_date = $custom_due_date;
-
-    $this->pdo->beginTransaction();
-    try {
-        // Insert new invoice with custom end date (matching your existing function's structure)
-        $this->executeStatement(
-            "INSERT INTO invoice (Client_ID, Space_ID, InvoiceDate, EndDate, InvoiceTotal, Status, Flow_Status) VALUES (?, ?, ?, ?, ?, 'unpaid', 'new')",
-            [$invoice['Client_ID'], $invoice['Space_ID'], $start_date, $end_date, $invoice['InvoiceTotal']]
-        );
-        $new_invoice_id = $this->pdo->lastInsertId();
-
-        // Copy all messages from old invoice chat (same as your existing function)
-        $old_msgs = $this->runQueryAll(
-            "SELECT * FROM invoice_chat WHERE Invoice_ID = ? ORDER BY Created_At ASC, Chat_ID ASC",
-            [$invoice_id]
-        );
-        foreach ($old_msgs as $msg) {
-            $this->executeStatement(
-                "INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At) VALUES (?, ?, ?, ?, ?, ?)",
-                [
-                    $new_invoice_id,
-                    $msg['Sender_Type'],
-                    $msg['Sender_ID'],
-                    $msg['Message'],
-                    $msg['Image_Path'],
-                    $msg['Created_At']
-                ]
-            );
-        }
-
-        // Add system message (same as your existing function)
-        $this->executeStatement(
-            "INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At) VALUES (?, 'system', NULL, ?, NULL, NOW())",
-            [$new_invoice_id, 'Conversation continued from previous invoice with custom due date: ' . $custom_due_date]
-        );
-
-        $this->pdo->commit();
-        return $new_invoice_id;
-    } catch (Exception $e) {
-        $this->pdo->rollBack();
-        return false;
-    }
-}
-
-
 
 
 
