@@ -1778,32 +1778,62 @@ public function getAdminMonthChartData($startDate, $endDate) {
 
 
 
-    // NEW METHOD: Update invoice due date
+// NEW METHOD: Update invoice due date
 public function updateInvoiceDueDate($invoice_id, $new_due_date) {
-    $sql = "UPDATE invoices SET EndDate = ? WHERE Invoice_ID = ?";
+    $sql = "UPDATE invoice SET EndDate = ? WHERE Invoice_ID = ?";
     return $this->executeStatement($sql, [$new_due_date, $invoice_id]);
 }
 
 // NEW METHOD: Create next invoice with custom due date
-public function createNextRecurringInvoiceWithChatCustomDate($old_invoice_id, $custom_due_date) {
-    // Get old invoice details
-    $old_invoice = $this->getSingleInvoiceForDisplay($old_invoice_id);
-    if (!$old_invoice) return false;
+public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custom_due_date) {
+    // Get the current invoice
+    $invoice = $this->runQuery("SELECT * FROM invoice WHERE Invoice_ID = ?", [$invoice_id]);
+    if (!$invoice) return false;
     
-    // Create new invoice with custom due date
-    $start_date = date('Y-m-d');
-    $sql = "INSERT INTO invoices (Client_ID, Space_ID, InvoiceDate, EndDate, Status, Flow_Status, Amount) 
-            VALUES (?, ?, ?, ?, 'unpaid', 'new', ?)";
+    // Calculate start date based on custom due date
+    $start_date = date('Y-m-d', strtotime($invoice['InvoiceDate'] . ' +1 month'));
+    $end_date = $custom_due_date;
     
-    $this->executeStatement($sql, [
-        $old_invoice['Client_ID'],
-        $old_invoice['Space_ID'], 
-        $start_date,
-        $custom_due_date,
-        $old_invoice['Amount']
-    ]);
-    
-    return $this->connection->lastInsertId();
+    $this->pdo->beginTransaction();
+    try {
+        // Insert new invoice with custom end date
+        $this->executeStatement(
+            "INSERT INTO invoice (Client_ID, Space_ID, InvoiceDate, EndDate, InvoiceTotal, Status, Flow_Status) VALUES (?, ?, ?, ?, ?, 'unpaid', 'new')",
+            [$invoice['Client_ID'], $invoice['Space_ID'], $start_date, $end_date, $invoice['InvoiceTotal']]
+        );
+        $new_invoice_id = $this->pdo->lastInsertId();
+        
+        // Copy all messages from old invoice chat
+        $old_msgs = $this->runQueryAll(
+            "SELECT * FROM invoice_chat WHERE Invoice_ID = ? ORDER BY Created_At ASC, Chat_ID ASC",
+            [$invoice_id]
+        );
+        foreach ($old_msgs as $msg) {
+            $this->executeStatement(
+                "INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At) VALUES (?, ?, ?, ?, ?, ?)",
+                [
+                    $new_invoice_id,
+                    $msg['Sender_Type'],
+                    $msg['Sender_ID'],
+                    $msg['Message'],
+                    $msg['Image_Path'],
+                    $msg['Created_At']
+                ]
+            );
+        }
+        
+        // Add system message
+        $this->executeStatement(
+            "INSERT INTO invoice_chat (Invoice_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At) VALUES (?, 'system', NULL, ?, NULL, NOW())",
+            [$new_invoice_id, 'Conversation continued from previous invoice with custom due date: ' . $custom_due_date]
+        );
+        
+        $this->pdo->commit();
+        return $new_invoice_id;
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        return false;
+    }
 }
 
 
