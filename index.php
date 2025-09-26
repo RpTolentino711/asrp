@@ -1120,7 +1120,7 @@ if (isset($_SESSION['login_error'])) {
                   <i class="bi bi-geo-alt"></i>
                 </div>
                 <h5 class="fw-bold">Visit Us</h5>
-                <p class="text-muted mb-2">Our main office location</p>
+                <p class="text-muted mb-2">Our main location</p>
                 <address class="mb-0">Gen. Luna St, Lipa, Batangas</address>
               </div>
             </div>
