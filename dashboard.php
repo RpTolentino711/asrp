@@ -1312,7 +1312,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 <i class="bi bi-house-x"></i>
                 <h5>No Active Rentals</h5>
                 <p class="text-muted">You currently have no active rental units. Contact our team to explore available properties.</p>
-               <a href="tel:1234567890">1234567890</a>
             </div>
         <?php endif; ?>
 
