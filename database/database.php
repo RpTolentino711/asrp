@@ -1776,6 +1776,37 @@ public function getAdminMonthChartData($startDate, $endDate) {
     }
 
 
+
+
+    // NEW METHOD: Update invoice due date
+public function updateInvoiceDueDate($invoice_id, $new_due_date) {
+    $sql = "UPDATE invoices SET EndDate = ? WHERE Invoice_ID = ?";
+    return $this->executeStatement($sql, [$new_due_date, $invoice_id]);
+}
+
+// NEW METHOD: Create next invoice with custom due date
+public function createNextRecurringInvoiceWithChatCustomDate($old_invoice_id, $custom_due_date) {
+    // Get old invoice details
+    $old_invoice = $this->getSingleInvoiceForDisplay($old_invoice_id);
+    if (!$old_invoice) return false;
+    
+    // Create new invoice with custom due date
+    $start_date = date('Y-m-d');
+    $sql = "INSERT INTO invoices (Client_ID, Space_ID, InvoiceDate, EndDate, Status, Flow_Status, Amount) 
+            VALUES (?, ?, ?, ?, 'unpaid', 'new', ?)";
+    
+    $this->executeStatement($sql, [
+        $old_invoice['Client_ID'],
+        $old_invoice['Space_ID'], 
+        $start_date,
+        $custom_due_date,
+        $old_invoice['Amount']
+    ]);
+    
+    return $this->connection->lastInsertId();
+}
+
+
 }
 
 
