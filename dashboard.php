@@ -1311,7 +1311,8 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="empty-state">
                 <i class="bi bi-house-x"></i>
                 <h5>No Active Rentals</h5>
-                <p class="text-muted">You currently have no active rental units. Contact our team to explore available properties.</p>
+             <p>You currently have no active rental units. <a href="tel:9451357685">Contact the Admin</a> to explore available properties.</p>
+
             </div>
         <?php endif; ?>
 
