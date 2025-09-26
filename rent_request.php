@@ -11,16 +11,25 @@ if (!$logged_in) {
     $show_login_modal = true;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['start_date'], $_POST['end_date'], $_POST['confirm_price'])) {
+// Handle form submission with POST-redirect-GET pattern to prevent duplicate submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['start_date'], $_POST['confirm_price'])) {
     $space_id = intval($_POST['space_id']);
     $start_date = $_POST['start_date'];
-    $end_date = $_POST['end_date'];
+    
+    // Calculate end date as 1 month from start date
+    $end_date = date('Y-m-d', strtotime($start_date . ' +1 month'));
 
     if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
-        $success = "Your rental request has been sent to the admin!";
-        // Immediately update pending_requests to reflect the new pending request
-        $pending_requests = $db->getPendingRequestsByClient($client_id);
+        // Redirect to prevent form resubmission on page reload
+        header("Location: " . $_SERVER['PHP_SELF'] . "?space_id=" . $_GET['space_id'] . "&success=1");
+        exit();
     }
+}
+
+// Check for success message from redirect
+$success = "";
+if (isset($_GET['success']) && $_GET['success'] == '1') {
+    $success = "Your rental request has been sent to the admin!";
 }
 
 $id = $_GET["space_id"];
@@ -463,6 +472,21 @@ foreach ($pending_requests as $request) {
             display: block;
         }
 
+        /* Due date display */
+        .due-date-display {
+            background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+            border: 1px solid #0ea5e9;
+            border-radius: var(--border-radius-sm);
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .due-date-display strong {
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -839,15 +863,13 @@ foreach ($pending_requests as $request) {
                                                 <i class="bi bi-calendar-plus"></i>
                                                 Start Date
                                             </label>
-                                            <input type="date" name="start_date" class="form-control" <?= $has_pending_request ? 'disabled' : '' ?> required min="<?= date('Y-m-d') ?>">
+                                            <input type="date" name="start_date" class="form-control start-date-input" <?= $has_pending_request ? 'disabled' : '' ?> required min="<?= date('Y-m-d') ?>">
                                         </div>
                                         
-                                        <div class="mb-3">
-                                            <label class="form-label">
-                                                <i class="bi bi-calendar-check"></i>
-                                                End Date
-                                            </label>
-                                            <input type="date" name="end_date" class="form-control" <?= $has_pending_request ? 'disabled' : '' ?> required min="<?= date('Y-m-d') ?>">
+                                        <div class="due-date-display" style="display: none;">
+                                            <strong>Rental Period: 1 Month</strong>
+                                            <p class="mb-0 mt-2 text-muted">Due date will be automatically set to 1 month from your selected start date</p>
+                                            <div class="calculated-end-date mt-2" style="font-weight: 600; color: var(--primary);"></div>
                                         </div>
                                         
                                         <div class="rental-notes">
@@ -856,7 +878,7 @@ foreach ($pending_requests as $request) {
                                                 <?php if ($has_pending_request): ?>
                                                     You have already submitted a request for this unit. Please wait for admin approval.
                                                 <?php else: ?>
-                                                    Choose your preferred rental period. Our team will review your application and contact you within 24 hours.
+                                                    Choose your preferred start date. The rental period is fixed at 1 month. Our team will review your application and contact you within 24 hours.
                                                 <?php endif; ?>
                                             </p>
                                         </div>
@@ -918,9 +940,13 @@ foreach ($pending_requests as $request) {
                             <div class="text-muted small">Monthly Rental Price</div>
                             <div class="price-amount" id="modalPriceText"></div>
                         </div>
+                        <div class="due-date-display">
+                            <div class="text-muted small">Rental Period</div>
+                            <div style="font-weight: 600; color: var(--primary);" id="modalDateRange"></div>
+                        </div>
                         <p class="mb-0">
                             Are you sure you want to submit this rental request? 
-                            The price is fixed and non-negotiable.
+                            The price is fixed and rental period is 1 month.
                         </p>
                         <div class="alert alert-warning mt-3">
                             <small><i class="bi bi-exclamation-triangle me-2"></i>
@@ -982,9 +1008,28 @@ foreach ($pending_requests as $request) {
 
         // Show confirmation modal
         function showConfirmModal(form, price, unitName) {
+            const startDateInput = form.querySelector('input[name="start_date"]');
+            if (!startDateInput.value) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Please Select Start Date',
+                    text: 'Please select a start date before submitting your request.',
+                    confirmButtonColor: 'var(--primary)'
+                });
+                return false;
+            }
+
             pendingForm = form;
             document.getElementById('modalPriceText').textContent = "₱" + Number(price).toLocaleString() + " per month";
             document.getElementById('modalUnitName').textContent = unitName;
+            
+            // Calculate and display date range
+            const startDate = new Date(startDateInput.value);
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + 1);
+            
+            const dateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+            document.getElementById('modalDateRange').textContent = dateRange;
             
             const modal = new bootstrap.Modal(document.getElementById('confirmationModal'));
             modal.show();
@@ -1034,37 +1079,42 @@ foreach ($pending_requests as $request) {
                 }
             });
 
-            // Form validation
+            // Start date change handler to show/calculate end date
+            document.querySelectorAll('.start-date-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    const form = this.closest('form');
+                    const dueDateDisplay = form.querySelector('.due-date-display');
+                    const calculatedEndDate = form.querySelector('.calculated-end-date');
+                    
+                    if (this.value && dueDateDisplay && calculatedEndDate) {
+                        const startDate = new Date(this.value);
+                        const endDate = new Date(startDate);
+                        endDate.setMonth(endDate.getMonth() + 1);
+                        
+                        calculatedEndDate.textContent = `End Date: ${formatDate(endDate)}`;
+                        dueDateDisplay.style.display = 'block';
+                    } else if (dueDateDisplay) {
+                        dueDateDisplay.style.display = 'none';
+                    }
+                });
+            });
+
+            // Form validation - no need to validate end date since it's auto-calculated
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', function(e) {
                     const startDate = this.querySelector('input[name="start_date"]');
-                    const endDate = this.querySelector('input[name="end_date"]');
                     
-                    if (startDate && endDate && startDate.value && endDate.value) {
+                    if (startDate && startDate.value) {
                         const start = new Date(startDate.value);
-                        const end = new Date(endDate.value);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0); // Reset time for comparison
                         
-                        if (end <= start) {
+                        if (start < today) {
                             e.preventDefault();
                             Swal.fire({
                                 icon: 'error',
-                                title: 'Invalid Date Range',
-                                text: 'End date must be after the start date.',
-                                confirmButtonColor: 'var(--primary)'
-                            });
-                            return false;
-                        }
-                        
-                        // Calculate rental period
-                        const diffTime = Math.abs(end - start);
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        if (diffDays < 30) {
-                            e.preventDefault();
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'Minimum Rental Period',
-                                text: 'Minimum rental period is 30 days. Please adjust your dates.',
+                                title: 'Invalid Start Date',
+                                text: 'Start date cannot be in the past.',
                                 confirmButtonColor: 'var(--primary)'
                             });
                             return false;
@@ -1112,20 +1162,6 @@ foreach ($pending_requests as $request) {
             document.querySelectorAll('input[type="date"]').forEach(input => {
                 // Set minimum date to today
                 input.min = new Date().toISOString().split('T')[0];
-                
-                // Add change event for start date to update end date minimum
-                if (input.name === 'start_date') {
-                    input.addEventListener('change', function() {
-                        const endDateInput = this.form.querySelector('input[name="end_date"]');
-                        if (endDateInput) {
-                            endDateInput.min = this.value;
-                            // Clear end date if it's before the new start date
-                            if (endDateInput.value && endDateInput.value <= this.value) {
-                                endDateInput.value = '';
-                            }
-                        }
-                    });
-                }
             });
 
             // Enhanced card interactions for available units only
@@ -1139,19 +1175,25 @@ foreach ($pending_requests as $request) {
                 });
             });
 
-            // Form submission loading states
+            // Form submission loading states (prevent double submission)
             document.querySelectorAll('.request-btn:not(:disabled)').forEach(btn => {
                 btn.form.addEventListener('submit', function(e) {
+                    // Check if already submitted to prevent double submission
+                    if (btn.classList.contains('loading') || btn.disabled) {
+                        e.preventDefault();
+                        return false;
+                    }
+                    
                     if (e.defaultPrevented) return;
                     
                     btn.classList.add('loading');
                     btn.disabled = true;
                     
-                    // Reset after 5 seconds as fallback
+                    // Reset after 10 seconds as fallback
                     setTimeout(() => {
                         btn.classList.remove('loading');
                         btn.disabled = false;
-                    }, 5000);
+                    }, 10000);
                 });
             });
 
@@ -1170,6 +1212,11 @@ foreach ($pending_requests as $request) {
                     });
                 }
             });
+
+            // Prevent form resubmission on page refresh
+            if (window.history.replaceState) {
+                window.history.replaceState(null, null, window.location.href);
+            }
         });
 
         // Auto-show login modal for non-logged-in users
@@ -1208,6 +1255,19 @@ foreach ($pending_requests as $request) {
                 // Adjust modal sizes for mobile
                 document.querySelectorAll('.modal-dialog').forEach(dialog => {
                     dialog.classList.add('modal-fullscreen-sm-down');
+                });
+            }
+        });
+
+        // Prevent back button issues after form submission
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                // Reset any loading states if page is loaded from cache
+                document.querySelectorAll('.loading').forEach(el => {
+                    el.classList.remove('loading');
+                });
+                document.querySelectorAll('.request-btn').forEach(btn => {
+                    btn.disabled = false;
                 });
             }
         });
