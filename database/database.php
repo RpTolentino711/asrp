@@ -608,14 +608,14 @@ public function getHomepageRentedUnits($limit = 12) {
     }
 
 
-    public function getClientSpacesForMaintenance($client_id) {
-        $sql = "SELECT s.Space_ID, s.Name
-                FROM clientspace cs
-                JOIN space s ON cs.Space_ID = s.Space_ID
-                WHERE cs.Client_ID = ?
-                ORDER BY s.Name";
-        return $this->runQuery($sql, [$client_id], true);
-    }
+ public function getClientSpacesForMaintenance($client_id) {
+    $sql = "SELECT s.Space_ID, s.Name
+            FROM clientspace cs
+            JOIN space s ON cs.Space_ID = s.Space_ID
+            WHERE cs.Client_ID = ? AND cs.active = 1
+            ORDER BY s.Name";
+    return $this->runQuery($sql, [$client_id], true);
+}
 
 
 
