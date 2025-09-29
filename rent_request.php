@@ -863,7 +863,7 @@ foreach ($pending_requests as $request) {
                                                 <i class="bi bi-calendar-plus"></i>
                                                 Start Date
                                             </label>
-                                            <input type="date" name="start_date" class="form-control start-date-input" <?= $has_pending_request ? 'disabled' : '' ?> required min="<?= date('Y-m-d') ?>">
+                                            <input type="date" name="start_date" class="form-control start-date-input" <?= $has_pending_request ? 'disabled' : '' ?> required>
                                         </div>
                                         
                                         <div class="due-date-display" style="display: none;">
@@ -878,7 +878,7 @@ foreach ($pending_requests as $request) {
                                                 <?php if ($has_pending_request): ?>
                                                     You have already submitted a request for this unit. Please wait for admin approval.
                                                 <?php else: ?>
-                                                    Choose your preferred start date. The rental period is fixed at 1 month. Our team will review your application and contact you within 24 hours.
+                                                    Choose your preferred start date (any date is allowed). The rental period is fixed at 1 month. Our team will review your application and contact you within 24 hours.
                                                 <?php endif; ?>
                                             </p>
                                         </div>
@@ -1099,26 +1099,14 @@ foreach ($pending_requests as $request) {
                 });
             });
 
-            // Form validation - no need to validate end date since it's auto-calculated
+            // Form validation - removed past date restriction
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', function(e) {
                     const startDate = this.querySelector('input[name="start_date"]');
                     
                     if (startDate && startDate.value) {
-                        const start = new Date(startDate.value);
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0); // Reset time for comparison
-                        
-                        if (start < today) {
-                            e.preventDefault();
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Invalid Start Date',
-                                text: 'Start date cannot be in the past.',
-                                confirmButtonColor: 'var(--primary)'
-                            });
-                            return false;
-                        }
+                        // No date restrictions - any date is allowed
+                        console.log('Start date selected:', startDate.value);
                     }
                 });
             });
@@ -1158,10 +1146,10 @@ foreach ($pending_requests as $request) {
                 }, 1000);
             <?php endif; ?>
 
-            // Date input improvements
+            // Date input improvements - no minimum date restriction
             document.querySelectorAll('input[type="date"]').forEach(input => {
-                // Set minimum date to today
-                input.min = new Date().toISOString().split('T')[0];
+                // Remove any minimum date restrictions - users can select any date
+                input.removeAttribute('min');
             });
 
             // Enhanced card interactions for available units only
