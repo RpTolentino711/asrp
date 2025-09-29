@@ -505,6 +505,8 @@ public function getRentedUnits($client_id) {
     } catch (PDOException $e) { return []; }
 }
 
+
+
 public function getHomepageRentedUnits($limit = 12) {
     $sql = "SELECT s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City, 
                    sa.StartDate, sa.EndDate, c.Client_fn, c.Client_ln
@@ -517,17 +519,20 @@ public function getHomepageRentedUnits($limit = 12) {
             LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
             LEFT JOIN client c ON cs.Client_ID = c.Client_ID
             WHERE s.Flow_Status = 'old'
+              AND cs.active = 1
+              AND c.Status = 'Active'
             ORDER BY sa.EndDate DESC
             LIMIT :limit";
     try {
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) { 
         return []; 
     }
 }
+
 
     // --- Feedback and Testimonials ---
     public function saveFeedback($invoice_id, $rating, $comments) {
@@ -1905,7 +1910,7 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
         }
     }
   
-    
+
 
 
 }
