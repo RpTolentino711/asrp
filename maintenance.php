@@ -14,6 +14,7 @@ try {
     die("A system error occurred. Please try again later.");
 }
 
+date_default_timezone_set('Asia/Manila');
 
 $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
 
@@ -467,7 +468,8 @@ if ($is_logged_in) {
                                         <tbody>
                                             <?php foreach ($requests as $req): ?>
                                                 <tr>
-                                                    <td><?= htmlspecialchars($req['RequestDate']) ?></td>
+                                                    <td><?= htmlspecialchars(date('M j, Y g:i A', strtotime($req['RequestDate']))) ?>
+// Displays as: Sep 30, 2025 2:35 PM</td>
                                                     <td><strong><?= htmlspecialchars($req['SpaceName']) ?></strong></td>
                                                     <td>
                                                         <?php
