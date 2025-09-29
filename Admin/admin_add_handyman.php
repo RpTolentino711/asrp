@@ -609,9 +609,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (msg === 'updated') text = 'Handyman information has been updated.';
     if (msg === 'deleted') text = 'Handyman has been removed from the system.';
     if (msg === 'jobtype_added') text = 'New job type has been added successfully.';
+    if (msg === 'jobtype_deleted') text = 'Job type has been deleted successfully.';
     if (msg === 'error') { 
         title = 'Error!'; 
         text = 'An operation could not be completed. Please try again.';
+        icon = 'error';
+    }
+    if (msg === 'jobtype_delete_error') {
+        title = 'Error!';
+        text = 'Failed to delete job type. Please try again.';
         icon = 'error';
     }
 
