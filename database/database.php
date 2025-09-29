@@ -511,26 +511,24 @@ public function getRentedUnits($client_id) {
 public function getHomepageRentedUnits($limit = 12) {
     $sql = "SELECT 
             s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
-            sa.StartDate, sa.EndDate,
+            rr.StartDate, rr.EndDate,
             c.Client_fn, c.Client_ln
         FROM space s
+        INNER JOIN (
+            SELECT rr1.*
+            FROM rentalrequest rr1
+            INNER JOIN (
+                SELECT Space_ID, MAX(Requested_At) AS latest_request
+                FROM rentalrequest
+                WHERE Status = 'Accepted'
+                GROUP BY Space_ID
+            ) rr2 ON rr1.Space_ID = rr2.Space_ID AND rr1.Requested_At = rr2.latest_request
+            WHERE rr1.Status = 'Accepted'
+        ) rr ON s.Space_ID = rr.Space_ID
+        INNER JOIN client c ON rr.Client_ID = c.Client_ID
         LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-        LEFT JOIN (
-            SELECT sa1.*
-            FROM spaceavailability sa1
-            WHERE sa1.Status = 'Occupied'
-            AND sa1.EndDate = (
-                SELECT MAX(sa2.EndDate)
-                FROM spaceavailability sa2
-                WHERE sa2.Space_ID = sa1.Space_ID AND sa2.Status = 'Occupied'
-            )
-            AND sa1.EndDate >= CURDATE()
-        ) sa ON sa.Space_ID = s.Space_ID
-        LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
-        LEFT JOIN client c ON cs.Client_ID = c.Client_ID
         WHERE s.Flow_Status = 'old'
-        AND sa.Space_ID IS NOT NULL
-        ORDER BY sa.EndDate DESC
+        ORDER BY rr.EndDate DESC
         LIMIT :limit
     ";
     try {
