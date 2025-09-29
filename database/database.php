@@ -1457,6 +1457,9 @@ public function acceptRentalRequest($request_id) {
         }
     }
 
+
+
+
     public function getAllHandymenWithJobTypes() {
         $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, 
                        GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ') AS JobTypes
@@ -1492,6 +1495,8 @@ public function acceptRentalRequest($request_id) {
             return false;
         }
     }
+
+    
 
     public function updateClientStatus($client_id, $status) {
         $sql = "UPDATE client SET Status = ? WHERE Client_ID = ?";

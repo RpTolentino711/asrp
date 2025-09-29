@@ -14,20 +14,35 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['update_request'])) {
     $request_id = intval($_POST['request_id']);
     $status = $_POST['status'];
     $handyman_id = $_POST['handyman_id'] !== "" ? intval($_POST['handyman_id']) : null;
+    
 
-    if ($db->updateMaintenanceRequest($request_id, $status, $handyman_id)) {
-        $message = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Request #' . htmlspecialchars($request_id) . ' updated successfully.
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>';
-    } else {
-        $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Failed to update request #' . htmlspecialchars($request_id) . '.
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>';
-    }
+if ($db->updateMaintenanceRequest($request_id, $status, $handyman_id)) {
+    // Fetch the latest status change date (Philippine time)
+    $row = $db->runQuery(
+        "SELECT StatusChangeDate 
+         FROM maintenancerequeststatushistory 
+         WHERE Request_ID = ? 
+         ORDER BY StatusChangeDate DESC 
+         LIMIT 1", 
+        [$request_id]
+    );
+
+    $date_str = $row ? date("M d, Y - h:i A", strtotime($row['StatusChangeDate'])) . " (PHT)" : "";
+
+    $message = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Request #' . htmlspecialchars($request_id) . ' updated successfully' . 
+                    ($date_str ? ' on <strong>' . htmlspecialchars($date_str) . '</strong>' : '') . '.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+} else {
+    $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Failed to update request #' . htmlspecialchars($request_id) . '.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+}
+
 }
 
 $active_requests = $db->getActiveMaintenanceRequests();
