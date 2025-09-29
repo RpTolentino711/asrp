@@ -507,31 +507,42 @@ public function getRentedUnits($client_id) {
 
 
 
+
 public function getHomepageRentedUnits($limit = 12) {
-    $sql = "SELECT s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City, 
-                   sa.StartDate, sa.EndDate, c.Client_fn, c.Client_ln
-            FROM space s
-            JOIN spaceavailability sa 
-                ON s.Space_ID = sa.Space_ID 
-                AND sa.Status = 'Occupied' 
-                AND sa.EndDate >= CURDATE()
-            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-            LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
-            LEFT JOIN client c ON cs.Client_ID = c.Client_ID
-            WHERE s.Flow_Status = 'old'
-              AND cs.active = 1
-              AND c.Status = 'Active'
-            ORDER BY sa.EndDate DESC
-            LIMIT :limit";
+    $sql = "SELECT 
+            s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
+            sa.StartDate, sa.EndDate,
+            c.Client_fn, c.Client_ln
+        FROM space s
+        LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+        LEFT JOIN (
+            SELECT sa1.*
+            FROM spaceavailability sa1
+            WHERE sa1.Status = 'Occupied'
+            AND sa1.EndDate = (
+                SELECT MAX(sa2.EndDate)
+                FROM spaceavailability sa2
+                WHERE sa2.Space_ID = sa1.Space_ID AND sa2.Status = 'Occupied'
+            )
+            AND sa1.EndDate >= CURDATE()
+        ) sa ON sa.Space_ID = s.Space_ID
+        LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
+        LEFT JOIN client c ON cs.Client_ID = c.Client_ID
+        WHERE s.Flow_Status = 'old'
+        AND sa.Space_ID IS NOT NULL
+        ORDER BY sa.EndDate DESC
+        LIMIT :limit
+    ";
     try {
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll();
     } catch (PDOException $e) { 
         return []; 
     }
 }
+
 
 
     // --- Feedback and Testimonials ---
@@ -1910,7 +1921,7 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
         }
     }
   
-
+    
 
 
 }
