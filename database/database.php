@@ -517,13 +517,6 @@ public function getHomepageRentedUnits($limit = 12) {
         FROM clientspace cs
         JOIN space s ON cs.Space_ID = s.Space_ID
         LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-        LEFT JOIN spaceavailability sa ON sa.Space_ID = s.Space_ID
-            AND sa.Status = 'Occupied'
-            AND sa.EndDate = (
-                SELECT MAX(sa2.EndDate) 
-                FROM spaceavailability sa2
-                WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
-            )
         JOIN (
             SELECT inv1.*
             FROM invoice inv1
@@ -535,6 +528,10 @@ public function getHomepageRentedUnits($limit = 12) {
                  AND inv1.Space_ID = inv2.Space_ID 
                  AND inv1.Created_At = inv2.max_created
         ) i ON i.Client_ID = cs.Client_ID AND i.Space_ID = cs.Space_ID
+        LEFT JOIN spaceavailability sa ON sa.Space_ID = s.Space_ID
+            AND sa.Status = 'Occupied'
+            AND sa.StartDate <= i.Due_Date
+            AND sa.EndDate >= i.Issue_Date
         LEFT JOIN client c ON cs.Client_ID = c.Client_ID
         WHERE i.Status != 'kicked'
           AND i.Flow_Status != 'done'
@@ -549,6 +546,7 @@ public function getHomepageRentedUnits($limit = 12) {
         return []; 
     }
 }
+
 
 
 
