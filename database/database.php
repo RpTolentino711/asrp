@@ -866,14 +866,24 @@ public function removeSpacePhoto($space_id) {
         }
     }
 
-    public function addJobType($jobtype_name) {
-        $stmt = $this->pdo->query("SELECT MAX(JobType_ID) as max_id FROM jobtype");
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        $next_id = $row['max_id'] + 1;
-        $sql = "INSERT INTO jobtype (JobType_ID, JobType_Name) VALUES (?, ?)";
+
+    public function addJobType($jobTypeName) {
+    $sql = "INSERT INTO jobtype (JobType_Name) VALUES (:name)";
+    try {
         $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([$next_id, $jobtype_name]);
+        $stmt->bindParam(':name', $jobTypeName, PDO::PARAM_STR);
+        return $stmt->execute();
+    } catch (PDOException $e) {
+        error_log("Error adding job type: " . $e->getMessage());
+        return false;
     }
+}
+
+
+
+
+
+
 
     // --- Admin Actions ---
     public function kickClientFromUnit($invoice_id, $client_id, $space_id) {
