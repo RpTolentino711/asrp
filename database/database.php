@@ -459,6 +459,8 @@ public function getRentedUnits($client_id) {
     return $this->runQuery($sql, [$client_id], true);
 }
 
+
+
     public function getClientRentedUnitIds($client_id) {
         $sql = "SELECT cs.Space_ID
                 FROM clientspace cs
@@ -507,32 +509,40 @@ public function getRentedUnits($client_id) {
 
 
 
-
-public function getRentedUnits($client_id) {
+public function getHomepageRentedUnits($limit = 12) {
     $sql = "SELECT 
             s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
-            rr.StartDate, rr.EndDate
-        FROM clientspace cs
-        JOIN space s ON cs.Space_ID = s.Space_ID
+            rr.StartDate, rr.EndDate,
+            c.Client_fn, c.Client_ln
+        FROM space s
         LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-        JOIN (
+        INNER JOIN (
             SELECT rr1.*
             FROM rentalrequest rr1
             INNER JOIN (
-                SELECT Space_ID, MAX(Requested_At) AS max_requested
+                SELECT Space_ID, MAX(Requested_At) AS latest_request
                 FROM rentalrequest
-                WHERE Client_ID = ?
-                  AND Status = 'Accepted'
+                WHERE Status = 'Accepted'
                 GROUP BY Space_ID
-            ) rr2 ON rr1.Space_ID = rr2.Space_ID AND rr1.Requested_At = rr2.max_requested
-            WHERE rr1.Client_ID = ? 
-              AND rr1.Status = 'Accepted'
-        ) rr ON rr.Space_ID = cs.Space_ID
-        WHERE cs.Client_ID = ? 
+            ) rr2 ON rr1.Space_ID = rr2.Space_ID AND rr1.Requested_At = rr2.latest_request
+            WHERE rr1.Status = 'Accepted'
+              AND rr1.EndDate >= CURDATE() -- Only ongoing or future rentals
+        ) rr ON s.Space_ID = rr.Space_ID
+        INNER JOIN client c ON rr.Client_ID = c.Client_ID
+        WHERE s.Flow_Status = 'old'
         ORDER BY rr.EndDate DESC
+        LIMIT :limit
     ";
-    return $this->runQuery($sql, [$client_id, $client_id, $client_id], true);
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    } catch (PDOException $e) { 
+        return []; 
+    }
 }
+
 
 
     // --- Feedback and Testimonials ---
