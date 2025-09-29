@@ -662,23 +662,31 @@ public function getClientSpacesForMaintenance($client_id) {
         return (bool)$this->runQuery($sql, [$client_id, $space_id]);
     }
 
+
+
+    
     public function createMaintenanceRequest($client_id, $space_id) {
-        $this->pdo->beginTransaction();
-        try {
-            $sql1 = "INSERT INTO maintenancerequest (Client_ID, Space_ID, RequestDate, Status)
-                     VALUES (?, ?, CURDATE(), 'Submitted')";
-            $request_id = $this->insertAndGetId($sql1, [$client_id, $space_id]);
-            if (!$request_id) throw new Exception("Failed to create maintenance request.");
-            $sql2 = "INSERT INTO maintenancerequeststatushistory (Request_ID, StatusChangeDate, NewStatus)
-                     VALUES (?, CURDATE(), 'Submitted')";
-            $this->executeStatement($sql2, [$request_id]);
-            $this->pdo->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->pdo->rollBack();
-            return false;
-        }
+    $this->pdo->beginTransaction();
+    try {
+        // ✅ FIXED: Use NOW() instead of CURDATE()
+        $sql1 = "INSERT INTO maintenancerequest (Client_ID, Space_ID, RequestDate, Status)
+                 VALUES (?, ?, NOW(), 'Submitted')";
+        $request_id = $this->insertAndGetId($sql1, [$client_id, $space_id]);
+        if (!$request_id) throw new Exception("Failed to create maintenance request.");
+        
+        // ✅ FIXED: Use NOW() here too
+        $sql2 = "INSERT INTO maintenancerequeststatushistory (Request_ID, StatusChangeDate, NewStatus)
+                 VALUES (?, NOW(), 'Submitted')";
+        $this->executeStatement($sql2, [$request_id]);
+        
+        $this->pdo->commit();
+        return true;
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        return false;
     }
+}
+
 
     public function sendInvoiceChatWithChatId($chat_id, $sender_type, $sender_id, $message, $image_path = null) {
     $sql = "INSERT INTO invoice_chat (Chat_ID, Sender_Type, Sender_ID, Message, Image_Path, Created_At)
