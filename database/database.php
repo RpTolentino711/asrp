@@ -510,36 +510,51 @@ public function getRentedUnits($client_id) {
 
 
 public function getHomepageRentedUnits($limit = 12) {
-    $sql = "SELECT 
-            s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
-            sa.StartDate, sa.EndDate,
-            c.Client_fn, c.Client_ln
-        FROM clientspace cs
-        JOIN space s ON cs.Space_ID = s.Space_ID
-        LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-        LEFT JOIN spaceavailability sa ON sa.Space_ID = s.Space_ID
-            AND sa.Status = 'Occupied'
-            AND sa.EndDate = (
-                SELECT MAX(sa2.EndDate) 
-                FROM spaceavailability sa2
-                WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
-            )
-        JOIN (
-            SELECT inv1.*
-            FROM invoice inv1
-            INNER JOIN (
-                SELECT Client_ID, Space_ID, MAX(Created_At) AS max_created
-                FROM invoice
-                GROUP BY Client_ID, Space_ID
-            ) inv2 ON inv1.Client_ID = inv2.Client_ID 
+    $sql = "SELECT  s.Space_ID, 
+                s.Name, 
+                s.Price, 
+                st.SpaceTypeName, 
+                s.Street, 
+                s.Brgy, 
+                s.City,
+                sa.StartDate AS RentalStartDate, 
+                sa.EndDate AS RentalEndDate,
+                i.Issue_Date AS InvoiceIssueDate,
+                i.Due_Date AS InvoiceDueDate,
+                c.Client_fn, 
+                c.Client_ln
+            FROM clientspace cs
+            JOIN space s 
+                ON cs.Space_ID = s.Space_ID
+            LEFT JOIN spacetype st 
+                ON s.SpaceType_ID = st.SpaceType_ID
+            -- Rental period should come from spaceavailability linked to invoice
+            LEFT JOIN spaceavailability sa 
+                ON sa.Space_ID = s.Space_ID
+                AND sa.Status = 'Occupied'
+                AND sa.StartDate <= i.Due_Date 
+                AND sa.EndDate >= i.Issue_Date
+            JOIN (
+                SELECT inv1.*
+                FROM invoice inv1
+                INNER JOIN (
+                    SELECT Client_ID, Space_ID, MAX(Created_At) AS max_created
+                    FROM invoice
+                    GROUP BY Client_ID, Space_ID
+                ) inv2 
+                  ON inv1.Client_ID = inv2.Client_ID 
                  AND inv1.Space_ID = inv2.Space_ID 
                  AND inv1.Created_At = inv2.max_created
-        ) i ON i.Client_ID = cs.Client_ID AND i.Space_ID = cs.Space_ID
-        LEFT JOIN client c ON cs.Client_ID = c.Client_ID
-        WHERE i.Status != 'kicked'
-          AND i.Flow_Status != 'done'
-        ORDER BY sa.EndDate DESC
-        LIMIT :limit";
+            ) i 
+                ON i.Client_ID = cs.Client_ID 
+               AND i.Space_ID = cs.Space_ID
+            LEFT JOIN client c 
+                ON cs.Client_ID = c.Client_ID
+            WHERE i.Status != 'kicked'
+              AND i.Flow_Status != 'done'
+            ORDER BY sa.EndDate DESC
+            LIMIT :limit";
+
     try {
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
@@ -549,6 +564,7 @@ public function getHomepageRentedUnits($limit = 12) {
         return []; 
     }
 }
+
 
 
 
