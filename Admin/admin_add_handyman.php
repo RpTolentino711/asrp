@@ -26,6 +26,21 @@ if (isset($_GET['delete'])) {
     exit;
 }
 
+// --- Handle DELETE JobType Request ---
+if (isset($_GET['delete_jobtype'])) {
+    $jid = intval($_GET['delete_jobtype']);
+    if ($db->deleteJobType($jid)) {
+        header("Location: admin_add_handyman.php?msg=jobtype_deleted");
+    } else {
+        header("Location: admin_add_handyman.php?msg=jobtype_delete_error");
+    }
+    exit;
+}
+
+
+
+
+
 // --- Handle POST Requests ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Add a new job type
@@ -600,6 +615,44 @@ function confirmDelete(id) {
             window.location.href = '?delete=' + id;
         }
     });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        public function deleteJobType($jobtype_id) {
+        $this->pdo->beginTransaction();
+        try {
+            // Remove jobtype from handymanjob first to avoid foreign key issues
+            $this->executeStatement("DELETE FROM handymanjob WHERE JobType_ID = ?", [$jobtype_id]);
+            // Remove the jobtype itself
+            $this->executeStatement("DELETE FROM jobtype WHERE JobType_ID = ?", [$jobtype_id]);
+            $this->pdo->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("Error deleting job type: " . $e->getMessage());
+            return false;
+        }
+    }
+  
+    
 }
 </script>
 </body>
