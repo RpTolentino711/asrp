@@ -14,12 +14,17 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 $edit = false;
 $edit_data = ['Handyman_ID' => '', 'Handyman_fn' => '', 'Handyman_ln' => '', 'Phone' => '', 'JobType_ID' => ''];
 $msg = '';
+$msg_type = 'danger'; // danger, success, info
 
 // --- Handle DELETE Request ---
 if (isset($_GET['delete'])) {
     $hid = intval($_GET['delete']);
-    if ($db->deleteHandyman($hid)) {
-        header("Location: admin_add_handyman.php?msg=deleted");
+    if ($hid > 0) {
+        if ($db->deleteHandyman($hid)) {
+            header("Location: admin_add_handyman.php?msg=deleted");
+        } else {
+            header("Location: admin_add_handyman.php?msg=error");
+        }
     } else {
         header("Location: admin_add_handyman.php?msg=error");
     }
@@ -28,18 +33,38 @@ if (isset($_GET['delete'])) {
 
 // --- Handle POST Requests ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Add a new job type
+    // IMPORTANT: Check which form was submitted
     if (isset($_POST['add_jobtype'])) {
+        // Add a new job type form submission
         $new_jobtype = trim($_POST['NewJobType'] ?? '');
+        
         if (!empty($new_jobtype)) {
-            if ($db->addJobType($new_jobtype)) {
-                header("Location: admin_add_handyman.php?msg=jobtype_added");
-                exit;
+            // Check if job type already exists
+            $existing_types = $db->getAllJobTypes();
+            $already_exists = false;
+            
+            foreach ($existing_types as $type) {
+                if (strcasecmp($type['JobType_Name'], $new_jobtype) === 0) {
+                    $already_exists = true;
+                    break;
+                }
+            }
+            
+            if ($already_exists) {
+                $msg = "Job type '$new_jobtype' already exists.";
+                $msg_type = 'warning';
             } else {
-                $msg = "Failed to add new job type.";
+                if ($db->addJobType($new_jobtype)) {
+                    header("Location: admin_add_handyman.php?msg=jobtype_added");
+                    exit;
+                } else {
+                    $msg = "Failed to add new job type. Please try again.";
+                    $msg_type = 'danger';
+                }
             }
         } else {
             $msg = "Job type name cannot be empty.";
+            $msg_type = 'danger';
         }
     } else {
         // Handle adding/updating a handyman
@@ -48,24 +73,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone = trim($_POST['Phone'] ?? '');
         $jobtype_id = intval($_POST['JobType_ID'] ?? 0);
 
-        // Use strict checks to avoid "" and 0
+        // Validate phone number format (allow digits, spaces, +, -, parentheses)
+        $phone_valid = preg_match('/^[\d\s\+\-\(\)]+$/', $phone) && strlen($phone) >= 7;
+
         if ($fn !== '' && $ln !== '' && $phone !== '' && $jobtype_id > 0) {
-            if (isset($_POST['handyman_id']) && !empty($_POST['handyman_id'])) {
-                // UPDATE
-                $id = intval($_POST['handyman_id']);
-                if ($db->updateHandyman($id, $fn, $ln, $phone, $jobtype_id)) {
-                    header("Location: admin_add_handyman.php?msg=updated");
-                    exit;
-                } else { $msg = "Failed to update handyman."; }
+            if (!$phone_valid) {
+                $msg = "Invalid phone number format. Please use digits, spaces, +, -, and parentheses only.";
+                $msg_type = 'danger';
             } else {
-                // ADD
-                if ($db->addHandyman($fn, $ln, $phone, $jobtype_id)) {
-                    header("Location: admin_add_handyman.php?msg=added");
-                    exit;
-                } else { $msg = "Failed to add handyman."; }
+                if (isset($_POST['handyman_id']) && !empty($_POST['handyman_id'])) {
+                    // UPDATE
+                    $id = intval($_POST['handyman_id']);
+                    if ($id > 0) {
+                        if ($db->updateHandyman($id, $fn, $ln, $phone, $jobtype_id)) {
+                            header("Location: admin_add_handyman.php?msg=updated");
+                            exit;
+                        } else { 
+                            $msg = "Failed to update handyman. Please try again."; 
+                            $msg_type = 'danger';
+                        }
+                    } else {
+                        $msg = "Invalid handyman ID.";
+                        $msg_type = 'danger';
+                    }
+                } else {
+                    // ADD
+                    if ($db->addHandyman($fn, $ln, $phone, $jobtype_id)) {
+                        header("Location: admin_add_handyman.php?msg=added");
+                        exit;
+                    } else { 
+                        $msg = "Failed to add handyman. Please try again."; 
+                        $msg_type = 'danger';
+                    }
+                }
             }
         } else {
-            $msg = "All handyman fields are required.";
+            $msg = "All handyman fields are required and must be valid.";
+            $msg_type = 'danger';
         }
     }
 }
@@ -77,6 +121,9 @@ if (isset($_GET['edit'])) {
     $data = $db->getHandymanById($hid);
     if ($data) {
         $edit_data = $data;
+    } else {
+        $msg = "Handyman not found.";
+        $msg_type = 'danger';
     }
 }
 
@@ -624,7 +671,7 @@ $handymen_list = $db->getAllHandymenWithJob();
             }
 
             .form-control, .form-select {
-                font-size: 16px; /* Prevents zoom on iOS */
+                font-size: 16px;
             }
 
             .row .col-lg-8, .row .col-lg-4 {
@@ -660,7 +707,6 @@ $handymen_list = $db->getAllHandymenWithJob();
             }
         }
 
-        /* Touch-friendly improvements */
         @media (hover: none) and (pointer: coarse) {
             .btn, .mobile-menu-btn, .nav-link {
                 min-height: 44px;
@@ -783,7 +829,10 @@ $handymen_list = $db->getAllHandymenWithJob();
         </div>
         
         <?php if ($msg): ?>
-            <div class="alert alert-danger animate-fade-in"><?= htmlspecialchars($msg) ?></div>
+            <div class="alert alert-<?= $msg_type ?> animate-fade-in alert-dismissible fade show" role="alert">
+                <?= htmlspecialchars($msg) ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         <?php endif; ?>
 
         <!-- Handyman List Card -->
@@ -818,7 +867,7 @@ $handymen_list = $db->getAllHandymenWithJob();
                                         <a href="?edit=<?= $r['Handyman_ID'] ?>" class="btn btn-sm btn-warning me-1">
                                             <i class="fas fa-edit me-1"></i>Edit
                                         </a>
-                                        <a href="#" class="btn btn-sm btn-danger" onclick="confirmDelete(<?= $r['Handyman_ID'] ?>)">
+                                        <a href="#" class="btn btn-sm btn-danger" onclick="confirmDelete(<?= $r['Handyman_ID'] ?>); return false;">
                                             <i class="fas fa-trash me-1"></i>Delete
                                         </a>
                                     </td>
@@ -888,7 +937,7 @@ $handymen_list = $db->getAllHandymenWithJob();
                 <div class="form-section animate-fade-in" style="animation-delay: 0.1s;">
                     <h4 class="mb-4"><i class="fas fa-user-plus me-2 text-primary"></i><?= $edit ? 'Edit Handyman' : 'Add New Handyman' ?></h4>
                     
-                    <form method="POST">
+                    <form method="POST" id="handymanForm">
                         <?php if ($edit): ?>
                             <input type="hidden" name="handyman_id" value="<?= $edit_data['Handyman_ID'] ?>">
                         <?php endif; ?>
@@ -902,7 +951,7 @@ $handymen_list = $db->getAllHandymenWithJob();
                                 <label class="form-label">Last Name*</label>
                                 <input type="text" name="Handyman_ln" class="form-control" required
                                     value="<?= htmlspecialchars($edit_data['Handyman_ln']) ?>">
-                                           </div>
+                            </div>
                         </div>
                         
                         <div class="row">
@@ -944,11 +993,11 @@ $handymen_list = $db->getAllHandymenWithJob();
                 <div class="form-section animate-fade-in" style="animation-delay: 0.2s;">
                     <h4 class="mb-4"><i class="fas fa-briefcase me-2 text-primary"></i>Add New Job Type</h4>
                     
-                    <form method="POST">
+                    <form method="POST" id="jobTypeForm">
                         <div class="mb-3">
                             <label class="form-label">Job Type Name*</label>
                             <input type="text" name="NewJobType" class="form-control" required 
-                                placeholder="e.g., General Cleaning, Plumbing, Electrical">
+                                placeholder="e.g., Plumbing, Electrical">
                         </div>
                         <button type="submit" name="add_jobtype" class="btn btn-success w-100">
                             <i class="fas fa-plus-circle"></i>Add Job Type
@@ -993,13 +1042,11 @@ $handymen_list = $db->getAllHandymenWithJob();
             mobileOverlay.classList.remove('active');
         }
 
-        // Only toggle menu when clicking the menu button
         mobileMenuBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             toggleMobileMenu();
         });
 
-        // Close menu when clicking overlay or close button
         mobileOverlay.addEventListener('click', function(e) {
             e.stopPropagation();
             closeMobileMenu();
@@ -1010,7 +1057,6 @@ $handymen_list = $db->getAllHandymenWithJob();
             closeMobileMenu();
         });
 
-        // Close mobile menu when clicking on nav links only
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 if (window.innerWidth <= 992) {
@@ -1019,14 +1065,11 @@ $handymen_list = $db->getAllHandymenWithJob();
             });
         });
 
-        // Prevent sidebar clicks from bubbling up
         sidebar.addEventListener('click', function(e) {
             e.stopPropagation();
         });
 
-        // Close menu on main content click, but not form interactions
         document.querySelector('.main-content').addEventListener('click', function(e) {
-            // Don't close if clicking on form elements or buttons
             if (e.target.closest('form') || 
                 e.target.closest('button') || 
                 e.target.closest('select') || 
@@ -1041,7 +1084,6 @@ $handymen_list = $db->getAllHandymenWithJob();
             }
         });
 
-        // Handle window resize
         window.addEventListener('resize', () => {
             if (window.innerWidth > 992) {
                 closeMobileMenu();
@@ -1076,7 +1118,6 @@ $handymen_list = $db->getAllHandymenWithJob();
                     toast: true,
                     position: 'top-end'
                 });
-                // Clean URL
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
         });
@@ -1114,29 +1155,50 @@ $handymen_list = $db->getAllHandymenWithJob();
             }, 5000);
         });
 
-        // Prevent double form submission - FIXED VERSION
-        document.querySelectorAll('form').forEach(form => {
-            let isSubmitting = false;
-            form.addEventListener('submit', function(e) {
-                if (isSubmitting) {
-                    e.preventDefault();
-                    return false;
-                }
+        // Prevent double form submission
+        let handymanFormSubmitting = false;
+        let jobTypeFormSubmitting = false;
+
+        document.getElementById('handymanForm').addEventListener('submit', function(e) {
+            if (handymanFormSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            handymanFormSubmitting = true;
+            
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                submitBtn.disabled = true;
                 
-                // Allow the form to submit
-                isSubmitting = true;
+                setTimeout(() => {
+                    handymanFormSubmitting = false;
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 5000);
+            }
+        });
+
+        document.getElementById('jobTypeForm').addEventListener('submit', function(e) {
+            if (jobTypeFormSubmitting) {
+                e.preventDefault();
+                return false;
+            }
+            jobTypeFormSubmitting = true;
+            
+            const submitBtn = this.querySelector('[type="submit"]');
+            if (submitBtn) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+                submitBtn.disabled = true;
                 
-                // Show loading state on button
-                const submitBtn = form.querySelector('[type="submit"]');
-                if (submitBtn && !submitBtn.disabled) {
-                    const originalText = submitBtn.innerHTML;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-                    submitBtn.disabled = true;
-                }
-                
-                // Don't prevent default - let form submit naturally
-                return true;
-            });
+                setTimeout(() => {
+                    jobTypeFormSubmitting = false;
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }, 5000);
+            }
         });
 
         // Form validation feedback
@@ -1145,25 +1207,16 @@ $handymen_list = $db->getAllHandymenWithJob();
                 e.preventDefault();
                 this.classList.add('is-invalid');
                 
-                // Remove invalid class on input
                 this.addEventListener('input', function() {
                     this.classList.remove('is-invalid');
                 }, { once: true });
             });
         });
 
-        // Phone number formatting (basic)
+        // Phone number formatting
         document.querySelector('input[name="Phone"]')?.addEventListener('input', function(e) {
-            let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
-            if (value.length > 0) {
-                // Basic Dutch phone formatting
-                if (value.startsWith('31')) {
-                    value = '+' + value;
-                } else if (value.startsWith('6') && value.length === 9) {
-                    value = '+31 ' + value;
-                }
-            }
-            // Don't force format to allow international numbers
+            let value = e.target.value.replace(/[^\d\s\+\-\(\)]/g, '');
+            e.target.value = value;
         });
 
         // Touch gestures for mobile sidebar (swipe)
@@ -1181,13 +1234,11 @@ $handymen_list = $db->getAllHandymenWithJob();
             currentX = e.touches[0].clientX;
             const diffX = currentX - startX;
             
-            // Swipe right to open sidebar (from left edge)
             if (diffX > 50 && startX < 50 && window.innerWidth <= 992) {
                 toggleMobileMenu();
                 isDragging = false;
             }
             
-            // Swipe left to close sidebar
             if (diffX < -50 && sidebar.classList.contains('active')) {
                 closeMobileMenu();
                 isDragging = false;
