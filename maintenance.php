@@ -468,8 +468,7 @@ if ($is_logged_in) {
                                         <tbody>
                                             <?php foreach ($requests as $req): ?>
                                                 <tr>
-                                                    <td><?= htmlspecialchars(date('M j, Y g:i A', strtotime($req['RequestDate']))) ?>
-// Displays as: Sep 30, 2025 2:35 PM</td>
+                                                    <td><?= htmlspecialchars(date('M j, Y g:i A', strtotime($req['RequestDate']))) ?></td>
                                                     <td><strong><?= htmlspecialchars($req['SpaceName']) ?></strong></td>
                                                     <td>
                                                         <?php

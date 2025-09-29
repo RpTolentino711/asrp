@@ -668,17 +668,14 @@ public function getClientSpacesForMaintenance($client_id) {
 public function createMaintenanceRequest($client_id, $space_id) {
     $this->pdo->beginTransaction();
     try {
-        // Use PHP to get Philippine time
-        $philippine_time = date('Y-m-d H:i:s');
-        
         $sql1 = "INSERT INTO maintenancerequest (Client_ID, Space_ID, RequestDate, Status)
-                 VALUES (?, ?, ?, 'Submitted')";
-        $request_id = $this->insertAndGetId($sql1, [$client_id, $space_id, $philippine_time]);
+                 VALUES (?, ?, NOW(), 'Submitted')";  // ✅ Must be NOW()
+        $request_id = $this->insertAndGetId($sql1, [$client_id, $space_id]);
         if (!$request_id) throw new Exception("Failed to create maintenance request.");
         
         $sql2 = "INSERT INTO maintenancerequeststatushistory (Request_ID, StatusChangeDate, NewStatus)
-                 VALUES (?, ?, 'Submitted')";
-        $this->executeStatement($sql2, [$request_id, $philippine_time]);
+                 VALUES (?, NOW(), 'Submitted')";  // ✅ Must be NOW()
+        $this->executeStatement($sql2, [$request_id]);
         
         $this->pdo->commit();
         return true;
@@ -687,6 +684,8 @@ public function createMaintenanceRequest($client_id, $space_id) {
         return false;
     }
 }
+
+
 
 
 
