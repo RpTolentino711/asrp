@@ -567,6 +567,33 @@ $handymen_list = $db->getAllHandymenWithJob();
                 </div>
             </div>
         </form>
+            <div class="mt-4">
+                <h4><i class="fas fa-list"></i> All Job Types</h4>
+                <div class="table-container">
+                    <table class="table custom-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($jobtypes as $jt): ?>
+                            <tr>
+                                <td><?= $jt['JobType_ID'] ?></td>
+                                <td><?= htmlspecialchars($jt['JobType_Name']) ?></td>
+                                <td>
+                                    <a href="#" class="btn btn-danger-custom btn-custom btn-sm-custom" onclick="confirmDeleteJobType(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')">
+                                        <i class="fas fa-trash-alt"></i> Delete
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
     </div>
 </div>
 
@@ -600,44 +627,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function confirmDelete(id) {
+function confirmDelete(handymanId) {
     Swal.fire({
-        title: 'Are you sure?',
-        text: "This will permanently delete the handyman and their job assignment. This action cannot be undone!",
+        title: 'Delete Handyman?',
+        text: 'Are you sure you want to delete this handyman? This action cannot be undone.',
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
-        confirmButtonText: '<i class="fas fa-trash-alt"></i> Yes, delete it!',
-        cancelButtonText: '<i class="fas fa-times"></i> Cancel'
+        confirmButtonText: 'Yes, delete',
+        cancelButtonText: 'Cancel'
     }).then((result) => {
         if (result.isConfirmed) {
-            window.location.href = '?delete=' + id;
+            window.location.href = '?delete=' + handymanId;
         }
     });
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
+function confirmDeleteJobType(jobTypeId, jobTypeName) {
+    Swal.fire({
+        title: 'Delete Job Type?',
+        text: 'Are you sure you want to delete the job type "' + jobTypeName + '"? This will remove it from all handymen.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Yes, delete',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = '?delete_jobtype=' + jobTypeId;
+        }
+    });
 }
 </script>
 </body>
