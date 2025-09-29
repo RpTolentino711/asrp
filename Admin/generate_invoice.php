@@ -1563,11 +1563,7 @@ setInterval(() => {
                 
                 <div class="text-center mt-3">
                     <?php if (strtolower($invoice['Status'] ?? '') !== 'paid' && strtolower($invoice['Flow_Status'] ?? '') !== 'done'): ?>
-                        <!-- Regular Mark as Paid Button -->
-                        <button class="btn-action btn-paid me-2" onclick="confirmPaid(this)"
-                            data-href="generate_invoice.php?toggle_status=paid&invoice_id=<?= $invoice['Invoice_ID'] ?>&status=<?= htmlspecialchars($status_filter) ?>">
-                            <i class="fas fa-check-circle"></i> Mark as Paid (Auto Next Month)
-                        </button>
+                        
                         
                         <!-- Custom Due Date Mark as Paid Button -->
                         <button class="btn-action btn-paid" onclick="showCustomPaidModal(<?= $invoice['Invoice_ID'] ?>)">
