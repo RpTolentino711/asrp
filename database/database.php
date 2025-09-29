@@ -664,19 +664,17 @@ public function getClientSpacesForMaintenance($client_id) {
 
 
 
-    
+
     public function createMaintenanceRequest($client_id, $space_id) {
     $this->pdo->beginTransaction();
     try {
-        // ✅ FIXED: Use NOW() instead of CURDATE()
         $sql1 = "INSERT INTO maintenancerequest (Client_ID, Space_ID, RequestDate, Status)
-                 VALUES (?, ?, NOW(), 'Submitted')";
+                 VALUES (?, ?, NOW(), 'Submitted')";  // Changed here
         $request_id = $this->insertAndGetId($sql1, [$client_id, $space_id]);
         if (!$request_id) throw new Exception("Failed to create maintenance request.");
         
-        // ✅ FIXED: Use NOW() here too
         $sql2 = "INSERT INTO maintenancerequeststatushistory (Request_ID, StatusChangeDate, NewStatus)
-                 VALUES (?, NOW(), 'Submitted')";
+                 VALUES (?, NOW(), 'Submitted')";  // Changed here
         $this->executeStatement($sql2, [$request_id]);
         
         $this->pdo->commit();
