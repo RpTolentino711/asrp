@@ -902,7 +902,7 @@ $handymen_list = $db->getAllHandymenWithJob();
                                 <label class="form-label">Last Name*</label>
                                 <input type="text" name="Handyman_ln" class="form-control" required
                                     value="<?= htmlspecialchars($edit_data['Handyman_ln']) ?>">
-                            </div>
+                                           </div>
                         </div>
                         
                         <div class="row">
@@ -1114,7 +1114,7 @@ $handymen_list = $db->getAllHandymenWithJob();
             }, 5000);
         });
 
-        // Prevent double form submission
+        // Prevent double form submission - FIXED VERSION
         document.querySelectorAll('form').forEach(form => {
             let isSubmitting = false;
             form.addEventListener('submit', function(e) {
@@ -1122,22 +1122,20 @@ $handymen_list = $db->getAllHandymenWithJob();
                     e.preventDefault();
                     return false;
                 }
+                
+                // Allow the form to submit
                 isSubmitting = true;
                 
                 // Show loading state on button
                 const submitBtn = form.querySelector('[type="submit"]');
-                if (submitBtn) {
+                if (submitBtn && !submitBtn.disabled) {
                     const originalText = submitBtn.innerHTML;
                     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
                     submitBtn.disabled = true;
-                    
-                    // Re-enable after 5 seconds in case of error
-                    setTimeout(() => {
-                        isSubmitting = false;
-                        submitBtn.innerHTML = originalText;
-                        submitBtn.disabled = false;
-                    }, 5000);
                 }
+                
+                // Don't prevent default - let form submit naturally
+                return true;
             });
         });
 
