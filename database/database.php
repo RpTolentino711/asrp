@@ -509,33 +509,36 @@ public function getRentedUnits($client_id) {
 
 
 
-
 public function getHomepageRentedUnits($limit = 12) {
     $sql = "SELECT 
-            s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City, 
-            rr.StartDate, rr.EndDate,
+            s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
+            sa.StartDate, sa.EndDate,
             c.Client_fn, c.Client_ln
-        FROM space s
-        JOIN spaceavailability sa 
-            ON s.Space_ID = sa.Space_ID 
-            AND sa.Status = 'Occupied' 
-            AND sa.EndDate >= CURDATE()
+        FROM clientspace cs
+        JOIN space s ON cs.Space_ID = s.Space_ID
         LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-        LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
-        LEFT JOIN client c ON cs.Client_ID = c.Client_ID
-        LEFT JOIN (
-            SELECT r1.Space_ID, r1.StartDate, r1.EndDate
-            FROM rentalrequest r1
+        LEFT JOIN spaceavailability sa ON sa.Space_ID = s.Space_ID
+            AND sa.Status = 'Occupied'
+            AND sa.EndDate = (
+                SELECT MAX(sa2.EndDate) 
+                FROM spaceavailability sa2
+                WHERE sa2.Space_ID = s.Space_ID AND sa2.Status = 'Occupied'
+            )
+        JOIN (
+            SELECT inv1.*
+            FROM invoice inv1
             INNER JOIN (
-                SELECT Space_ID, MAX(Requested_At) AS latest_request
-                FROM rentalrequest
-                WHERE Status = 'Accepted'
-                GROUP BY Space_ID
-            ) r2 ON r1.Space_ID = r2.Space_ID AND r1.Requested_At = r2.latest_request
-            WHERE r1.Status = 'Accepted'
-        ) rr ON rr.Space_ID = s.Space_ID
-        WHERE s.Flow_Status = 'old'
-        ORDER BY rr.EndDate DESC
+                SELECT Client_ID, Space_ID, MAX(Created_At) AS max_created
+                FROM invoice
+                GROUP BY Client_ID, Space_ID
+            ) inv2 ON inv1.Client_ID = inv2.Client_ID 
+                 AND inv1.Space_ID = inv2.Space_ID 
+                 AND inv1.Created_At = inv2.max_created
+        ) i ON i.Client_ID = cs.Client_ID AND i.Space_ID = cs.Space_ID
+        LEFT JOIN client c ON cs.Client_ID = c.Client_ID
+        WHERE i.Status != 'kicked'
+          AND i.Flow_Status != 'done'
+        ORDER BY sa.EndDate DESC
         LIMIT :limit";
     try {
         $stmt = $this->pdo->prepare($sql);
