@@ -132,14 +132,11 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
         }
 
         .mobile-menu-btn:hover {
             background: rgba(0,0,0,0.1);
-        }
-
-        .mobile-menu-btn:active {
-            transform: scale(0.95);
         }
 
         .mobile-brand {
@@ -221,17 +218,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             font-size: 1.1rem;
         }
         
-        .badge-notification {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 0.7rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 20px;
-            font-weight: 600;
-        }
-        
         /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
@@ -310,11 +296,16 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             padding: 1.5rem;
         }
         
-        /* Table Styling */
+        /* FIXED: Desktop/Mobile Layout Toggle */
         .table-container {
+            display: block;
             overflow-x: auto;
             border-radius: var(--border-radius);
             -webkit-overflow-scrolling: touch;
+        }
+
+        .table-mobile {
+            display: none;
         }
         
         .custom-table {
@@ -461,11 +452,11 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             position: relative;
         }
 
-        .mobile-card:hover {
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-            transform: translateY(-2px);
+        .mobile-card:active {
+            transform: scale(0.98);
         }
 
+        /* FIXED: Proper status colors */
         .mobile-card.submitted {
             border-left-color: #3b82f6;
         }
@@ -551,7 +542,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             padding: 0.875rem;
             border: 1px solid #d1d5db;
             border-radius: var(--border-radius);
-            font-size: 16px; /* Prevents zoom on iOS */
+            font-size: 16px;
             background: white;
             transition: var(--transition);
             -webkit-appearance: none;
@@ -588,10 +579,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             min-height: 50px;
         }
 
-        .mobile-save-btn:hover:not(:disabled) {
-            background: #0da271;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        .mobile-save-btn:active {
+            transform: scale(0.98);
         }
 
         .mobile-save-btn:disabled {
@@ -615,27 +604,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
 
         .current-handyman i {
             color: var(--secondary);
-        }
-
-        /* Pull to refresh indicator */
-        .pull-refresh {
-            position: fixed;
-            top: var(--mobile-header-height);
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--primary);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 0 0 12px 12px;
-            font-size: 0.9rem;
-            z-index: 999;
-            opacity: 0;
-            transition: var(--transition);
-        }
-
-        .pull-refresh.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
         }
 
         /* Loading states */
@@ -670,51 +638,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        /* Toast notifications */
-        .toast-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1050;
-        }
-
-        @media (max-width: 768px) {
-            .toast-container {
-                bottom: 80px;
-                left: 20px;
-                right: 20px;
-            }
-        }
-
-        /* Swipe indicators */
-        .swipe-indicator {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 1rem;
-            border-radius: 50%;
-            font-size: 1.2rem;
-            opacity: 0;
-            transition: var(--transition);
-            pointer-events: none;
-        }
-
-        .swipe-indicator.left {
-            left: 20px;
-        }
-
-        .swipe-indicator.right {
-            right: 20px;
-        }
-
-        .swipe-indicator.show {
-            opacity: 1;
-        }
         
-        /* Mobile Responsive */
+        /* FIXED: Mobile Responsive - Critical Changes */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -736,6 +661,15 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 padding: 1.25rem;
             }
 
+            /* FIXED: Hide desktop table, show mobile cards */
+            .table-container {
+                display: none !important;
+            }
+
+            .table-mobile {
+                display: block !important;
+            }
+
             .dashboard-header {
                 flex-direction: column;
                 align-items: flex-start;
@@ -755,14 +689,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 width: 45px;
                 height: 45px;
                 font-size: 1.1rem;
-            }
-
-            .custom-table {
-                display: none;
-            }
-
-            .table-mobile {
-                display: block;
             }
 
             .card-body {
@@ -856,16 +782,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             }
         }
 
-        /* High DPI displays */
-        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
-            .sidebar-brand i,
-            .title-icon i,
-            .card-header i {
-                -webkit-font-smoothing: antialiased;
-                -moz-osx-font-smoothing: grayscale;
-            }
-        }
-
         /* Touch-friendly improvements */
         @media (hover: none) and (pointer: coarse) {
             .btn-save, 
@@ -875,40 +791,15 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             .form-select,
             .mobile-form select {
                 min-height: 48px;
-                min-width: 48px;
             }
 
-            .btn-save:hover,
             .mobile-save-btn:hover {
                 transform: none;
             }
 
             .nav-link:hover {
-                transform: none;
+                transform: translateX(5px);
             }
-
-            .mobile-card:hover {
-                transform: none;
-            }
-
-            /* Remove hover effects on touch devices */
-            .custom-table tr:hover {
-                background-color: transparent;
-            }
-        }
-
-        /* Focus states for accessibility */
-        .mobile-menu-btn:focus,
-        .nav-link:focus,
-        .btn-save:focus,
-        .mobile-save-btn:focus {
-            outline: 2px solid var(--primary);
-            outline-offset: 2px;
-        }
-
-        .form-select:focus,
-        .mobile-form select:focus {
-            outline: none;
         }
         
         /* Animations */
@@ -918,10 +809,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
 
         .animate-slide-up {
             animation: slideUp 0.3s ease-out;
-        }
-
-        .animate-scale-in {
-            animation: scaleIn 0.2s ease-out;
         }
         
         @keyframes fadeIn {
@@ -934,11 +821,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.9); }
-            to { opacity: 1; transform: scale(1); }
-        }
-
         /* Reduced motion for accessibility */
         @media (prefers-reduced-motion: reduce) {
             * {
@@ -947,21 +829,11 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 transition-duration: 0.01ms !important;
             }
         }
-
-        /* Dark mode support (optional) */
-        @media (prefers-color-scheme: dark) {
-            /* Add dark mode styles if needed */
-        }
     </style>
 </head>
 <body>
     <!-- Mobile Overlay -->
     <div class="mobile-overlay" id="mobileOverlay"></div>
-
-    <!-- Pull to refresh indicator -->
-    <div class="pull-refresh" id="pullRefresh">
-        <i class="fas fa-sync-alt"></i> Pull to refresh
-    </div>
 
     <!-- Mobile Header -->
     <div class="mobile-header">
@@ -1143,11 +1015,13 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
                         <?php foreach($active_requests as $index => $row): 
+                            // FIXED: Proper status class conversion
                             $statusClass = strtolower(str_replace(' ', '', $row['Status']));
-                            if ($statusClass === 'inprogress') $statusClass = 'progress';
-                            $cardClass = 'mobile-card ' . $statusClass;
+                            if ($statusClass === 'inprogress') {
+                                $statusClass = 'progress';
+                            }
                         ?>
-                        <div class="<?= $cardClass ?> animate-slide-up" style="animation-delay: <?= $index * 0.1 ?>s;">
+                        <div class="mobile-card <?= $statusClass ?> animate-slide-up" style="animation-delay: <?= $index * 0.05 ?>s;">
                             <div class="loading-overlay">
                                 <div class="spinner"></div>
                             </div>
@@ -1201,7 +1075,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                         </label>
                                         <select name="status" id="status_<?= $row['Request_ID'] ?>">
                                             <option value="Submitted" <?= $row['Status'] === 'Submitted' ? 'selected' : '' ?>>📝 Submitted</option>
-                                            <option value="In Progress" <?= $row['Status'] === 'In Progress' ? 'selected' : '' ?>>⚠️ In Progress</option>
+                                            <option value="In Progress" <?= $row['Status'] === 'In Progress' ? 'selected' : '' ?>>⚙️ In Progress</option>
                                             <option value="Completed" <?= $row['Status'] === 'Completed' ? 'selected' : '' ?>>✅ Completed</option>
                                         </select>
                                     </div>
@@ -1226,14 +1100,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                     </button>
                                 </div>
                             </form>
-                            
-                            <!-- Swipe indicators -->
-                            <div class="swipe-indicator left">
-                                <i class="fas fa-arrow-left"></i>
-                            </div>
-                            <div class="swipe-indicator right">
-                                <i class="fas fa-arrow-right"></i>
-                            </div>
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -1251,12 +1117,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         </div>
     </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container"></div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Enhanced mobile functionality
         document.addEventListener('DOMContentLoaded', function() {
             // Mobile menu functionality
             const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -1269,16 +1131,19 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
             }
 
-            mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-            mobileOverlay.addEventListener('click', toggleMobileMenu);
+            if (mobileMenuBtn) {
+                mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+            }
+            
+            if (mobileOverlay) {
+                mobileOverlay.addEventListener('click', toggleMobileMenu);
+            }
 
-            // Close mobile menu when clicking on nav links
+            // Close mobile menu on nav link click
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', () => {
-                    if (window.innerWidth <= 992) {
-                        sidebar.classList.remove('active');
-                        mobileOverlay.classList.remove('active');
-                        document.body.style.overflow = '';
+                    if (window.innerWidth <= 992 && sidebar.classList.contains('active')) {
+                        toggleMobileMenu();
                     }
                 });
             });
@@ -1288,7 +1153,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimer);
                 resizeTimer = setTimeout(() => {
-                    if (window.innerWidth > 992) {
+                    if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
                         sidebar.classList.remove('active');
                         mobileOverlay.classList.remove('active');
                         document.body.style.overflow = '';
@@ -1318,25 +1183,20 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         }
                     }
                     
-                    // Show loading state on submit button
+                    // Disable and update submit button
                     const submitBtn = form.querySelector('[type="submit"]');
                     if (submitBtn) {
                         const originalText = submitBtn.innerHTML;
                         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                         submitBtn.disabled = true;
-                        
-                        // Store original text for restoration
                         submitBtn.dataset.originalText = originalText;
                     }
                     
-                    // Show toast notification
-                    showToast('Updating request #' + requestId + '...', 'info');
-                    
-                    // Reset after timeout in case of network issues
+                    // Reset after timeout (fallback)
                     setTimeout(() => {
                         isSubmitting = false;
                         if (submitBtn && submitBtn.disabled) {
-                            submitBtn.innerHTML = submitBtn.dataset.originalText || originalText;
+                            submitBtn.innerHTML = submitBtn.dataset.originalText || '<i class="fas fa-save"></i> Save';
                             submitBtn.disabled = false;
                         }
                         if (mobileCard) {
@@ -1349,7 +1209,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 });
             });
 
-            // Auto-hide alerts with enhanced animation
+            // Auto-hide alerts
             document.querySelectorAll('.alert').forEach(alert => {
                 setTimeout(() => {
                     if (alert.parentNode) {
@@ -1364,26 +1224,31 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 }, 6000);
             });
 
-            // Enhanced status change confirmation
+            // Status change confirmation
             document.addEventListener('change', function(e) {
                 if (e.target.name === 'status') {
                     const newStatus = e.target.value;
                     const requestId = e.target.closest('form').dataset.requestId;
                     
                     if (newStatus === 'Completed') {
-                        if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request and notify the client.')) {
-                            // Reset to previous value
-                            e.target.selectedIndex = [...e.target.options].findIndex(option => option.selected && option.value !== newStatus);
+                        if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request.')) {
+                            // Find the previously selected option
+                            const options = e.target.options;
+                            for (let i = 0; i < options.length; i++) {
+                                if (options[i].defaultSelected) {
+                                    e.target.selectedIndex = i;
+                                    break;
+                                }
+                            }
                             return;
                         }
                     }
                     
-                    // Auto-save on status change for better UX
+                    // Highlight save button on mobile
                     if (window.innerWidth <= 992) {
                         const form = e.target.closest('form');
                         const saveBtn = form.querySelector('[type="submit"]');
                         if (saveBtn) {
-                            // Highlight the save button
                             saveBtn.style.background = '#f59e0b';
                             saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Save Required';
                             
@@ -1396,162 +1261,13 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 }
             });
 
-            // Pull to refresh functionality (mobile only)
-            let startY = 0;
-            let pullDistance = 0;
-            let isPulling = false;
-            const pullRefresh = document.getElementById('pullRefresh');
-            
-            if (window.innerWidth <= 992) {
-                document.addEventListener('touchstart', function(e) {
-                    if (window.scrollY === 0) {
-                        startY = e.touches[0].pageY;
-                        isPulling = true;
-                    }
-                }, { passive: true });
-                
-                document.addEventListener('touchmove', function(e) {
-                    if (!isPulling) return;
-                    
-                    pullDistance = e.touches[0].pageY - startY;
-                    
-                    if (pullDistance > 0 && window.scrollY === 0) {
-                        if (pullDistance > 80) {
-                            pullRefresh.classList.add('show');
-                            pullRefresh.innerHTML = '<i class="fas fa-arrow-down"></i> Release to refresh';
-                        } else if (pullDistance > 20) {
-                            pullRefresh.classList.add('show');
-                            pullRefresh.innerHTML = '<i class="fas fa-arrow-down"></i> Pull to refresh';
-                        }
-                    }
-                }, { passive: true });
-                
-                document.addEventListener('touchend', function(e) {
-                    if (isPulling && pullDistance > 80) {
-                        pullRefresh.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Refreshing...';
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    } else {
-                        pullRefresh.classList.remove('show');
-                    }
-                    
-                    isPulling = false;
-                    pullDistance = 0;
-                }, { passive: true });
-            }
-
-            // Toast notification system
-            function showToast(message, type = 'info', duration = 4000) {
-                const toastContainer = document.querySelector('.toast-container');
-                if (!toastContainer) return;
-                
-                const toast = document.createElement('div');
-                toast.className = `alert alert-${type} alert-dismissible fade show animate-scale-in`;
-                toast.innerHTML = `
-                    ${message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                `;
-                
-                toastContainer.appendChild(toast);
-                
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.style.opacity = '0';
-                        toast.style.transform = 'scale(0.9)';
-                        setTimeout(() => {
-                            if (toast.parentNode) {
-                                toast.remove();
-                            }
-                        }, 300);
-                    }
-                }, duration);
-            }
-
-            // Enhanced keyboard navigation
+            // Keyboard shortcuts
             document.addEventListener('keydown', function(e) {
-                // Escape key closes mobile menu
+                // Escape closes mobile menu
                 if (e.key === 'Escape' && sidebar.classList.contains('active')) {
                     toggleMobileMenu();
                 }
-                
-                // Ctrl/Cmd + S to save first form
-                if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                    e.preventDefault();
-                    const firstForm = document.querySelector('form');
-                    if (firstForm) {
-                        firstForm.submit();
-                    }
-                }
             });
-
-            // Service Worker for offline support (if needed)
-            if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
-                navigator.serviceWorker.register('/sw.js').catch(console.error);
-            }
-
-            // Enhanced touch gestures for mobile cards
-            if (window.innerWidth <= 992) {
-                let touchStartX = 0;
-                let touchStartY = 0;
-                let touchEndX = 0;
-                let touchEndY = 0;
-                
-                document.querySelectorAll('.mobile-card').forEach(card => {
-                    card.addEventListener('touchstart', function(e) {
-                        touchStartX = e.changedTouches[0].screenX;
-                        touchStartY = e.changedTouches[0].screenY;
-                    }, { passive: true });
-                    
-                    card.addEventListener('touchend', function(e) {
-                        touchEndX = e.changedTouches[0].screenX;
-                        touchEndY = e.changedTouches[0].screenY;
-                        handleSwipe(this);
-                    }, { passive: true });
-                });
-                
-                function handleSwipe(element) {
-                    const swipeThreshold = 100;
-                    const swipeLength = Math.abs(touchEndX - touchStartX);
-                    const swipeHeight = Math.abs(touchEndY - touchStartY);
-                    
-                    // Horizontal swipe detection
-                    if (swipeLength > swipeThreshold && swipeHeight < 100) {
-                        const leftIndicator = element.querySelector('.swipe-indicator.left');
-                        const rightIndicator = element.querySelector('.swipe-indicator.right');
-                        
-                        if (touchEndX < touchStartX) {
-                            // Swipe left - could trigger quick actions
-                            if (rightIndicator) {
-                                rightIndicator.classList.add('show');
-                                setTimeout(() => rightIndicator.classList.remove('show'), 1000);
-                            }
-                        } else {
-                            // Swipe right - could trigger quick actions
-                            if (leftIndicator) {
-                                leftIndicator.classList.add('show');
-                                setTimeout(() => leftIndicator.classList.remove('show'), 1000);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Performance optimization - Intersection Observer for animations
-            if ('IntersectionObserver' in window) {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            entry.target.style.animationPlayState = 'running';
-                        }
-                    });
-                });
-                
-                document.querySelectorAll('.animate-slide-up').forEach(el => {
-                    el.style.animationPlayState = 'paused';
-                    observer.observe(el);
-                });
-            }
         });
     </script>
 </body>
