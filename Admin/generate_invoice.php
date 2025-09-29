@@ -369,10 +369,6 @@ if (isset($_POST['update_due_date']) && isset($_POST['invoice_id']) && isset($_P
 
 // --- Mark as Paid (send paid message in old invoice chat, create new invoice with chat continuity) ---
 if (isset($_GET['toggle_status']) && isset($_GET['invoice_id'])) {
-    // Ensure the invoice ID is valid
-    if (!is_numeric($_GET['invoice_id'])) {
-        exit("Invalid invoice ID.");
-    }
     $invoice_id = intval($_GET['invoice_id']);
 
     // Fetch the invoice to check status
@@ -418,10 +414,6 @@ $invoices = [];
 $show_chat = false;
 $chat_invoice_id = null;
 $chat_messages = [];
-    // Check if the invoice is already paid
-    if (strtolower($invoice['Status']) === 'paid' || strtolower($invoice['Flow_Status']) === 'done') {
-        exit("Invoice is already marked as paid.");
-    }
 $invoice = null;
 
 // --- Invoice filter logic ---
