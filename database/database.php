@@ -509,30 +509,34 @@ public function getRentedUnits($client_id) {
 
 
 
+
 public function getHomepageRentedUnits($limit = 12) {
     $sql = "SELECT 
-            s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
+            s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City, 
             rr.StartDate, rr.EndDate,
             c.Client_fn, c.Client_ln
         FROM space s
+        JOIN spaceavailability sa 
+            ON s.Space_ID = sa.Space_ID 
+            AND sa.Status = 'Occupied' 
+            AND sa.EndDate >= CURDATE()
         LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-        INNER JOIN (
-            SELECT rr1.*
-            FROM rentalrequest rr1
+        LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID
+        LEFT JOIN client c ON cs.Client_ID = c.Client_ID
+        LEFT JOIN (
+            SELECT r1.Space_ID, r1.StartDate, r1.EndDate
+            FROM rentalrequest r1
             INNER JOIN (
                 SELECT Space_ID, MAX(Requested_At) AS latest_request
                 FROM rentalrequest
                 WHERE Status = 'Accepted'
                 GROUP BY Space_ID
-            ) rr2 ON rr1.Space_ID = rr2.Space_ID AND rr1.Requested_At = rr2.latest_request
-            WHERE rr1.Status = 'Accepted'
-              AND rr1.EndDate >= CURDATE() -- Only ongoing or future rentals
-        ) rr ON s.Space_ID = rr.Space_ID
-        INNER JOIN client c ON rr.Client_ID = c.Client_ID
+            ) r2 ON r1.Space_ID = r2.Space_ID AND r1.Requested_At = r2.latest_request
+            WHERE r1.Status = 'Accepted'
+        ) rr ON rr.Space_ID = s.Space_ID
         WHERE s.Flow_Status = 'old'
         ORDER BY rr.EndDate DESC
-        LIMIT :limit
-    ";
+        LIMIT :limit";
     try {
         $stmt = $this->pdo->prepare($sql);
         $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
