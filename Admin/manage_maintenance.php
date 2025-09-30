@@ -78,7 +78,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Mobile Menu Overlay */
         .mobile-overlay {
             position: fixed;
             top: 0;
@@ -102,7 +101,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             to { opacity: 1; }
         }
 
-        /* Mobile Header */
         .mobile-header {
             display: none;
             position: fixed;
@@ -135,7 +133,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             cursor: pointer;
         }
 
-        .mobile-menu-btn:hover {
+        .mobile-menu-btn:active {
             background: rgba(0,0,0,0.1);
         }
 
@@ -152,7 +150,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             color: var(--primary);
         }
         
-        /* Sidebar Styling */
         .sidebar {
             position: fixed;
             width: var(--sidebar-width);
@@ -218,7 +215,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             font-size: 1.1rem;
         }
         
-        /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
             padding: 2rem;
@@ -226,7 +222,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             min-height: 100vh;
         }
         
-        /* Header */
         .dashboard-header {
             display: flex;
             justify-content: space-between;
@@ -267,7 +262,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             font-size: 1.25rem;
         }
         
-        /* Dashboard Card */
         .dashboard-card {
             background: white;
             border-radius: var(--border-radius);
@@ -296,8 +290,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             padding: 1.5rem;
         }
         
-        /* FIXED: Desktop/Mobile Layout Toggle */
-        .table-container {
+        /* Desktop Table */
+        .table-desktop {
             display: block;
             overflow-x: auto;
             border-radius: var(--border-radius);
@@ -341,7 +335,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             background-color: #f9fafb;
         }
         
-        /* Form Elements */
         .form-select-sm {
             padding: 0.35rem 2.25rem 0.35rem 0.75rem;
             font-size: 0.875rem;
@@ -355,7 +348,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
         }
         
-        /* Button Styling */
         .btn-save {
             background: var(--secondary);
             color: white;
@@ -382,10 +374,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         .btn-save:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
         }
         
-        /* Status Badges */
         .badge-status {
             padding: 0.4rem 0.8rem;
             font-weight: 600;
@@ -413,7 +403,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             border: 1px solid rgba(16, 185, 129, 0.2);
         }
         
-        /* Handyman Info */
         .handyman-info {
             font-size: 0.8rem;
             color: #6b7280;
@@ -421,7 +410,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             font-style: italic;
         }
         
-        /* Empty State */
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -440,33 +428,28 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             margin-bottom: 0.5rem;
         }
 
-        /* Mobile Card Layout */
+        /* Mobile Cards */
         .mobile-card {
             background: white;
             border-radius: var(--border-radius);
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             margin-bottom: 1.25rem;
             padding: 1.25rem;
-            border-left: 4px solid var(--primary);
+            border-left: 4px solid;
             transition: var(--transition);
             position: relative;
         }
 
-        .mobile-card:active {
-            transform: scale(0.98);
-        }
-
-        /* FIXED: Proper status colors */
-        .mobile-card.submitted {
+        .mobile-card.status-submitted {
             border-left-color: #3b82f6;
         }
 
-        .mobile-card.progress {
-            border-left-color: var(--warning);
+        .mobile-card.status-inprogress {
+            border-left-color: #f59e0b;
         }
 
-        .mobile-card.completed {
-            border-left-color: var(--secondary);
+        .mobile-card.status-completed {
+            border-left-color: #10b981;
         }
 
         .mobile-card-header {
@@ -546,7 +529,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             background: white;
             transition: var(--transition);
             -webkit-appearance: none;
-            -moz-appearance: none;
             appearance: none;
             background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
             background-position: right 0.5rem center;
@@ -579,14 +561,13 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             min-height: 50px;
         }
 
-        .mobile-save-btn:active {
+        .mobile-save-btn:active:not(:disabled) {
             transform: scale(0.98);
         }
 
         .mobile-save-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
         }
 
         .current-handyman {
@@ -606,7 +587,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             color: var(--secondary);
         }
 
-        /* Loading states */
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -639,16 +619,14 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             100% { transform: rotate(360deg); }
         }
         
-        /* FIXED: Mobile Responsive - Critical Changes */
+        /* CRITICAL: Mobile Responsive Breakpoints */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
-                width: 280px;
             }
             
             .sidebar.active {
                 transform: translateX(0);
-                box-shadow: 0 0 50px rgba(0,0,0,0.3);
             }
 
             .mobile-header {
@@ -661,8 +639,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 padding: 1.25rem;
             }
 
-            /* FIXED: Hide desktop table, show mobile cards */
-            .table-container {
+            /* CRITICAL FIX: Toggle table/mobile display */
+            .table-desktop {
                 display: none !important;
             }
 
@@ -673,35 +651,15 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             .dashboard-header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 1.25rem;
-                margin-bottom: 1.5rem;
-            }
-
-            .page-title {
-                width: 100%;
+                gap: 1rem;
             }
 
             .page-title h1 {
                 font-size: 1.6rem;
             }
 
-            .title-icon {
-                width: 45px;
-                height: 45px;
-                font-size: 1.1rem;
-            }
-
             .card-body {
                 padding: 1.25rem;
-            }
-
-            .card-header {
-                padding: 1.25rem;
-                font-size: 1rem;
-            }
-
-            .empty-state {
-                padding: 3rem 1.5rem;
             }
         }
         
@@ -710,33 +668,16 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 padding: 1rem;
             }
 
-            .mobile-card {
-                padding: 1rem;
-                margin-bottom: 1rem;
-            }
-
-            .mobile-form {
-                padding: 1rem;
-            }
-
-            .mobile-card-header {
-                font-size: 1rem;
-                margin-bottom: 0.75rem;
-            }
-
-            .mobile-card-detail {
-                margin-bottom: 0.5rem;
-                font-size: 0.9rem;
-            }
-
             .page-title h1 {
                 font-size: 1.4rem;
             }
 
-            .title-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
+            .mobile-card {
+                padding: 1rem;
+            }
+
+            .mobile-form {
+                padding: 1rem;
             }
         }
 
@@ -749,56 +690,19 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 font-size: 1.3rem;
             }
 
-            .dashboard-card {
-                border-radius: 8px;
-                margin-bottom: 1rem;
-            }
-
-            .mobile-card {
-                border-radius: 8px;
-            }
-
-            .mobile-form {
-                padding: 0.875rem;
-                border-radius: 8px;
-            }
-
             .mobile-card-header {
                 flex-direction: column;
-                align-items: flex-start;
                 gap: 0.5rem;
-            }
-
-            .mobile-card-detail .label {
-                min-width: 80px;
-            }
-
-            .empty-state {
-                padding: 2rem 1rem;
-            }
-
-            .empty-state i {
-                font-size: 3rem;
             }
         }
 
         /* Touch-friendly improvements */
         @media (hover: none) and (pointer: coarse) {
-            .btn-save, 
-            .nav-link, 
-            .mobile-menu-btn, 
-            .mobile-save-btn,
-            .form-select,
-            .mobile-form select {
+            .nav-link,
+            .mobile-menu-btn,
+            .btn-save,
+            .mobile-save-btn {
                 min-height: 48px;
-            }
-
-            .mobile-save-btn:hover {
-                transform: none;
-            }
-
-            .nav-link:hover {
-                transform: translateX(5px);
             }
         }
         
@@ -821,9 +725,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Reduced motion for accessibility */
         @media (prefers-reduced-motion: reduce) {
-            * {
+            *, *::before, *::after {
                 animation-duration: 0.01ms !important;
                 animation-iteration-count: 1 !important;
                 transition-duration: 0.01ms !important;
@@ -832,10 +735,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
     </style>
 </head>
 <body>
-    <!-- Mobile Overlay -->
     <div class="mobile-overlay" id="mobileOverlay"></div>
 
-    <!-- Mobile Header -->
     <div class="mobile-header">
         <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
             <i class="fas fa-bars"></i>
@@ -847,7 +748,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         <div></div>
     </div>
 
-    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
@@ -922,9 +822,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         </div>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
-        <!-- Header -->
         <div class="dashboard-header">
             <div class="page-title">
                 <div class="title-icon">
@@ -939,7 +837,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         
         <?= $message ?>
         
-        <!-- Maintenance Requests Table -->
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-list-alt"></i>
@@ -949,7 +846,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             <div class="card-body p-0">
                 <?php if (!empty($active_requests)): ?>
                     <!-- Desktop Table -->
-                    <div class="table-container">
+                    <div class="table-desktop">
                         <table class="custom-table">
                             <thead>
                                 <tr>
@@ -965,18 +862,12 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                             <tbody>
                                 <?php foreach($active_requests as $row): ?>
                                 <tr>
-                                    <form method="post" class="desktop-form" data-request-id="<?= $row['Request_ID'] ?>">
+                                    <form method="post">
                                         <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
-                                        <td>
-                                            <span class="fw-medium">#<?= $row['Request_ID'] ?></span>
-                                        </td>
-                                        <td>
-                                            <div class="fw-medium"><?= htmlspecialchars($row['Client_fn'] . " " . $row['Client_ln']) ?></div>
-                                        </td>
+                                        <td><span class="fw-medium">#<?= $row['Request_ID'] ?></span></td>
+                                        <td><div class="fw-medium"><?= htmlspecialchars($row['Client_fn'] . " " . $row['Client_ln']) ?></div></td>
                                         <td><?= htmlspecialchars($row['SpaceName']) ?></td>
-                                        <td>
-                                            <div class="text-muted"><?= htmlspecialchars($row['RequestDate']) ?></div>
-                                        </td>
+                                        <td><div class="text-muted"><?= htmlspecialchars($row['RequestDate']) ?></div></td>
                                         <td>
                                             <select name="status" class="form-select form-select-sm">
                                                 <option value="Submitted" <?= $row['Status'] === 'Submitted' ? 'selected' : '' ?>>Submitted</option>
@@ -1015,18 +906,14 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
                         <?php foreach($active_requests as $index => $row): 
-                            // FIXED: Proper status class conversion
-                            $statusClass = strtolower(str_replace(' ', '', $row['Status']));
-                            if ($statusClass === 'inprogress') {
-                                $statusClass = 'progress';
-                            }
+                            $statusClass = 'status-' . strtolower(str_replace(' ', '', $row['Status']));
                         ?>
                         <div class="mobile-card <?= $statusClass ?> animate-slide-up" style="animation-delay: <?= $index * 0.05 ?>s;">
                             <div class="loading-overlay">
                                 <div class="spinner"></div>
                             </div>
                             
-                            <form method="post" class="mobile-form-container" data-request-id="<?= $row['Request_ID'] ?>">
+                            <form method="post" data-request-id="<?= $row['Request_ID'] ?>">
                                 <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
                                 
                                 <div class="mobile-card-header">
@@ -1074,9 +961,9 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                             <i class="fas fa-tasks me-1"></i>Update Status
                                         </label>
                                         <select name="status" id="status_<?= $row['Request_ID'] ?>">
-                                            <option value="Submitted" <?= $row['Status'] === 'Submitted' ? 'selected' : '' ?>>📝 Submitted</option>
-                                            <option value="In Progress" <?= $row['Status'] === 'In Progress' ? 'selected' : '' ?>>⚙️ In Progress</option>
-                                            <option value="Completed" <?= $row['Status'] === 'Completed' ? 'selected' : '' ?>>✅ Completed</option>
+                                            <option value="Submitted" <?= $row['Status'] === 'Submitted' ? 'selected' : '' ?>>Submitted</option>
+                                            <option value="In Progress" <?= $row['Status'] === 'In Progress' ? 'selected' : '' ?>>In Progress</option>
+                                            <option value="Completed" <?= $row['Status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
                                         </select>
                                     </div>
                                     
@@ -1120,7 +1007,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Mobile menu functionality
             const mobileMenuBtn = document.getElementById('mobileMenuBtn');
             const sidebar = document.getElementById('sidebar');
             const mobileOverlay = document.getElementById('mobileOverlay');
@@ -1139,7 +1025,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 mobileOverlay.addEventListener('click', toggleMobileMenu);
             }
 
-            // Close mobile menu on nav link click
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.addEventListener('click', () => {
                     if (window.innerWidth <= 992 && sidebar.classList.contains('active')) {
@@ -1148,7 +1033,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 });
             });
 
-            // Handle window resize
             let resizeTimer;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimer);
@@ -1161,7 +1045,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 }, 250);
             });
 
-            // Enhanced form submission with loading states
             document.querySelectorAll('form').forEach(form => {
                 let isSubmitting = false;
                 
@@ -1172,10 +1055,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                     }
                     
                     isSubmitting = true;
-                    const requestId = this.dataset.requestId;
-                    
-                    // Show loading overlay for mobile cards
                     const mobileCard = this.closest('.mobile-card');
+                    
                     if (mobileCard) {
                         const loadingOverlay = mobileCard.querySelector('.loading-overlay');
                         if (loadingOverlay) {
@@ -1183,7 +1064,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         }
                     }
                     
-                    // Disable and update submit button
                     const submitBtn = form.querySelector('[type="submit"]');
                     if (submitBtn) {
                         const originalText = submitBtn.innerHTML;
@@ -1192,7 +1072,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         submitBtn.dataset.originalText = originalText;
                     }
                     
-                    // Reset after timeout (fallback)
                     setTimeout(() => {
                         isSubmitting = false;
                         if (submitBtn && submitBtn.disabled) {
@@ -1209,7 +1088,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 });
             });
 
-            // Auto-hide alerts
             document.querySelectorAll('.alert').forEach(alert => {
                 setTimeout(() => {
                     if (alert.parentNode) {
@@ -1224,46 +1102,22 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 }, 6000);
             });
 
-            // Status change confirmation
             document.addEventListener('change', function(e) {
-                if (e.target.name === 'status') {
-                    const newStatus = e.target.value;
+                if (e.target.name === 'status' && e.target.value === 'Completed') {
                     const requestId = e.target.closest('form').dataset.requestId;
-                    
-                    if (newStatus === 'Completed') {
-                        if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request.')) {
-                            // Find the previously selected option
-                            const options = e.target.options;
-                            for (let i = 0; i < options.length; i++) {
-                                if (options[i].defaultSelected) {
-                                    e.target.selectedIndex = i;
-                                    break;
-                                }
+                    if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request.')) {
+                        const options = e.target.options;
+                        for (let i = 0; i < options.length; i++) {
+                            if (options[i].defaultSelected) {
+                                e.target.selectedIndex = i;
+                                break;
                             }
-                            return;
-                        }
-                    }
-                    
-                    // Highlight save button on mobile
-                    if (window.innerWidth <= 992) {
-                        const form = e.target.closest('form');
-                        const saveBtn = form.querySelector('[type="submit"]');
-                        if (saveBtn) {
-                            saveBtn.style.background = '#f59e0b';
-                            saveBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Save Required';
-                            
-                            setTimeout(() => {
-                                saveBtn.style.background = '';
-                                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
-                            }, 3000);
                         }
                     }
                 }
             });
 
-            // Keyboard shortcuts
             document.addEventListener('keydown', function(e) {
-                // Escape closes mobile menu
                 if (e.key === 'Escape' && sidebar.classList.contains('active')) {
                     toggleMobileMenu();
                 }
