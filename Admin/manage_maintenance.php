@@ -1046,17 +1046,11 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             });
 
             document.querySelectorAll('form').forEach(form => {
-                let isSubmitting = false;
-                
                 form.addEventListener('submit', function(e) {
-                    if (isSubmitting) {
-                        e.preventDefault();
-                        return false;
-                    }
-                    
-                    isSubmitting = true;
+                    const submitBtn = this.querySelector('[type="submit"]');
                     const mobileCard = this.closest('.mobile-card');
                     
+                    // Show loading state
                     if (mobileCard) {
                         const loadingOverlay = mobileCard.querySelector('.loading-overlay');
                         if (loadingOverlay) {
@@ -1064,27 +1058,13 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         }
                     }
                     
-                    const submitBtn = form.querySelector('[type="submit"]');
                     if (submitBtn) {
                         const originalText = submitBtn.innerHTML;
                         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                         submitBtn.disabled = true;
-                        submitBtn.dataset.originalText = originalText;
                     }
                     
-                    setTimeout(() => {
-                        isSubmitting = false;
-                        if (submitBtn && submitBtn.disabled) {
-                            submitBtn.innerHTML = submitBtn.dataset.originalText || '<i class="fas fa-save"></i> Save';
-                            submitBtn.disabled = false;
-                        }
-                        if (mobileCard) {
-                            const loadingOverlay = mobileCard.querySelector('.loading-overlay');
-                            if (loadingOverlay) {
-                                loadingOverlay.classList.remove('show');
-                            }
-                        }
-                    }, 10000);
+                    // Let the form submit normally - don't prevent default
                 });
             });
 
