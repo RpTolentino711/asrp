@@ -913,7 +913,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                 <div class="spinner"></div>
                             </div>
                             
-                            <form method="post" data-request-id="<?= $row['Request_ID'] ?>">
+                            <form method="POST" action="" data-request-id="<?= $row['Request_ID'] ?>">
                                 <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
                                 
                                 <div class="mobile-card-header">
