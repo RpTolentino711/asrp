@@ -666,7 +666,8 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </section>
 
- <!-- Available Units Section -->
+  
+<!-- Available Units Section -->
 <section id="units" class="available-units">
   <div class="container">
     <div class="section-title animate-on-scroll">
