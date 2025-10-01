@@ -859,7 +859,7 @@ if (isset($_SESSION['login_error'])) {
 </section>
 
   <!-- All rental modals rendered here -->
-<?php if (!empty($modals)) echo $modals; ?>
+  <?php if (!empty($modals)) echo $modals; ?>
 
   <!-- Rented Units Section -->
   <section class="rented-units">
@@ -873,28 +873,18 @@ if (isset($_SESSION['login_error'])) {
         <?php
         if (!empty($rented_units_display)) {
       $rented_modal_counter = 0;
-      // Get all rented unit photos using the new JSON method
-      $rented_unit_photos = [];
-      foreach ($rented_units_display as $rent) {
-        $client_id = $rent['Client_ID'] ?? null;
-        if ($client_id) {
-          $client_photos = $db->getBusinessPhotosForClient($client_id);
-          $rented_unit_photos[$rent['Space_ID']] = $client_photos[$rent['Space_ID']] ?? [];
-        } else {
-          $rented_unit_photos[$rent['Space_ID']] = [];
-        }
-      }
-      
+      // Get all rented unit photos for the units being displayed
+      $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
+      $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
       foreach ($rented_units_display as $rent) {
         $rented_modal_counter++;
         $rented_modal_id = "rentedModal" . $rented_modal_counter;
-        
-        // Multi-photo display logic for rented units (JSON BusinessPhoto from clientspace)
+        // Multi-photo display logic for rented units (BusinessPhoto1-5 from clientspace)
         $rented_photo_urls = [];
         if (!empty($rented_unit_photos[$rent['Space_ID']])) {
           foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
             if (!empty($photo)) {
-              $rented_photo_urls[] = "uploads/business_photos/" . htmlspecialchars($photo);
+              $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo);
             }
           }
         }
