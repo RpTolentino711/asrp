@@ -1735,6 +1735,26 @@ public function getSpacePhoto($space_id) {
 }
 
 
+public function deleteSpacePhoto($space_id, $photo_index) {
+    // Fetch current photo array
+    $stmt = $this->pdo->prepare("SELECT Photo FROM space WHERE Space_ID = ?");
+    $stmt->execute([$space_id]);
+    $space = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $photos = [];
+    if ($space && !empty($space['Photo'])) {
+        $photos = json_decode($space['Photo'], true) ?: [];
+    }
+
+    // Remove photo at index if it exists
+    if (isset($photos[$photo_index])) {
+        array_splice($photos, $photo_index, 1);
+        $stmt = $this->pdo->prepare("UPDATE space SET Photo = ? WHERE Space_ID = ?");
+        return $stmt->execute([json_encode($photos), $space_id]);
+    }
+    return false; // Photo index doesn't exist
+}
+
 
 public function updateSpacePhotos($space_id, $new_photo_filename, $replace_index = null) {
     // Fetch current photo array
