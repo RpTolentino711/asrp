@@ -964,7 +964,7 @@ public function removeSpacePhoto($space_id, $photo_filename) {
         return (bool)$this->runQuery($sql, [$name]);
     }
 
-public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_filename = null) {
+public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
     $street = 'General Luna Strt';
     $brgy = '10';
     $city = 'Lipa City';
@@ -972,11 +972,10 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_filenam
 
     $this->pdo->beginTransaction();
     try {
-        // Only set Photo1 for the main photo, Photo (legacy) is always NULL for new units
+        // Use the new JSON Photo column instead of individual Photo1, Photo2, etc.
         $sql1 = "INSERT INTO space (
-                    Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Price, Flow_Status,
-                    Photo1, Photo2, Photo3, Photo4, Photo5
-                ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'new', ?, NULL, NULL, NULL, NULL)";
+                    Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Price, Flow_Status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')";
         $space_id = $this->insertAndGetId($sql1, [
             $name,                // Name
             $spacetype_id,        // SpaceType_ID
@@ -984,8 +983,8 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_filenam
             $street,              // Street
             $brgy,                // Brgy
             $city,                // City
-            $price,               // Price
-            $photo_filename       // Photo1 (main photo)
+            $photo_json,          // Photo (JSON array)
+            $price                // Price
         ]);
 
         if (!$space_id) {
@@ -1002,6 +1001,12 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_filenam
         return false;
     }
 }
+
+
+
+
+
+
 
 public function getAllSpacesWithDetails() {
     $sql = "SELECT s.*, t.SpaceTypeName 

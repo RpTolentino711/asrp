@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $space_id = intval($_POST['space_id'] ?? 0);
     $photo_index = intval($_POST['photo_index'] ?? -1);
     if ($space_id >= 1 && $photo_index >= 0) {
-        $space = $db->getSpacePhoto($space_id); // returns ['Photo' => '["a.jpg","b.jpg"]']
+        $space = $db->getSpacePhoto($space_id);
         $photos = [];
         if ($space && !empty($space['Photo'])) {
             $photos = json_decode($space['Photo'], true) ?: [];
@@ -35,12 +35,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             $filepath = __DIR__ . "/../uploads/unit_photos/" . $photos[$photo_index];
             if (file_exists($filepath)) unlink($filepath);
             array_splice($photos, $photo_index, 1);
-            $db->updateSpacePhotos($space_id, json_encode($photos));
-            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Photo deleted successfully!
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
+            
+            // FIX: Use raw SQL since your updateSpacePhotos method doesn't accept the full array
+            $stmt = $db->pdo->prepare("UPDATE space SET Photo = ? WHERE Space_ID = ?");
+            if ($stmt->execute([json_encode($photos), $space_id])) {
+                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Photo deleted successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            }
         }
     }
 }
@@ -48,6 +52,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Handle photo update/upload (append to JSON array) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
+    $photo_index = isset($_POST['photo_index']) ? intval($_POST['photo_index']) : null;
+    
     if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
         $file = $_FILES['new_photo'];
@@ -70,18 +76,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             $filepath = $upload_dir . $filename;
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $space = $db->getSpacePhoto($space_id);
-                $photos = [];
-                if ($space && !empty($space['Photo'])) {
-                    $photos = json_decode($space['Photo'], true) ?: [];
+                // FIX: Use updateSpacePhotos correctly with photo_index for replacements
+                if ($db->updateSpacePhotos($space_id, $filename, $photo_index)) {
+                    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Photo ' . ($photo_index !== null ? 'updated' : 'uploaded') . ' successfully!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>';
+                } else {
+                    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                                  <i class="fas fa-exclamation-circle me-2"></i>
+                                  Failed to update photo in database.
+                                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                  </div>';
                 }
-                $photos[] = $filename;
-                $db->updateSpacePhotos($space_id, json_encode($photos));
-                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Photo uploaded successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
             } else {
                 $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                               <i class="fas fa-exclamation-circle me-2"></i>
@@ -92,6 +100,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
         }
     }
 }
+
 // --- Handle form submission for new space/unit ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'unit') {
     $name = trim($_POST['name'] ?? '');
@@ -154,22 +163,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       A space/unit with this name already exists.
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
-
-
-  if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json)) {
-    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
-                    Space/unit added successfully!
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>';
-} else {
-    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                  <i class="fas fa-exclamation-circle me-2"></i>
-                  A database error occurred. The unit could not be added.
-                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                  </div>';
-}
-}
+    } else {
+        if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json)) {
+            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Space/unit added successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          A database error occurred. The unit could not be added.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        }
+    }
 }
 
 // --- Handle form submission for new space type ---
@@ -505,7 +513,7 @@ $spaces = $db->getAllSpacesWithDetails();
             background-color: #f9fafb;
         }
         
-        /* Photo Management */
+        /* Photo Management - HORIZONTAL LAYOUT */
         .photo-management {
             background: #f9fafb;
             border-radius: var(--border-radius);
@@ -513,27 +521,34 @@ $spaces = $db->getAllSpacesWithDetails();
             margin-bottom: 1rem;
         }
         
-        .photo-item {
+        .photo-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
             margin-bottom: 1rem;
-            padding: 1rem;
+        }
+        
+        .photo-item {
             background: white;
             border-radius: var(--border-radius);
             border: 1px solid #e5e7eb;
+            padding: 1rem;
+            min-width: 200px;
+            flex: 1;
         }
         
         .photo-preview {
-            width: 80px;
-            height: 80px;
+            width: 100%;
+            height: 120px;
             object-fit: cover;
             border-radius: 8px;
-            margin-right: 1rem;
+            margin-bottom: 0.75rem;
         }
         
         .photo-actions {
             display: flex;
+            flex-direction: column;
             gap: 0.5rem;
-            margin-top: 0.5rem;
-            flex-wrap: wrap;
         }
         
         .btn-action {
@@ -546,6 +561,9 @@ $spaces = $db->getAllSpacesWithDetails();
             align-items: center;
             gap: 0.5rem;
             cursor: pointer;
+            border: none;
+            width: 100%;
+            justify-content: center;
         }
         
         .btn-update {
@@ -585,6 +603,7 @@ $spaces = $db->getAllSpacesWithDetails();
         .file-input-container {
             position: relative;
             display: inline-block;
+            width: 100%;
         }
         
         .file-input-container input[type="file"] {
@@ -607,6 +626,8 @@ $spaces = $db->getAllSpacesWithDetails();
             cursor: pointer;
             transition: var(--transition);
             font-size: 0.9rem;
+            width: 100%;
+            text-align: center;
         }
         
         .file-input-label:hover {
@@ -617,8 +638,9 @@ $spaces = $db->getAllSpacesWithDetails();
         .filename-display {
             font-size: 0.8rem;
             color: #6b7280;
-            margin-left: 0.5rem;
+            margin-top: 0.5rem;
             word-break: break-all;
+            text-align: center;
         }
         
         /* Price Display */
@@ -676,22 +698,22 @@ $spaces = $db->getAllSpacesWithDetails();
 
         .mobile-photo-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
             margin-top: 1rem;
         }
 
         .mobile-photo-item {
             background: #f9fafb;
             border-radius: 8px;
-            padding: 0.75rem;
+            padding: 1rem;
             text-align: center;
             border: 1px solid #e5e7eb;
         }
 
         .mobile-photo-item img {
-            width: 60px;
-            height: 60px;
+            width: 100%;
+            height: 100px;
             object-fit: cover;
             border-radius: 6px;
             margin-bottom: 0.5rem;
@@ -700,12 +722,27 @@ $spaces = $db->getAllSpacesWithDetails();
         .mobile-photo-actions {
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
+            gap: 0.5rem;
         }
 
         .mobile-photo-actions .btn-action {
-            padding: 0.25rem 0.5rem;
+            padding: 0.5rem;
             font-size: 0.7rem;
+        }
+
+        /* Add Photo Section */
+        .add-photo-section {
+            background: white;
+            border: 2px dashed #d1d5db;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .add-photo-section:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.02);
         }
         
         /* Mobile Responsive */
@@ -767,6 +804,14 @@ $spaces = $db->getAllSpacesWithDetails();
                 font-size: 0.75rem;
                 padding: 0.4rem 0.8rem;
             }
+
+            .photo-grid {
+                flex-direction: column;
+            }
+
+            .photo-item {
+                min-width: auto;
+            }
         }
         
         @media (max-width: 768px) {
@@ -782,33 +827,12 @@ $spaces = $db->getAllSpacesWithDetails();
                 font-size: 16px; /* Prevents zoom on iOS */
             }
 
-            .photo-item {
-                flex-direction: column;
-                align-items: flex-start;
+            .mobile-photo-grid {
+                grid-template-columns: 1fr;
             }
 
             .photo-preview {
-                margin-bottom: 0.5rem;
-                margin-right: 0;
-            }
-
-            .photo-actions {
-                flex-direction: column;
-                width: 100%;
-            }
-
-            .btn-action {
-                justify-content: center;
-                width: 100%;
-            }
-
-            .filename-display {
-                margin-left: 0;
-                margin-top: 0.25rem;
-            }
-
-            .mobile-photo-grid {
-                grid-template-columns: repeat(2, 1fr);
+                height: 100px;
             }
         }
 
@@ -819,10 +843,6 @@ $spaces = $db->getAllSpacesWithDetails();
 
             .dashboard-card {
                 border-radius: 8px;
-            }
-
-            .mobile-photo-grid {
-                grid-template-columns: 1fr;
             }
 
             .btn {
@@ -1080,7 +1100,12 @@ $spaces = $db->getAllSpacesWithDetails();
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($spaces as $space): ?>
+                                <?php foreach ($spaces as $space): 
+                                    $photos = [];
+                                    if (!empty($space['Photo'])) {
+                                        $photos = json_decode($space['Photo'], true) ?: [];
+                                    }
+                                ?>
                                     <tr>
                                         <td>
                                             <span class="fw-medium">#<?= $space['Space_ID'] ?></span>
@@ -1092,55 +1117,62 @@ $spaces = $db->getAllSpacesWithDetails();
                                         <td>₱<?= number_format($space['Price'], 2) ?></td>
                                         <td>
                                             <div class="photo-management">
-                                                <?php for ($i=1; $i<=5; $i++): $field = "Photo$i"; ?>
-                                                    <div class="photo-item d-flex align-items-center">
-                                                        <?php if (!empty($space[$field])): ?>
-                                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($space[$field]) ?>" class="photo-preview" alt="Photo<?= $i ?>">
-                                                            <div class="flex-grow-1">
-                                                                <div class="fw-medium"><?= $field ?></div>
-                                                                <div class="text-muted small"><?= htmlspecialchars($space[$field]) ?></div>
+                                                <!-- Existing Photos Grid -->
+                                                <?php if (!empty($photos)): ?>
+                                                    <div class="photo-grid">
+                                                        <?php foreach ($photos as $index => $photo): ?>
+                                                            <div class="photo-item">
+                                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($photo) ?>" class="photo-preview" alt="Photo <?= $index + 1 ?>">
                                                                 <div class="photo-actions">
-                                                                    <form method="post" enctype="multipart/form-data" class="d-inline">
+                                                                    <form method="post" enctype="multipart/form-data">
                                                                         <div class="file-input-container">
                                                                             <div class="file-input-label btn-action btn-update">
                                                                                 <i class="fas fa-sync-alt"></i> Update
                                                                             </div>
-                                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $space['Space_ID'].$i ?>')">
+                                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $space['Space_ID'].$index ?>')">
                                                                             <input type="hidden" name="form_type" value="update_photo">
                                                                             <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                            <input type="hidden" name="photo_field" value="<?= $field ?>">
+                                                                            <input type="hidden" name="photo_index" value="<?= $index ?>">
                                                                         </div>
-                                                                        <span class="filename-display" id="update<?= $space['Space_ID'].$i ?>"></span>
-                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
+                                                                        <span class="filename-display" id="update<?= $space['Space_ID'].$index ?>"></span>
+                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Submit</button>
                                                                     </form>
-                                                                    <form method="post" class="d-inline" onsubmit="return confirm('Delete this photo?');">
+                                                                    <form method="post" onsubmit="return confirm('Delete this photo?');">
                                                                         <input type="hidden" name="form_type" value="delete_photo">
                                                                         <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
+                                                                        <input type="hidden" name="photo_index" value="<?= $index ?>">
                                                                         <button type="submit" class="btn-action btn-delete">
                                                                             <i class="fas fa-trash"></i> Delete
                                                                         </button>
                                                                     </form>
                                                                 </div>
                                                             </div>
-                                                        <?php else: ?>
-                                                            <div class="text-muted me-3">No <?= $field ?></div>
-                                                            <form method="post" enctype="multipart/form-data" class="d-inline">
-                                                                <div class="file-input-container">
-                                                                    <div class="file-input-label btn-action btn-upload">
-                                                                        <i class="fas fa-upload"></i> Upload
-                                                                    </div>
-                                                                    <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'upload<?= $space['Space_ID'].$i ?>')">
-                                                                    <input type="hidden" name="form_type" value="update_photo">
-                                                                    <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                    <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                                </div>
-                                                                <span class="filename-display" id="upload<?= $space['Space_ID'].$i ?>"></span>
-                                                                <button type="submit" class="btn btn-primary btn-sm mt-2">Submit</button>
-                                                            </form>
-                                                        <?php endif; ?>
+                                                        <?php endforeach; ?>
                                                     </div>
-                                                <?php endfor; ?>
+                                                <?php else: ?>
+                                                    <div class="text-center text-muted py-3">
+                                                        <i class="fas fa-images fa-2x mb-2"></i>
+                                                        <p>No photos uploaded yet</p>
+                                                    </div>
+                                                <?php endif; ?>
+
+                                                <!-- Add New Photo Section -->
+                                                <div class="add-photo-section">
+                                                    <form method="post" enctype="multipart/form-data">
+                                                        <div class="file-input-container">
+                                                            <div class="file-input-label btn-action btn-upload">
+                                                                <i class="fas fa-plus-circle me-1"></i> Add New Photo
+                                                            </div>
+                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'add<?= $space['Space_ID'] ?>')">
+                                                            <input type="hidden" name="form_type" value="update_photo">
+                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                        </div>
+                                                        <span class="filename-display" id="add<?= $space['Space_ID'] ?>"></span>
+                                                        <button type="submit" class="btn btn-success btn-sm mt-2">
+                                                            <i class="fas fa-upload me-1"></i> Upload Photo
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -1151,7 +1183,12 @@ $spaces = $db->getAllSpacesWithDetails();
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach ($spaces as $space): ?>
+                        <?php foreach ($spaces as $space): 
+                            $photos = [];
+                            if (!empty($space['Photo'])) {
+                                $photos = json_decode($space['Photo'], true) ?: [];
+                            }
+                        ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
                                     <?= htmlspecialchars($space['Name']) ?>
@@ -1169,53 +1206,52 @@ $spaces = $db->getAllSpacesWithDetails();
                                 </div>
 
                                 <div class="mobile-photo-grid">
-                                    <?php for ($i=1; $i<=5; $i++): $field = "Photo$i"; ?>
+                                    <?php foreach ($photos as $index => $photo): ?>
                                         <div class="mobile-photo-item">
-                                            <div class="fw-medium mb-2" style="font-size: 0.8rem;"><?= $field ?></div>
-                                            
-                                            <?php if (!empty($space[$field])): ?>
-                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($space[$field]) ?>" alt="Photo<?= $i ?>">
-                                                <div class="mobile-photo-actions">
-                                                    <form method="post" enctype="multipart/form-data">
-                                                        <div class="file-input-container w-100">
-                                                            <div class="file-input-label btn-action btn-update w-100">
-                                                                <i class="fas fa-sync-alt"></i> Update
-                                                            </div>
-                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-update<?= $space['Space_ID'].$i ?>')">
-                                                            <input type="hidden" name="form_type" value="update_photo">
-                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                            <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                        </div>
-                                                        <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$i ?>"></div>
-                                                        <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Submit</button>
-                                                    </form>
-                                                    <form method="post" onsubmit="return confirm('Delete this photo?');">
-                                                        <input type="hidden" name="form_type" value="delete_photo">
-                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
-                                                        <button type="submit" class="btn-action btn-delete w-100">
-                                                            <i class="fas fa-trash"></i> Delete
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            <?php else: ?>
-                                                <div class="text-muted mb-2" style="font-size: 0.8rem;">No image</div>
+                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($photo) ?>" alt="Photo <?= $index + 1 ?>">
+                                            <div class="mobile-photo-actions">
                                                 <form method="post" enctype="multipart/form-data">
                                                     <div class="file-input-container w-100">
-                                                        <div class="file-input-label btn-action btn-upload w-100">
-                                                            <i class="fas fa-upload"></i> Upload
+                                                        <div class="file-input-label btn-action btn-update w-100">
+                                                            <i class="fas fa-sync-alt"></i> Update
                                                         </div>
-                                                        <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-upload<?= $space['Space_ID'].$i ?>')">
+                                                        <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-update<?= $space['Space_ID'].$index ?>')">
                                                         <input type="hidden" name="form_type" value="update_photo">
                                                         <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                        <input type="hidden" name="photo_field" value="<?= $field ?>">
+                                                        <input type="hidden" name="photo_index" value="<?= $index ?>">
                                                     </div>
-                                                    <div class="filename-display" id="mobile-upload<?= $space['Space_ID'].$i ?>"></div>
+                                                    <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$index ?>"></div>
                                                     <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Submit</button>
                                                 </form>
-                                            <?php endif; ?>
+                                                <form method="post" onsubmit="return confirm('Delete this photo?');">
+                                                    <input type="hidden" name="form_type" value="delete_photo">
+                                                    <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                    <input type="hidden" name="photo_index" value="<?= $index ?>">
+                                                    <button type="submit" class="btn-action btn-delete w-100">
+                                                        <i class="fas fa-trash"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
-                                    <?php endfor; ?>
+                                    <?php endforeach; ?>
+
+                                    <!-- Add New Photo Mobile -->
+                                    <div class="mobile-photo-item" style="background: transparent; border: 2px dashed #d1d5db;">
+                                        <form method="post" enctype="multipart/form-data">
+                                            <div class="file-input-container w-100">
+                                                <div class="file-input-label btn-action btn-upload w-100">
+                                                    <i class="fas fa-plus-circle"></i> Add Photo
+                                                </div>
+                                                <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-add<?= $space['Space_ID'] ?>')">
+                                                <input type="hidden" name="form_type" value="update_photo">
+                                                <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                            </div>
+                                            <div class="filename-display" id="mobile-add<?= $space['Space_ID'] ?>"></div>
+                                            <button type="submit" class="btn btn-success btn-sm w-100 mt-1" style="font-size: 0.7rem;">
+                                                <i class="fas fa-upload"></i> Upload
+                                            </button>
+                                        </form>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
