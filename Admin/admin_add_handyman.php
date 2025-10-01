@@ -37,24 +37,29 @@ if (isset($_GET['delete_jobtype'])) {
     exit;
 }
 
-
-
-
-
 // --- Handle POST Requests ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Add a new job type
     if (isset($_POST['add_jobtype'])) {
         $new_jobtype = trim($_POST['NewJobType'] ?? '');
+        $new_icon = trim($_POST['JobIcon'] ?? 'fa-wrench');
         if (!empty($new_jobtype)) {
-            if ($db->addJobType($new_jobtype)) {
+            if ($db->addJobTypeWithIcon($new_jobtype, $new_icon)) {
                 header("Location: admin_add_handyman.php?msg=jobtype_added");
                 exit;
             } else {
-                $msg = "Failed to add new job type.";
+                $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to add new job type.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>';
             }
         } else {
-            $msg = "Job type name cannot be empty.";
+            $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Job type name cannot be empty.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
         }
     } else {
         // Handle adding/updating a handyman
@@ -63,7 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone = trim($_POST['Phone'] ?? '');
         $jobtype_id = intval($_POST['JobType_ID'] ?? 0);
 
-        // Use strict checks to avoid "" and 0
         if ($fn !== '' && $ln !== '' && $phone !== '' && $jobtype_id > 0) {
             if (isset($_POST['handyman_id']) && !empty($_POST['handyman_id'])) {
                 // UPDATE
@@ -71,21 +75,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($db->updateHandyman($id, $fn, $ln, $phone, $jobtype_id)) {
                     header("Location: admin_add_handyman.php?msg=updated");
                     exit;
-                } else { $msg = "Failed to update handyman."; }
+                } else {
+                    $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Failed to update handyman.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+                }
             } else {
                 // ADD
                 if ($db->addHandyman($fn, $ln, $phone, $jobtype_id)) {
                     header("Location: admin_add_handyman.php?msg=added");
                     exit;
-                } else { $msg = "Failed to add handyman."; }
+                } else {
+                    $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            Failed to add handyman.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+                }
             }
         } else {
-            $msg = "All handyman fields are required.";
+            $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    All handyman fields are required.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
         }
     }
 }
 
-// --- Handle EDIT Request (to populate the form) ---
+// --- Handle EDIT Request ---
 if (isset($_GET['edit'])) {
     $edit = true;
     $hid = intval($_GET['edit']);
@@ -98,574 +118,1023 @@ if (isset($_GET['edit'])) {
 // --- Fetch Data for Display ---
 $jobtypes = $db->getAllJobTypes();
 $handymen_list = $db->getAllHandymenWithJob();
+
+// Display success messages
+if (isset($_GET['msg'])) {
+    $msg_type = $_GET['msg'];
+    $alert_messages = [
+        'added' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Handyman successfully added to the system!'],
+        'updated' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Handyman information has been updated!'],
+        'deleted' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Handyman has been removed from the system!'],
+        'jobtype_added' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'New job type has been added successfully!'],
+        'jobtype_deleted' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Job type has been deleted successfully!'],
+        'error' => ['type' => 'danger', 'icon' => 'exclamation-circle', 'text' => 'An error occurred. Please try again.'],
+        'jobtype_delete_error' => ['type' => 'danger', 'icon' => 'exclamation-circle', 'text' => 'Failed to delete job type. It may be assigned to handymen.']
+    ];
+    
+    if (isset($alert_messages[$msg_type])) {
+        $alert = $alert_messages[$msg_type];
+        $msg = '<div class="alert alert-' . $alert['type'] . ' alert-dismissible fade show animate-fade-in" role="alert">
+                <i class="fas fa-' . $alert['icon'] . ' me-2"></i>
+                ' . $alert['text'] . '
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>';
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Handyman Management - Admin Panel</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
+    <title>Handyman Management | ASRT Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary-color: #2563eb;
-            --secondary-color: #64748b;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --bg-light: #f8fafc;
-            --border-color: #e2e8f0;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
-            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --dark: #1f2937;
+            --darker: #111827;
+            --light: #f3f4f6;
+            --sidebar-width: 280px;
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
         }
-
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px 0;
-        }
-
-        .main-container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .page-header {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .page-header h1 {
-            color: #1e293b;
-            font-size: 2rem;
-            font-weight: 700;
+        
+        * {
             margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #f8fafc, #f1f5f9);
+            color: #374151;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Mobile Menu Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
+        }
+        
+        /* Sidebar Styling */
+        .sidebar {
+            position: fixed;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, var(--dark), var(--darker));
+            color: white;
+            padding: 1.5rem 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: var(--transition);
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 0 1.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-brand {
             display: flex;
             align-items: center;
-            gap: 15px;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.35rem;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .sidebar-brand i {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+        
+        .nav-item {
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: rgba(255, 255, 255, 0.85);
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .nav-link i {
+            width: 24px;
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+        
+        /* Header */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .page-title h1 {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: var(--dark);
+            margin-bottom: 0;
         }
 
-        .page-header h1 i {
-            color: var(--primary-color);
+        .page-title p {
+            font-size: 0.9rem;
         }
-
-        .stats-card {
+        
+        .title-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-size: 1.25rem;
+        }
+        
+        /* Dashboard Card */
+        .dashboard-card {
             background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: var(--shadow-md);
-            border-left: 4px solid var(--primary-color);
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .card-header i {
+            color: var(--primary);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Table Styling */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+        }
+        
+        .custom-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 800px;
+        }
+        
+        .custom-table th {
+            background-color: #f9fafb;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            text-align: left;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+        }
+        
+        .custom-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+        
+        .custom-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .custom-table tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        /* Form Elements */
+        .form-control, .form-select {
+            padding: 0.65rem 0.75rem;
+            font-size: 0.9rem;
+            border-radius: var(--border-radius);
+            border: 1px solid #d1d5db;
+            transition: var(--transition);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+        }
+        
+        /* Button Styling */
+        .btn-action {
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-edit {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .btn-edit:hover {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
         }
 
-        .stats-card h3 {
+        .btn-success {
+            background: var(--secondary);
+            border-color: var(--secondary);
+        }
+        
+        /* Status Badges */
+        .badge {
+            padding: 0.35rem 0.65rem;
+            font-weight: 600;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+
+        .badge-job {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        /* Action Group */
+        .action-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Stats Cards */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
             font-size: 2rem;
             font-weight: 700;
-            color: var(--primary-color);
+            color: var(--primary);
             margin: 0;
         }
 
-        .stats-card p {
-            color: var(--secondary-color);
-            margin: 5px 0 0 0;
+        .stat-card p {
+            color: #6b7280;
+            margin: 0.5rem 0 0 0;
             font-size: 0.9rem;
         }
 
-        .content-card {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            box-shadow: var(--shadow-lg);
-            margin-bottom: 30px;
+        .stat-card.secondary {
+            border-left-color: var(--secondary);
         }
 
-        .content-card h2 {
-            color: #1e293b;
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 25px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .stat-card.secondary h3 {
+            color: var(--secondary);
         }
 
-        .content-card h2 i {
-            color: var(--primary-color);
+        /* Icon Picker */
+        .icon-picker {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: var(--border-radius);
+            margin-top: 0.5rem;
         }
 
-        .table-container {
-            overflow-x: auto;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-        }
-
-        .custom-table {
-            margin: 0;
-            border: none;
-        }
-
-        .custom-table thead {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .custom-table thead th {
-            color: white;
-            font-weight: 600;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-            letter-spacing: 0.5px;
-            border: none;
-            padding: 18px 15px;
-        }
-
-        .custom-table tbody tr {
-            transition: all 0.3s ease;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .custom-table tbody tr:hover {
-            background-color: #f1f5f9;
-            transform: scale(1.01);
-        }
-
-        .custom-table tbody td {
-            padding: 18px 15px;
-            vertical-align: middle;
-            color: #334155;
-            border: none;
-        }
-
-        .badge-job-type {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            display: inline-block;
-        }
-
-        .btn-custom {
-            border: none;
-            border-radius: 8px;
-            padding: 10px 24px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .btn-primary-custom {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-primary-custom:hover {
-            background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
-            color: white;
-        }
-
-        .btn-success-custom {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: white;
-        }
-
-        .btn-success-custom:hover {
-            background: linear-gradient(135deg, #059669 0%, #047857 100%);
-            color: white;
-        }
-
-        .btn-warning-custom {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-            color: white;
-        }
-
-        .btn-danger-custom {
-            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-            color: white;
-        }
-
-        .btn-secondary-custom {
-            background: #e2e8f0;
-            color: #475569;
-        }
-
-        .btn-sm-custom {
-            padding: 6px 14px;
-            font-size: 0.875rem;
-        }
-
-        .form-section {
-            background: #f8fafc;
-            border-radius: 12px;
-            padding: 25px;
-            border: 2px solid var(--border-color);
-        }
-
-        .form-label {
-            font-weight: 600;
-            color: #334155;
-            margin-bottom: 8px;
-            font-size: 0.95rem;
-        }
-
-        .form-control, .form-select {
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            padding: 12px 16px;
-            transition: all 0.3s ease;
-            font-size: 0.95rem;
-        }
-
-        .form-control:focus, .form-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .alert-custom {
-            border-radius: 12px;
-            border: none;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .alert-custom i {
-            font-size: 1.5rem;
-        }
-
-        .empty-state {
+        .icon-option {
+            padding: 0.75rem;
             text-align: center;
-            padding: 60px 20px;
-            color: var(--secondary-color);
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 1.2rem;
         }
 
-        .empty-state i {
-            font-size: 4rem;
-            color: #cbd5e1;
-            margin-bottom: 20px;
+        .icon-option:hover, .icon-option.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
         }
+        
+        /* Mobile Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
 
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
+            .mobile-header {
+                display: flex;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
+            }
 
-        @media (max-width: 768px) {
-            .page-header h1 {
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .page-title h1 {
                 font-size: 1.5rem;
             }
 
-            .content-card {
-                padding: 20px;
+            .title-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
             }
 
             .custom-table {
-                font-size: 0.875rem;
+                font-size: 0.85rem;
             }
 
-            .action-buttons {
-                flex-direction: column;
+            .card-body {
+                padding: 1rem;
             }
 
-            .action-buttons .btn {
-                width: 100%;
+            .stats-row {
+                grid-template-columns: 1fr;
             }
         }
-
-        .section-divider {
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--border-color), transparent);
-            margin: 40px 0;
+        
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body>
-<div class="main-container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <h1><i class="fas fa-user-cog"></i> Handyman Management</h1>
-            <a href="dashboard.php" class="btn btn-secondary-custom btn-custom">
-                <i class="fas fa-arrow-left"></i> Back to Dashboard
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="mobile-brand">
+            ASRT Admin
+        </div>
+        <div></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="#" class="sidebar-brand">
+                <i class="fas fa-crown"></i>
+                <span>ASRT Admin</span>
             </a>
         </div>
-    </div>
-
-    <?php if ($msg): ?>
-        <div class="content-card">
-            <div class="alert alert-danger alert-custom">
-                <i class="fas fa-exclamation-circle"></i>
-                <div><?= htmlspecialchars($msg) ?></div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <!-- Statistics -->
-    <div class="row mb-4">
-        <div class="col-md-6 mb-3">
-            <div class="stats-card">
-                <h3><?= count($handymen_list) ?></h3>
-                <p><i class="fas fa-users"></i> Total Handymen</p>
-            </div>
-        </div>
-        <div class="col-md-6 mb-3">
-            <div class="stats-card" style="border-left-color: var(--success-color);">
-                <h3 style="color: var(--success-color);"><?= count($jobtypes) ?></h3>
-                <p><i class="fas fa-briefcase"></i> Job Types Available</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Handyman List -->
-    <div class="content-card">
-        <h2><i class="fas fa-list"></i> Handyman Directory</h2>
         
-        <?php if (empty($handymen_list)): ?>
-            <div class="empty-state">
-                <i class="fas fa-user-slash"></i>
-                <h4>No Handymen Found</h4>
-                <p>Start by adding your first handyman using the form below.</p>
+        <div class="sidebar-nav">
+            <div class="nav-item">
+                <a href="dashboard.php" class="nav-link">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
             </div>
-        <?php else: ?>
-            <div class="table-container">
-                <table class="table custom-table">
-                    <thead>
-                        <tr>
-                            <th><i class="fas fa-user"></i> First Name</th>
-                            <th><i class="fas fa-user"></i> Last Name</th>
-                            <th><i class="fas fa-phone"></i> Phone</th>
-                            <th><i class="fas fa-briefcase"></i> Job Type</th>
-                            <th><i class="fas fa-cog"></i> Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    <?php foreach($handymen_list as $r): ?>
-                        <tr>
-                            <td><strong><?= htmlspecialchars($r['Handyman_fn']) ?></strong></td>
-                            <td><strong><?= htmlspecialchars($r['Handyman_ln']) ?></strong></td>
-                            <td><i class="fas fa-phone-alt" style="color: var(--secondary-color);"></i> <?= htmlspecialchars($r['Phone']) ?></td>
-                            <td><span class="badge-job-type"><?= htmlspecialchars($r['JobType_Name'] ?? 'Unassigned') ?></span></td>
-                            <td>
-                                <div class="action-buttons">
-                                    <a href="?edit=<?= $r['Handyman_ID'] ?>" class="btn btn-warning-custom btn-custom btn-sm-custom">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                    <a href="#" class="btn btn-danger-custom btn-custom btn-sm-custom" onclick="confirmDelete(<?= $r['Handyman_ID'] ?>)">
-                                        <i class="fas fa-trash-alt"></i> Delete
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <div class="section-divider"></div>
-
-    <!-- Add/Edit Handyman Form -->
-    <div class="content-card">
-        <h2>
-            <i class="fas fa-<?= $edit ? 'user-edit' : 'user-plus' ?>"></i> 
-            <?= $edit ? 'Edit Handyman' : 'Add New Handyman' ?>
-        </h2>
-        
-        <form method="POST">
-            <?php if ($edit): ?>
-                <input type="hidden" name="handyman_id" value="<?= $edit_data['Handyman_ID'] ?>">
-            <?php endif; ?>
             
-            <div class="form-section">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label"><i class="fas fa-user"></i> First Name *</label>
-                        <input type="text" name="Handyman_fn" class="form-control" required
-                            value="<?= htmlspecialchars($edit_data['Handyman_fn']) ?>"
-                            placeholder="Enter first name">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label"><i class="fas fa-user"></i> Last Name *</label>
-                        <input type="text" name="Handyman_ln" class="form-control" required
-                            value="<?= htmlspecialchars($edit_data['Handyman_ln']) ?>"
-                            placeholder="Enter last name">
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label"><i class="fas fa-phone"></i> Phone Number *</label>
-                        <input type="text" name="Phone" class="form-control" required
-                            value="<?= htmlspecialchars($edit_data['Phone']) ?>"
-                            placeholder="Enter phone number">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label"><i class="fas fa-briefcase"></i> Job Type *</label>
-                        <select name="JobType_ID" class="form-select" required>
-                            <option value="">-- Select Job Type --</option>
-                            <?php foreach ($jobtypes as $jt): ?>
-                                <option value="<?= $jt['JobType_ID'] ?>"
-                                    <?= $jt['JobType_ID'] == $edit_data['JobType_ID'] ? 'selected' : '' ?>>
-                                    <?= htmlspecialchars($jt['JobType_Name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
+            <div class="nav-item">
+                <a href="manage_user.php" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    <span>Manage Users & Units</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="view_rental_requests.php" class="nav-link">
+                    <i class="fas fa-clipboard-check"></i>
+                    <span>Rental Requests</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="manage_maintenance.php" class="nav-link">
+                    <i class="fas fa-tools"></i>
+                    <span>Maintenance</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="generate_invoice.php" class="nav-link">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                    <span>Invoices</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="add_unit.php" class="nav-link">
+                    <i class="fas fa-plus-square"></i>
+                    <span>Add Unit</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="admin_add_handyman.php" class="nav-link active">
+                    <i class="fas fa-user-cog"></i>
+                    <span>Add Handyman</span>
+                </a>
+            </div>
+            
+            <div class="nav-item">
+                <a href="admin_kick_unpaid.php" class="nav-link">
+                    <i class="fas fa-user-slash"></i>
+                    <span>Overdue Accounts</span>
+                </a>
+            </div>
+            
+            <div class="nav-item mt-4">
+                <a href="logout.php" class="nav-link">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </div>
+    </div>
 
-                <div class="d-flex gap-2 flex-wrap mt-4">
-                    <button type="submit" class="btn btn-primary-custom btn-custom">
-                        <i class="fas fa-<?= $edit ? 'save' : 'plus' ?>"></i> 
-                        <?= $edit ? 'Update Handyman' : 'Add Handyman' ?>
-                    </button>
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <div class="page-title">
+                <div class="title-icon">
+                    <i class="fas fa-user-cog"></i>
+                </div>
+                <div>
+                    <h1>Handyman Management</h1>
+                    <p class="text-muted mb-0">Manage handymen and their job types</p>
+                </div>
+            </div>
+        </div>
+        
+        <?= $msg ?>
+
+        <!-- Statistics -->
+        <div class="stats-row animate-fade-in">
+            <div class="stat-card">
+                <h3><?= count($handymen_list) ?></h3>
+                <p><i class="fas fa-users me-2"></i>Total Handymen</p>
+            </div>
+            <div class="stat-card secondary">
+                <h3><?= count($jobtypes) ?></h3>
+                <p><i class="fas fa-briefcase me-2"></i>Job Types Available</p>
+            </div>
+        </div>
+
+        <!-- Handyman List -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-list"></i>
+                <span>Handyman Directory</span>
+                <span class="badge bg-primary ms-2"><?= count($handymen_list) ?></span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (empty($handymen_list)): ?>
+                    <div class="empty-state">
+                        <i class="fas fa-user-slash"></i>
+                        <h4>No handymen found</h4>
+                        <p>Start by adding your first handyman using the form below</p>
+                    </div>
+                <?php else: ?>
+                    <div class="table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>First Name</th>
+                                    <th>Last Name</th>
+                                    <th>Phone</th>
+                                    <th>Job Type</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($handymen_list as $r): ?>
+                                <tr>
+                                    <td><span class="fw-medium">#<?= htmlspecialchars($r['Handyman_ID']) ?></span></td>
+                                    <td><strong><?= htmlspecialchars($r['Handyman_fn']) ?></strong></td>
+                                    <td><strong><?= htmlspecialchars($r['Handyman_ln']) ?></strong></td>
+                                    <td><i class="fas fa-phone-alt text-muted me-2"></i><?= htmlspecialchars($r['Phone']) ?></td>
+                                    <td>
+                                        <span class="badge-job">
+                                            <i class="fas <?= htmlspecialchars($r['Icon'] ?? 'fa-wrench') ?>"></i>
+                                            <?= htmlspecialchars($r['JobType_Name'] ?? 'Unassigned') ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="action-group">
+                                            <a href="?edit=<?= $r['Handyman_ID'] ?>" class="btn-action btn-edit" title="Edit">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <button onclick="confirmDelete(<?= $r['Handyman_ID'] ?>, '<?= htmlspecialchars(addslashes($r['Handyman_fn'] . ' ' . $r['Handyman_ln'])) ?>')" 
+                                                    class="btn-action btn-delete" title="Delete">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Add/Edit Handyman Form -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-<?= $edit ? 'user-edit' : 'user-plus' ?>"></i>
+                <span><?= $edit ? 'Edit Handyman' : 'Add New Handyman' ?></span>
+            </div>
+            <div class="card-body">
+                <form method="POST">
                     <?php if ($edit): ?>
-                        <a href="admin_add_handyman.php" class="btn btn-secondary-custom btn-custom">
-                            <i class="fas fa-times"></i> Cancel
-                        </a>
+                        <input type="hidden" name="handyman_id" value="<?= $edit_data['Handyman_ID'] ?>">
+                    <?php endif; ?>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-user me-2"></i>First Name *</label>
+                            <input type="text" name="Handyman_fn" class="form-control" required
+                                value="<?= htmlspecialchars($edit_data['Handyman_fn']) ?>"
+                                placeholder="Enter first name">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-user me-2"></i>Last Name *</label>
+                            <input type="text" name="Handyman_ln" class="form-control" required
+                                value="<?= htmlspecialchars($edit_data['Handyman_ln']) ?>"
+                                placeholder="Enter last name">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-phone me-2"></i>Phone Number *</label>
+                            <input type="text" name="Phone" class="form-control" required
+                                value="<?= htmlspecialchars($edit_data['Phone']) ?>"
+                                placeholder="Enter phone number">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><i class="fas fa-briefcase me-2"></i>Job Type *</label>
+                            <select name="JobType_ID" class="form-select" required>
+                                <option value="">-- Select Job Type --</option>
+                                <?php foreach ($jobtypes as $jt): ?>
+                                    <option value="<?= $jt['JobType_ID'] ?>"
+                                        <?= $jt['JobType_ID'] == $edit_data['JobType_ID'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($jt['JobType_Name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-<?= $edit ? 'save' : 'plus' ?> me-2"></i>
+                            <?= $edit ? 'Update Handyman' : 'Add Handyman' ?>
+                        </button>
+                        <?php if ($edit): ?>
+                            <a href="admin_add_handyman.php" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Cancel
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Job Types Section -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-briefcase"></i>
+                <span>Job Type Management</span>
+            </div>
+            <div class="card-body">
+                <!-- Add Job Type Form -->
+                <form method="POST" id="jobTypeForm">
+                    <div class="row align-items-end">
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label"><i class="fas fa-tag me-2"></i>Job Type Name *</label>
+                            <input type="text" name="NewJobType" class="form-control" required 
+                                placeholder="e.g., Plumbing, Electrical, Carpentry">
+                        </div>
+                        <div class="col-md-5 mb-3">
+                            <label class="form-label"><i class="fas fa-icons me-2"></i>Select Icon *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-wrench" id="selectedIconPreview"></i>
+                                </span>
+                                <input type="text" name="JobIcon" id="jobIconInput" class="form-control" 
+                                    value="fa-wrench" readonly required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleIconPicker()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Icon Picker -->
+                            <div id="iconPicker" class="icon-picker" style="display: none;">
+                                <div class="icon-option" data-icon="fa-wrench" onclick="selectIcon('fa-wrench')">
+                                    <i class="fas fa-wrench"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-hammer" onclick="selectIcon('fa-hammer')">
+                                    <i class="fas fa-hammer"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-screwdriver" onclick="selectIcon('fa-screwdriver')">
+                                    <i class="fas fa-screwdriver"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-toolbox" onclick="selectIcon('fa-toolbox')">
+                                    <i class="fas fa-toolbox"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-bolt" onclick="selectIcon('fa-bolt')">
+                                    <i class="fas fa-bolt"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-plug" onclick="selectIcon('fa-plug')">
+                                    <i class="fas fa-plug"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-paint-roller" onclick="selectIcon('fa-paint-roller')">
+                                    <i class="fas fa-paint-roller"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-brush" onclick="selectIcon('fa-brush')">
+                                    <i class="fas fa-brush"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-ruler" onclick="selectIcon('fa-ruler')">
+                                    <i class="fas fa-ruler"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-drafting-compass" onclick="selectIcon('fa-drafting-compass')">
+                                    <i class="fas fa-drafting-compass"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-tape" onclick="selectIcon('fa-tape')">
+                                    <i class="fas fa-tape"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-faucet" onclick="selectIcon('fa-faucet')">
+                                    <i class="fas fa-faucet"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-toilet" onclick="selectIcon('fa-toilet')">
+                                    <i class="fas fa-toilet"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-shower" onclick="selectIcon('fa-shower')">
+                                    <i class="fas fa-shower"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-broom" onclick="selectIcon('fa-broom')">
+                                    <i class="fas fa-broom"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-spray-can" onclick="selectIcon('fa-spray-can')">
+                                    <i class="fas fa-spray-can"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-house-damage" onclick="selectIcon('fa-house-damage')">
+                                    <i class="fas fa-house-damage"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-fire-extinguisher" onclick="selectIcon('fa-fire-extinguisher')">
+                                    <i class="fas fa-fire-extinguisher"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-hard-hat" onclick="selectIcon('fa-hard-hat')">
+                                    <i class="fas fa-hard-hat"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-tools" onclick="selectIcon('fa-tools')">
+                                    <i class="fas fa-tools"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <button type="submit" name="add_jobtype" class="btn btn-success w-100">
+                                <i class="fas fa-plus-circle me-2"></i>Add
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Job Types List -->
+                <div class="mt-4">
+                    <h5 class="mb-3"><i class="fas fa-list me-2"></i>All Job Types</h5>
+                    <?php if (empty($jobtypes)): ?>
+                        <div class="empty-state">
+                            <i class="fas fa-briefcase"></i>
+                            <h4>No job types found</h4>
+                            <p>Add your first job type using the form above</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-container">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Icon</th>
+                                        <th>Name</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($jobtypes as $jt): ?>
+                                    <tr>
+                                        <td><span class="fw-medium">#<?= $jt['JobType_ID'] ?></span></td>
+                                        <td>
+                                            <i class="fas <?= htmlspecialchars($jt['Icon'] ?? 'fa-wrench') ?> fa-2x" 
+                                               style="color: var(--primary);"></i>
+                                        </td>
+                                        <td><strong><?= htmlspecialchars($jt['JobType_Name']) ?></strong></td>
+                                        <td>
+                                            <button onclick="confirmDeleteJobType(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')" 
+                                                    class="btn-action btn-delete" title="Delete">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
-        </form>
+        </div>
     </div>
 
-    <div class="section-divider"></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Mobile menu functionality
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
 
-    <!-- Add Job Type Form -->
-    <div class="content-card">
-        <h2><i class="fas fa-briefcase"></i> Add New Job Type</h2>
+        function toggleMobileMenu() {
+            sidebar.classList.toggle('active');
+            mobileOverlay.classList.toggle('active');
+        }
+
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+        }
         
-        <form method="POST">
-            <div class="form-section">
-                <div class="row">
-                    <div class="col-md-8 mb-3">
-                        <label class="form-label"><i class="fas fa-tag"></i> Job Type Name *</label>
-                        <input type="text" name="NewJobType" class="form-control" required 
-                            placeholder="e.g., General Cleaning, Plumbing, Electrical">
-                    </div>
-                    <div class="col-md-4 mb-3 d-flex align-items-end">
-                        <button type="submit" name="add_jobtype" class="btn btn-success-custom btn-custom w-100">
-                            <i class="fas fa-plus-circle"></i> Add Job Type
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </form>
-            <div class="mt-4">
-                <h4><i class="fas fa-list"></i> All Job Types</h4>
-                <div class="table-container">
-                    <table class="table custom-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Name</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($jobtypes as $jt): ?>
-                            <tr>
-                                <td><?= $jt['JobType_ID'] ?></td>
-                                <td><?= htmlspecialchars($jt['JobType_Name']) ?></td>
-                                <td>
-                                    <a href="#" class="btn btn-danger-custom btn-custom btn-sm-custom" onclick="confirmDeleteJobType(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')">
-                                        <i class="fas fa-trash-alt"></i> Delete
-                                    </a>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-    </div>
-</div>
+        if (mobileOverlay) {
+            mobileOverlay.addEventListener('click', toggleMobileMenu);
+        }
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const msg = urlParams.get('msg');
-    let title = 'Success!';
-    let text = '';
-    let icon = 'success';
-    
-    if (msg === 'added') text = 'Handyman successfully added to the system.';
-    if (msg === 'updated') text = 'Handyman information has been updated.';
-    if (msg === 'deleted') text = 'Handyman has been removed from the system.';
-    if (msg === 'jobtype_added') text = 'New job type has been added successfully.';
-    if (msg === 'jobtype_deleted') text = 'Job type has been deleted successfully.';
-    if (msg === 'error') { 
-        title = 'Error!'; 
-        text = 'An operation could not be completed. Please try again.';
-        icon = 'error';
-    }
-    if (msg === 'jobtype_delete_error') {
-        title = 'Error!';
-        text = 'Failed to delete job type. Please try again.';
-        icon = 'error';
-    }
-
-    if (text) {
-        Swal.fire({
-            title: title,
-            text: text,
-            icon: icon,
-            confirmButtonColor: '#667eea',
-            confirmButtonText: 'OK'
+        // Close mobile menu when clicking on nav links
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 992) {
+                    sidebar.classList.remove('active');
+                    mobileOverlay.classList.remove('active');
+                }
+            });
         });
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-});
 
-function confirmDelete(handymanId) {
-    Swal.fire({
-        title: 'Delete Handyman?',
-        text: 'Are you sure you want to delete this handyman? This action cannot be undone.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Yes, delete',
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = '?delete=' + handymanId;
+        // Icon picker functionality
+        function toggleIconPicker() {
+            const picker = document.getElementById('iconPicker');
+            picker.style.display = picker.style.display === 'none' ? 'grid' : 'none';
         }
-    });
-}
 
-function confirmDeleteJobType(jobTypeId, jobTypeName) {
-    Swal.fire({
-        title: 'Delete Job Type?',
-        text: 'Are you sure you want to delete the job type "' + jobTypeName + '"? This will remove it from all handymen.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#64748b',
-        confirmButtonText: 'Yes, delete',
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            window.location.href = '?delete_jobtype=' + jobTypeId;
+        function selectIcon(iconClass) {
+            document.getElementById('jobIconInput').value = iconClass;
+            document.getElementById('selectedIconPreview').className = 'fas ' + iconClass;
+            
+            // Update selected state
+            document.querySelectorAll('.icon-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.querySelector(`[data-icon="${iconClass}"]`).classList.add('selected');
+            
+            // Close picker
+            document.getElementById('iconPicker').style.display = 'none';
         }
-    });
-}
-</script>
+
+        // Close icon picker when clicking outside
+        document.addEventListener('click', function(event) {
+            const picker = document.getElementById('iconPicker');
+            const iconInput = document.getElementById('jobIconInput');
+            const searchBtn = event.target.closest('.btn-outline-secondary');
+            
+            if (picker && !picker.contains(event.target) && 
+                event.target !== iconInput && !searchBtn) {
+                picker.style.display = 'none';
+            }
+        });
+
+        // Confirmation dialogs
+        function confirmDelete(handymanId, name) {
+            if (confirm(`Are you sure you want to delete handyman "${name}"?\n\nThis action cannot be undone.`)) {
+                window.location.href = '?delete=' + handymanId;
+            }
+        }
+
+        function confirmDeleteJobType(jobTypeId, jobTypeName) {
+            if (confirm(`Are you sure you want to delete the job type "${jobTypeName}"?\n\nThis will remove it from all handymen assigned to this job type.`)) {
+                window.location.href = '?delete_jobtype=' + jobTypeId;
+            }
+        }
+
+        // Auto-hide alerts after 5 seconds
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 992) {
+                sidebar.classList.remove('active');
+                mobileOverlay.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>
