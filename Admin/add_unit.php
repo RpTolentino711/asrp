@@ -35,10 +35,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             $filepath = __DIR__ . "/../uploads/unit_photos/" . $photos[$photo_index];
             if (file_exists($filepath)) unlink($filepath);
             array_splice($photos, $photo_index, 1);
-            
-            // FIX: Use raw SQL since your updateSpacePhotos method doesn't accept the full array
-            $stmt = $db->pdo->prepare("UPDATE space SET Photo = ? WHERE Space_ID = ?");
-            if ($stmt->execute([json_encode($photos), $space_id])) {
+
+            // Use public method, not $db->pdo
+            if ($db->updateSpacePhotos($space_id, json_encode($photos))) {
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                 <i class="fas fa-check-circle me-2"></i>
                                 Photo deleted successfully!
