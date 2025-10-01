@@ -43,9 +43,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Handle photo update/upload for a specific slot ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
-    $photo_field = $_POST['photo_field'] ?? 'Photo1';
-    if ($space_id && in_array($photo_field, ['Photo1','Photo2','Photo3','Photo4','Photo5']) &&
-        isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
+
+    if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
         $file = $_FILES['new_photo'];
         if (!in_array($file['type'], $allowed_types)) {
@@ -61,20 +60,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         } else {
-            // Delete old photo if exists
-            $space = $db->getSpacePhoto($space_id);
-            if ($space && !empty($space[$photo_field])) {
-                $filepath = __DIR__ . "/../uploads/unit_photos/" . $space[$photo_field];
-                if (file_exists($filepath)) unlink($filepath);
-            }
-            // Save new
+            // Save new photo
             $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
             $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
             $upload_dir = __DIR__ . "/../uploads/unit_photos/";
             if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
             $filepath = $upload_dir . $filename;
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $db->updateSpacePhotoField($space_id, $photo_field, $filename);
+                // Fetch current photo array
+                $space = $db->getSpacePhoto($space_id);  // returns ['Photo' => '["a.jpg","b.jpg"]']
+                $photos = [];
+                if ($space && !empty($space['Photo'])) {
+                    $photos = json_decode($space['Photo'], true) ?: [];
+                }
+
+                // Add new photo (or replace logic, if you want to replace instead of append)
+                $photos[] = $filename;
+
+                // Save back as JSON
+                $db->updateSpacePhotos($space_id, json_encode($photos));
+
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                 <i class="fas fa-check-circle me-2"></i>
                                 Photo updated successfully!
@@ -90,7 +95,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
         }
     }
 }
-
 // --- Handle form submission for new space/unit ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'unit') {
     $name = trim($_POST['name'] ?? '');
@@ -151,22 +155,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       A space/unit with this name already exists.
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
-    } elseif (!$error_unit) {
-        // For new units, only Photo1 is set at creation. Others can be edited after creation.
-        if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo1_filename)) {
-            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Space/unit added successfully!
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
-        } else {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          A database error occurred. The unit could not be added.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        }
-    }
+
+
+  if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json)) {
+    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Space/unit added successfully!
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
+} else {
+    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                  <i class="fas fa-exclamation-circle me-2"></i>
+                  A database error occurred. The unit could not be added.
+                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                  </div>';
+}
+}
 }
 
 // --- Handle form submission for new space type ---

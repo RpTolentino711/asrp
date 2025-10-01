@@ -844,18 +844,24 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
     }
     
 
-public function removeSpacePhoto($space_id) {
-    // Set Photo, Photo1, Photo2, Photo3, Photo4, and Photo5 to NULL for the given space
-    $sql = "UPDATE space 
-            SET Photo = NULL, 
-                Photo1 = NULL, 
-                Photo2 = NULL, 
-                Photo3 = NULL, 
-                Photo4 = NULL, 
-                Photo5 = NULL 
-            WHERE Space_ID = ?";
-    return $this->executeStatement($sql, [$space_id]);
+public function removeSpacePhoto($space_id, $photo_filename) {
+    // Fetch current photo array
+    $stmt = $this->pdo->prepare("SELECT Photo FROM space WHERE Space_ID = ?");
+    $stmt->execute([$space_id]);
+    $space = $stmt->fetch();
+    $photos = [];
+    if ($space && !empty($space['Photo'])) {
+        $photos = json_decode($space['Photo'], true) ?: [];
+    }
+
+    // Remove the specified photo filename
+    $photos = array_values(array_diff($photos, [$photo_filename]));
+
+    // Update the Photo column with the new array
+    $stmt = $this->pdo->prepare("UPDATE space SET Photo = ? WHERE Space_ID = ?");
+    return $stmt->execute([json_encode($photos), $space_id]);
 }
+
 
 
     public function updateHandyman($id, $fn, $ln, $phone, $jobtype_id) {
@@ -1718,26 +1724,39 @@ public function markRentalRequestDone($client_id, $space_id) {
 
 
 public function getSpacePhoto($space_id) {
-    // Return all photo fields (Photo, Photo1, Photo2, Photo3, Photo4, Photo5) for compatibility and multi-photo support
-    $sql = "SELECT Photo, Photo1, Photo2, Photo3, Photo4, Photo5 FROM space WHERE Space_ID = ?";
+    // Return only the Photo column, which contains a JSON array of photo filenames
+    $sql = "SELECT Photo FROM space WHERE Space_ID = ?";
     return $this->runQuery($sql, [$space_id]);
 }
 
 
-public function updateSpacePhotoField($space_id, $photo_field, $photo_filename) {
-    // Only allow updating Photo1–Photo5 for safety
-    $allowed_fields = ['Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-    if (!in_array($photo_field, $allowed_fields)) {
-        return false;
+
+public function updateSpacePhotos($space_id, $new_photo_filename, $replace_index = null) {
+    // Fetch current photo array
+    $stmt = $this->pdo->prepare("SELECT Photo FROM space WHERE Space_ID = ?");
+    $stmt->execute([$space_id]);
+    $space = $stmt->fetch();
+    $photos = [];
+    if ($space && !empty($space['Photo'])) {
+        $photos = json_decode($space['Photo'], true) ?: [];
     }
-    // Optionally also update legacy Photo if Photo1 is updated
-    $sql = ($photo_field === 'Photo1')
-        ? "UPDATE space SET $photo_field = ?, Photo = ? WHERE Space_ID = ?"
-        : "UPDATE space SET $photo_field = ? WHERE Space_ID = ?";
-    return ($photo_field === 'Photo1')
-        ? $this->executeStatement($sql, [$photo_filename, $photo_filename, $space_id])
-        : $this->executeStatement($sql, [$photo_filename, $space_id]);
+
+    // Add or replace photo
+    if ($replace_index !== null && isset($photos[$replace_index])) {
+        // Replace photo at index
+        $photos[$replace_index] = $new_photo_filename;
+    } else {
+        // Append new photo
+        $photos[] = $new_photo_filename;
+    }
+
+    // Save updated array as JSON
+    $stmt = $this->pdo->prepare("UPDATE space SET Photo = ? WHERE Space_ID = ?");
+    return $stmt->execute([json_encode($photos), $space_id]);
 }
+
+
+
     public function rejectRentalRequest($request_id) {
         $sql = "UPDATE rentalrequest SET Status = 'Rejected' WHERE Request_ID = ? AND Status = 'Pending'";
         return $this->executeStatement($sql, [$request_id]);
