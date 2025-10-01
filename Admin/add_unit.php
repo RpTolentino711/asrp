@@ -25,33 +25,23 @@ $error_type = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $photo_index = intval($_POST['photo_index'] ?? -1);
-
     if ($space_id >= 1 && $photo_index >= 0) {
-        // Get current photo JSON array
-        $space = $db->getSpacePhoto($space_id); // Should return ['Photo' => ...]
+        $space = $db->getSpacePhoto($space_id);
         $photos = [];
         if ($space && !empty($space['Photo'])) {
             $photos = json_decode($space['Photo'], true) ?: [];
         }
-
-        // Remove photo from disk and array
         if (isset($photos[$photo_index])) {
             $filepath = __DIR__ . "/../uploads/unit_photos/" . $photos[$photo_index];
-            if (file_exists($filepath)) {
-                unlink($filepath);
-            }
-            // Remove photo from array and database
-            if ($db->deleteSpacePhoto($space_id, $photo_index)) {
+            if (file_exists($filepath)) unlink($filepath);
+            array_splice($photos, $photo_index, 1);
+            
+            // FIX: Use the new public method instead of direct pdo access
+            if ($db->updateSpacePhotoJson($space_id, json_encode($photos))) {
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                    <i class="fas fa-check-circle me-2"></i>
-                                    Photo deleted successfully!
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
-            } else {
-                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                                    <i class="fas fa-exclamation-circle me-2"></i>
-                                    Failed to delete photo from database.
-                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                <i class="fas fa-check-circle me-2"></i>
+                                Photo deleted successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>';
             }
         }
