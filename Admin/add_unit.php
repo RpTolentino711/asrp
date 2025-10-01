@@ -25,13 +25,20 @@ $error_type = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $photo_field = $_POST['photo_field'] ?? 'Photo1';
+    
     if ($space_id && in_array($photo_field, ['Photo1','Photo2','Photo3','Photo4','Photo5'])) {
-        $space = $db->getSpacePhoto($space_id);
+        // Get current photo filename
+        $space = $db->getSpaceById($space_id);
         if ($space && !empty($space[$photo_field])) {
             $filepath = __DIR__ . "/../uploads/unit_photos/" . $space[$photo_field];
-            if (file_exists($filepath)) unlink($filepath);
+            if (file_exists($filepath)) {
+                unlink($filepath);
+            }
         }
-        $db->removeSpacePhoto($space_id, $photo_field);
+        
+        // Set the column to NULL
+        $db->updateSpacePhotoField($space_id, $photo_field, null);
+        
         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                         <i class="fas fa-check-circle me-2"></i>
                         Photo deleted successfully!
@@ -43,14 +50,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Handle photo update/upload for a specific slot ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
+    $photo_field = $_POST['photo_field'] ?? 'Photo1';
 
-    if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
+    if ($space_id && in_array($photo_field, ['Photo1','Photo2','Photo3','Photo4','Photo5']) && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
         $file = $_FILES['new_photo'];
+        
         if (!in_array($file['type'], $allowed_types)) {
             $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                           <i class="fas fa-exclamation-circle me-2"></i>
-                          Invalid file type for photo.
+                          Invalid file type for photo. Only JPG, PNG, and GIF are allowed.
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         } elseif ($file['size'] > 2*1024*1024) {
@@ -60,26 +69,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         } else {
+            // Delete old photo if exists
+            $space = $db->getSpaceById($space_id);
+            if ($space && !empty($space[$photo_field])) {
+                $old_filepath = __DIR__ . "/../uploads/unit_photos/" . $space[$photo_field];
+                if (file_exists($old_filepath)) {
+                    unlink($old_filepath);
+                }
+            }
+            
             // Save new photo
             $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
             $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
             $upload_dir = __DIR__ . "/../uploads/unit_photos/";
-            if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+            if (!is_dir($upload_dir)) {
+                mkdir($upload_dir, 0777, true);
+            }
             $filepath = $upload_dir . $filename;
+            
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                // Fetch current photo array
-                $space = $db->getSpacePhoto($space_id);  // returns ['Photo' => '["a.jpg","b.jpg"]']
-                $photos = [];
-                if ($space && !empty($space['Photo'])) {
-                    $photos = json_decode($space['Photo'], true) ?: [];
-                }
-
-                // Add new photo (or replace logic, if you want to replace instead of append)
-                $photos[] = $filename;
-
-                // Save back as JSON
-                $db->updateSpacePhotos($space_id, json_encode($photos));
-
+                $db->updateSpacePhotoField($space_id, $photo_field, $filename);
+                
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                 <i class="fas fa-check-circle me-2"></i>
                                 Photo updated successfully!
@@ -95,20 +105,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
         }
     }
 }
+
 // --- Handle form submission for new space/unit ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'unit') {
     $name = trim($_POST['name'] ?? '');
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
 
-    // Handle file upload (main photo goes to Photo1 only)
+    // Handle file upload (main photo goes to Photo1)
     $photo1_filename = null;
     $upload_dir = __DIR__ . "/../uploads/unit_photos/";
-    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+    if (!is_dir($upload_dir)) {
+        mkdir($upload_dir, 0777, true);
+    }
 
     if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK) {
         $file = $_FILES['photo'];
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+        
         if (!in_array($file['type'], $allowed_types)) {
             $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                           <i class="fas fa-exclamation-circle me-2"></i>
@@ -125,6 +139,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
             $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
             $filepath = $upload_dir . $filename;
+            
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
                 $photo1_filename = $filename;
             } else {
@@ -137,40 +152,41 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
         }
     }
 
-    if (empty($name) || empty($spacetype_id) || $price === null || empty($ua_id)) {
-        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      Please fill in all required fields.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
-    } elseif ($price < 0) {
-        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      Price must be a non-negative number.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
-    } elseif ($db->isSpaceNameExists($name)) {
-        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                      <i class="fas fa-exclamation-circle me-2"></i>
-                      A space/unit with this name already exists.
-                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>';
-
-
-  if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json)) {
-    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>
-                    Space/unit added successfully!
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>';
-} else {
-    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                  <i class="fas fa-exclamation-circle me-2"></i>
-                  A database error occurred. The unit could not be added.
-                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                  </div>';
-}
-}
+    if (empty($error_unit)) {
+        if (empty($name) || empty($spacetype_id) || $price === null || empty($ua_id)) {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Please fill in all required fields.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        } elseif ($price < 0) {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Price must be a non-negative number.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        } elseif ($db->isSpaceNameExists($name)) {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          A space/unit with this name already exists.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        } else {
+            if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo1_filename)) {
+                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Space/unit added successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            } else {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              A database error occurred. The unit could not be added.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+    }
 }
 
 // --- Handle form submission for new space type ---
@@ -188,6 +204,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
         $existing = array_filter($existing_types, function($type) use ($spacetype_name) {
             return strtolower(trim($type['SpaceTypeName'])) === strtolower(trim($spacetype_name));
         });
+        
         if ($existing) {
             $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                           <i class="fas fa-exclamation-circle me-2"></i>
