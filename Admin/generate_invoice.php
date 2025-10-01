@@ -430,6 +430,23 @@ if (!$show_chat) {
     } else {
         $invoices = $db->getInvoicesByFlowStatus($status_filter);
     }
+    
+    // FIX: Sort invoices by due date - soonest first
+    usort($invoices, function($a, $b) {
+        // If both have due dates, sort by due date
+        if (!empty($a['EndDate']) && !empty($b['EndDate'])) {
+            return strtotime($a['EndDate']) - strtotime($b['EndDate']);
+        }
+        // If only one has due date, put that one first
+        if (!empty($a['EndDate']) && empty($b['EndDate'])) {
+            return -1;
+        }
+        if (empty($a['EndDate']) && !empty($b['EndDate'])) {
+            return 1;
+        }
+        // If neither has due date, maintain original order
+        return 0;
+    });
 }
 
 if (isset($_GET['chat_invoice_id'])) {
@@ -444,7 +461,7 @@ if ($show_chat && $chat_invoice_id) {
 }
 
 // Helper for countdown (output JS or static string)
-function renderCountdown($due_date) {
+function renderCountdown($due_date, $invoice_id) {
     $due = strtotime($due_date . ' 23:59:59');
     $now = time();
     $diff = $due - $now;
@@ -453,7 +470,7 @@ function renderCountdown($due_date) {
         return '<span class="badge bg-danger">OVERDUE</span>';
     }
     
-    $id = 'countdown_' . uniqid();
+    $id = 'countdown_' . $invoice_id;
     
     return '<span id="'.$id.'" class="badge bg-warning text-dark"></span>
 <script>
@@ -485,6 +502,16 @@ function renderCountdown($due_date) {
 </script>';
 }
 
+// Helper to get time remaining in seconds for sorting
+function getTimeRemaining($due_date) {
+    if (empty($due_date)) return PHP_INT_MAX; // Put invoices without due dates at the end
+    
+    $due = strtotime($due_date . ' 23:59:59');
+    $now = time();
+    $diff = $due - $now;
+    
+    return $diff;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1413,7 +1440,7 @@ function renderCountdown($due_date) {
                             <div class="text-end">
                                 <div class="fw-bold">Issued: <?= htmlspecialchars($invoice['InvoiceDate'] ?? '') ?></div>
                                 <div class="fw-bold">Due: <?= htmlspecialchars($invoice['EndDate'] ?? $invoice['InvoiceDate'] ?? '') ?></div>
-                                <?= isset($invoice['EndDate']) ? renderCountdown($invoice['EndDate']) : '' ?>
+                                <?= isset($invoice['EndDate']) ? renderCountdown($invoice['EndDate'], $invoice['Invoice_ID']) : '' ?>
                             </div>
                         </div>
                     </div>
@@ -1429,7 +1456,7 @@ function renderCountdown($due_date) {
                             <div class="small">Due: <?= htmlspecialchars($invoice['EndDate'] ?? $invoice['InvoiceDate'] ?? '') ?></div>
                         </div>
                         <div>
-                            <?= isset($invoice['EndDate']) ? renderCountdown($invoice['EndDate']) : '' ?>
+                            <?= isset($invoice['EndDate']) ? renderCountdown($invoice['EndDate'], $invoice['Invoice_ID']) : '' ?>
                         </div>
                     </div>
                 </div>
@@ -1631,7 +1658,7 @@ setInterval(() => {
                                             if (isset($row['Flow_Status']) && strtolower($row['Flow_Status']) === 'done') {
                                                 echo '<span class="badge bg-success">Completed</span>';
                                             } elseif (isset($row['EndDate'])) {
-                                                echo renderCountdown($row['EndDate']);
+                                                echo renderCountdown($row['EndDate'], $row['Invoice_ID']);
                                             } else {
                                                 echo '<span class="text-muted">N/A</span>';
                                             }
@@ -1685,7 +1712,7 @@ setInterval(() => {
                                         if ($isCompleted) {
                                             echo '<span class="badge bg-success">Completed</span>';
                                         } elseif (isset($row['EndDate'])) {
-                                            echo renderCountdown($row['EndDate']);
+                                            echo renderCountdown($row['EndDate'], $row['Invoice_ID']);
                                         } else {
                                             echo '<span class="text-muted">N/A</span>';
                                         }
