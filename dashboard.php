@@ -25,8 +25,6 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
     echo "</div>";
 }
 
-
-
 require 'database/database.php'; 
 session_start();
 
@@ -124,112 +122,107 @@ if (isset($_SESSION['feedback_success'])) {
     unset($_SESSION['feedback_success']);
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC (FIXED) ---
+// --- PHOTO UPLOAD/DELETE LOGIC FOR CLIENTSPACE BUSINESS PHOTOS ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
 // Photo Upload Processing
-if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {    $space_id = intval($_POST['space_id']);
+if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {
+    $space_id = intval($_POST['space_id']);
     $file = $_FILES['unit_photo'];
 
-    // Validate space_id belongs to client
+    // Validate space_id belongs to client and get CS_ID
     $rented_units = $db->getRentedUnits($client_id);
     $valid_space_ids = array_column($rented_units, 'Space_ID');
     
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
-    } else if ($file['error'] !== UPLOAD_ERR_OK) {
-        // Handle upload errors
-        switch($file['error']) {
-            case UPLOAD_ERR_INI_SIZE:
-            case UPLOAD_ERR_FORM_SIZE:
-                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
-                break;
-            case UPLOAD_ERR_PARTIAL:
-                $photo_upload_error = "File upload was interrupted. Please try again.";
-                break;
-            case UPLOAD_ERR_NO_FILE:
-                $photo_upload_error = "No file selected. Please choose an image to upload.";
-                break;
-            case UPLOAD_ERR_NO_TMP_DIR:
-                $photo_upload_error = "Server configuration error. Please contact support.";
-                break;
-            case UPLOAD_ERR_CANT_WRITE:
-                $photo_upload_error = "Failed to save file. Please try again.";
-                break;
-            default:
-                $photo_upload_error = "Unknown upload error occurred.";
-        }
     } else {
-        // Get current photo count (FIXED - now includes BusinessPhoto)
-        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-        $used_slots = count($current_photos);
-        
-        if ($used_slots >= 6) {
-            $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
-        } else {
-            // Validate file type and size
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-            $max_size = 2 * 1024 * 1024; // 2MB
-            
-            // Get actual file type using finfo
-            if (function_exists('finfo_open')) {
-                $finfo = new finfo(FILEINFO_MIME_TYPE);
-                $actual_type = $finfo->file($file['tmp_name']);
-            } else {
-                $actual_type = $file['type']; // Fallback
+        // Get the CS_ID for this client and space
+        $cs_id = null;
+        foreach ($rented_units as $unit) {
+            if ($unit['Space_ID'] == $space_id) {
+                $cs_id = $unit['CS_ID'];
+                break;
             }
+        }
+        
+        if (!$cs_id) {
+            $photo_upload_error = "Could not find client space record.";
+        } else {
+            // Get current photo count from clientspace
+            $current_photos_data = $db->getClientSpaceBusinessPhotos($cs_id);
+            $current_photos = [];
+            if ($current_photos_data && !empty($current_photos_data['BusinessPhoto'])) {
+                $current_photos = json_decode($current_photos_data['BusinessPhoto'], true) ?: [];
+            }
+            $used_slots = count($current_photos);
             
-            if (!in_array($actual_type, $allowed_types)) {
-                $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF images are allowed.";
-            } else if ($file['size'] > $max_size) {
-                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+            if ($used_slots >= 6) {
+                $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
             } else {
-                // Validate image dimensions
-                $image_info = getimagesize($file['tmp_name']);
-                if ($image_info === false) {
-                    $photo_upload_error = "Invalid image file. File appears to be corrupted.";
-                } else if ($image_info[0] > 2048 || $image_info[1] > 2048) {
-                    $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels allowed.";
+                // Validate file type and size
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+                $max_size = 2 * 1024 * 1024; // 2MB
+                
+                // Get actual file type
+                if (function_exists('finfo_open')) {
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $actual_type = $finfo->file($file['tmp_name']);
                 } else {
-                    // Generate secure filename
-                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
-                    
-                    if (!in_array($ext, $allowed_extensions)) {
-                        $photo_upload_error = "Invalid file extension. Only .jpg, .jpeg, .png, and .gif files are allowed.";
+                    $actual_type = $file['type'];
+                }
+                
+                if (!in_array($actual_type, $allowed_types)) {
+                    $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF images are allowed.";
+                } else if ($file['size'] > $max_size) {
+                    $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+                } else {
+                    // Validate image dimensions
+                    $image_info = getimagesize($file['tmp_name']);
+                    if ($image_info === false) {
+                        $photo_upload_error = "Invalid image file. File appears to be corrupted.";
+                    } else if ($image_info[0] > 2048 || $image_info[1] > 2048) {
+                        $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels allowed.";
                     } else {
-                        // Create upload directory if it doesn't exist
-                        $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                        if (!is_dir($upload_dir)) {
-                            if (!mkdir($upload_dir, 0755, true)) {
-                                $photo_upload_error = "Failed to create upload directory. Please contact support.";
-                            }
-                        }
+                        // Generate secure filename
+                        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
                         
-                        if (empty($photo_upload_error)) {
-                            // Generate unique filename
-                            $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
-                            $filepath = $upload_dir . $filename;
-                            
-                            if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                                // Save to database
-                                if ($db->addUnitPhoto($space_id, $client_id, $filename)) {
-                                    $photo_upload_success = "Photo uploaded successfully for this unit!";
-                                    $_SESSION['photo_upload_success'] = $photo_upload_success;
-                                    // Redirect to prevent resubmission
-                                    header("Location: " . $_SERVER['PHP_SELF']);
-                                    exit();
-                                } else {
-                                    // Delete uploaded file if database insert failed
-                                    if (file_exists($filepath)) {
-                                        unlink($filepath);
-                                    }
-                                    $photo_upload_error = "Database error occurred. Photo was not saved.";
+                        if (!in_array($ext, $allowed_extensions)) {
+                            $photo_upload_error = "Invalid file extension. Only .jpg, .jpeg, .png, and .gif files are allowed.";
+                        } else {
+                            // Create upload directory if it doesn't exist
+                            $upload_dir = __DIR__ . "/uploads/business_photos/";
+                            if (!is_dir($upload_dir)) {
+                                if (!mkdir($upload_dir, 0755, true)) {
+                                    $photo_upload_error = "Failed to create upload directory. Please contact support.";
                                 }
-                            } else {
-                                $photo_upload_error = "Failed to move uploaded file. Check file permissions.";
+                            }
+                            
+                            if (empty($photo_upload_error)) {
+                                // Generate unique filename
+                                $filename = "business_{$cs_id}_" . uniqid() . "." . $ext;
+                                $filepath = $upload_dir . $filename;
+                                
+                                if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                                    // Save to clientspace BusinessPhoto JSON
+                                    if ($db->updateClientSpaceBusinessPhotos($cs_id, $filename)) {
+                                        $photo_upload_success = "Photo uploaded successfully for this unit!";
+                                        $_SESSION['photo_upload_success'] = $photo_upload_success;
+                                        // Redirect to prevent resubmission
+                                        header("Location: " . $_SERVER['PHP_SELF']);
+                                        exit();
+                                    } else {
+                                        // Delete uploaded file if database insert failed
+                                        if (file_exists($filepath)) {
+                                            unlink($filepath);
+                                        }
+                                        $photo_upload_error = "Database error occurred. Photo was not saved.";
+                                    }
+                                } else {
+                                    $photo_upload_error = "Failed to move uploaded file. Check file permissions.";
+                                }
                             }
                         }
                     }
@@ -244,46 +237,67 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
     
-    // Validate space_id belongs to client
+    // Validate space_id belongs to client and get CS_ID
     $rented_units = $db->getRentedUnits($client_id);
     $valid_space_ids = array_column($rented_units, 'Space_ID');
     
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
-    } else if (empty($photo_filename)) {
-        $photo_upload_error = "Invalid photo filename.";
     } else {
-        // Validate filename to prevent directory traversal
-        if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
-            $photo_upload_error = "Invalid photo filename format.";
+        // Get the CS_ID for this client and space
+        $cs_id = null;
+        foreach ($rented_units as $unit) {
+            if ($unit['Space_ID'] == $space_id) {
+                $cs_id = $unit['CS_ID'];
+                break;
+            }
+        }
+        
+        if (!$cs_id) {
+            $photo_upload_error = "Could not find client space record.";
+        } else if (empty($photo_filename)) {
+            $photo_upload_error = "Invalid photo filename.";
         } else {
-            // Verify the photo belongs to this client and space
-            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-            
-            if (!in_array($photo_filename, $current_photos)) {
-                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
+            // Validate filename format
+            if (!preg_match('/^business_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+                $photo_upload_error = "Invalid photo filename format.";
             } else {
-                // Delete from database first
-                if ($db->deleteUnitPhoto($space_id, $client_id, $photo_filename)) {
-                    // Delete file from filesystem
-                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                    $file_to_delete = $upload_dir . basename($photo_filename);
-                    if (file_exists($file_to_delete)) {
-                        if (unlink($file_to_delete)) {
-                            $photo_upload_success = "Photo deleted successfully!";
-                        } else {
-                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
-                        }
-                    } else {
-                        $photo_upload_success = "Photo deleted successfully!";
-                    }
-                    $_SESSION['photo_upload_success'] = $photo_upload_success;
-                    // Redirect to prevent resubmission
-                    header("Location: " . $_SERVER['PHP_SELF']);
-                    exit();
+                // Get current photos and find the index to delete
+                $current_photos_data = $db->getClientSpaceBusinessPhotos($cs_id);
+                $current_photos = [];
+                if ($current_photos_data && !empty($current_photos_data['BusinessPhoto'])) {
+                    $current_photos = json_decode($current_photos_data['BusinessPhoto'], true) ?: [];
+                }
+                
+                $photo_index = array_search($photo_filename, $current_photos);
+                
+                if ($photo_index === false) {
+                    $photo_upload_error = "Photo not found or you don't have permission to delete it.";
                 } else {
-                    $photo_upload_error = "Failed to delete photo from database.";
+                    // Remove photo from array
+                    array_splice($current_photos, $photo_index, 1);
+                    
+                    // Update database with new array
+                    if ($db->updateClientSpaceBusinessPhotoArray($cs_id, $current_photos)) {
+                        // Delete file from filesystem
+                        $upload_dir = __DIR__ . "/uploads/business_photos/";
+                        $file_to_delete = $upload_dir . basename($photo_filename);
+                        if (file_exists($file_to_delete)) {
+                            if (unlink($file_to_delete)) {
+                                $photo_upload_success = "Photo deleted successfully!";
+                            } else {
+                                $photo_upload_success = "Photo deleted from database, but file removal failed.";
+                            }
+                        } else {
+                            $photo_upload_success = "Photo deleted successfully!";
+                        }
+                        $_SESSION['photo_upload_success'] = $photo_upload_success;
+                        // Redirect to prevent resubmission
+                        header("Location: " . $_SERVER['PHP_SELF']);
+                        exit();
+                    } else {
+                        $photo_upload_error = "Failed to delete photo from database.";
+                    }
                 }
             }
         }
@@ -318,18 +332,18 @@ try {
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
     
-    // Get maintenance history and photos only if there are rented units
+    // Get maintenance history and business photos only if there are rented units
     $maintenance_history = [];
-    $unit_photos = [];
+    $business_photos = [];
     
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
+        $business_photos = $db->getBusinessPhotosForClient($client_id);
         
         // Ensure arrays are returned
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
-        $unit_photos = is_array($unit_photos) ? $unit_photos : [];
+        $business_photos = is_array($business_photos) ? $business_photos : [];
     }
     
 } catch (Exception $e) {
@@ -338,8 +352,9 @@ try {
     $feedback_prompts = [];
     $rented_units = [];
     $maintenance_history = [];
-    $unit_photos = [];
+    $business_photos = [];
 }
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -1133,9 +1148,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
                                 </div>
                             </div>
-                            <<button class="btn btn-primary" type="submit" name="submit_feedback" value="1">
-    <i class="bi bi-send me-1"></i>Submit Feedback
-</button>
+                            <button class="btn btn-primary" type="submit" name="submit_feedback" value="1">
+                                <i class="bi bi-send me-1"></i>Submit Feedback
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -1156,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="row g-4">
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
-                    $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                    $photos = isset($business_photos[$space_id]) ? $business_photos[$space_id] : [];
                     
                     // Get dates safely
                     $rental_start = isset($rent['StartDate']) ? htmlspecialchars($rent['StartDate']) : 'N/A';
@@ -1222,9 +1237,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div class="photo-gallery">
                                             <?php foreach ($photos as $photo): ?>
                                                 <div class="photo-item">
-                                                    <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" 
+                                                    <img src="uploads/business_photos/<?= htmlspecialchars($photo) ?>" 
                                                          alt="Unit Photo"
-                                                         onclick="showImageModal('uploads/unit_photos/<?= htmlspecialchars($photo) ?>')">
+                                                         onclick="showImageModal('uploads/business_photos/<?= htmlspecialchars($photo) ?>')">
                                                     <form method="post" class="d-inline">
                                                         <input type="hidden" name="space_id" value="<?= $space_id ?>">
                                                         <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
@@ -1311,8 +1326,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="empty-state">
                 <i class="bi bi-house-x"></i>
                 <h5>No Active Rentals</h5>
-             <p>You currently have no active rental units. <a href="tel:9451357685">Contact the Admin</a> to explore available properties.</p>
-
+                <p>You currently have no active rental units. <a href="tel:9451357685">Contact the Admin</a> to explore available properties.</p>
             </div>
         <?php endif; ?>
 

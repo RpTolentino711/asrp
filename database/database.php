@@ -86,102 +86,77 @@ public function updatePasswordByEmail($email, $hashedPassword) {
 
 
 
-
-
-
-
-public function getUnitPhotosForClient($client_id) {
+public function updateClientSpaceBusinessPhotos($cs_id, $filename) {
     try {
-        $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-                FROM clientspace
-                WHERE Client_ID = ?";
+        // Get current photos
+        $current_data = $this->getClientSpaceBusinessPhotos($cs_id);
+        $current_photos = [];
+        
+        if ($current_data && !empty($current_data['BusinessPhoto'])) {
+            $current_photos = json_decode($current_data['BusinessPhoto'], true) ?: [];
+        }
+        
+        // Add new photo
+        $current_photos[] = $filename;
+        
+        // Update database
+        $sql = "UPDATE clientspace SET BusinessPhoto = ? WHERE CS_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $json_photos = json_encode($current_photos);
+        return $stmt->execute([$json_photos, $cs_id]);
+    } catch (PDOException $e) {
+        error_log("updateClientSpaceBusinessPhotos PDOException: " . $e->getMessage());
+        return false;
+    }
+}
+
+
+public function updateClientSpaceBusinessPhotoArray($cs_id, $photo_array) {
+    try {
+        $sql = "UPDATE clientspace SET BusinessPhoto = ? WHERE CS_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $json_photos = !empty($photo_array) ? json_encode($photo_array) : null;
+        return $stmt->execute([$json_photos, $cs_id]);
+    } catch (PDOException $e) {
+        error_log("updateClientSpaceBusinessPhotoArray PDOException: " . $e->getMessage());
+        return false;
+    }
+}
+
+
+public function getBusinessPhotosForClient($client_id) {
+    try {
+        $sql = "SELECT cs.CS_ID, cs.Space_ID, cs.BusinessPhoto 
+                FROM clientspace cs 
+                WHERE cs.Client_ID = ? AND cs.active = 1";
+        
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$client_id]);
-        $photos = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $photos[$row['Space_ID']] = array_values(array_filter([
-                $row['BusinessPhoto'],    // Include the main BusinessPhoto
-                $row['BusinessPhoto1'],
-                $row['BusinessPhoto2'],
-                $row['BusinessPhoto3'],
-                $row['BusinessPhoto4'],
-                $row['BusinessPhoto5'],
-            ]));
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $photos_by_space = [];
+        foreach ($result as $row) {
+            $space_id = $row['Space_ID'];
+            $photos = [];
+            
+            // Handle JSON photo array from BusinessPhoto column
+            if (!empty($row['BusinessPhoto'])) {
+                $decoded_photos = json_decode($row['BusinessPhoto'], true);
+                if (is_array($decoded_photos)) {
+                    $photos = array_values(array_filter($decoded_photos));
+                }
+            }
+            
+            $photos_by_space[$space_id] = $photos;
         }
-        return $photos;
+        
+        return $photos_by_space;
     } catch (PDOException $e) {
-        error_log("getUnitPhotosForClient PDOException: " . $e->getMessage());
+        error_log("getBusinessPhotosForClient PDOException: " . $e->getMessage());
         return [];
     }
 }
 
-public function getAllUnitPhotosForUnits($unit_ids) {
-    if (empty($unit_ids)) return [];
-    
-    // Prepare placeholders for array of unit IDs
-    $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
-            FROM clientspace 
-            WHERE Space_ID IN ($placeholders)";
-    
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute($unit_ids);
-    
-    $photos = [];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $photos[$row['Space_ID']] = array_values(array_filter([
-            $row['BusinessPhoto'],    // Added the main BusinessPhoto
-            $row['BusinessPhoto1'],
-            $row['BusinessPhoto2'],
-            $row['BusinessPhoto3'],
-            $row['BusinessPhoto4'],
-            $row['BusinessPhoto5'],
-        ]));
-    }
-    return $photos;
-}
-
-public function addUnitPhoto($space_id, $client_id, $filename) {
-    try {
-        $sql = "SELECT BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
-                FROM clientspace WHERE Space_ID = ? AND Client_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$space_id, $client_id]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) {
-            error_log("addUnitPhoto: No clientspace record found for Space_ID: $space_id, Client_ID: $client_id");
-            return false;
-        }
-        
-        // Check BusinessPhoto first, then BusinessPhoto1-5
-        if (empty($row["BusinessPhoto"])) {
-            $update = "UPDATE clientspace SET BusinessPhoto = ? WHERE Space_ID = ? AND Client_ID = ?";
-            $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
-            if (!$result) {
-                error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
-            }
-            return $result;
-        }
-        
-        // Then check BusinessPhoto1-5
-        for ($i = 1; $i <= 5; $i++) {
-            if (empty($row["BusinessPhoto$i"])) {
-                $update = "UPDATE clientspace SET BusinessPhoto$i = ? WHERE Space_ID = ? AND Client_ID = ?";
-                $result = $this->executeStatement($update, [$filename, $space_id, $client_id]);
-                if (!$result) {
-                    error_log("addUnitPhoto failed: " . print_r([$update, $filename, $space_id, $client_id], true));
-                }
-                return $result;
-            }
-        }
-        
-        error_log("addUnitPhoto: All photo slots are full for Space_ID: $space_id");
-        return false; // All slots full
-    } catch (PDOException $e) {
-        error_log("addUnitPhoto PDOException: " . $e->getMessage());
-        return false;
-    }
-}
 
 public function deleteUnitPhoto($space_id, $client_id, $photo_filename) {
     try {
@@ -434,7 +409,7 @@ public function runQueryAll($query, $params = []) {
     
 
 public function getRentedUnits($client_id) {
-    $sql = "SELECT s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
+    $sql = "SELECT cs.CS_ID, s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
                    sa.StartDate, sa.EndDate
             FROM clientspace cs
             JOIN space s ON cs.Space_ID = s.Space_ID
@@ -460,7 +435,6 @@ public function getRentedUnits($client_id) {
             ORDER BY sa.EndDate DESC";
     return $this->runQuery($sql, [$client_id], true);
 }
-
 
 
     public function getClientRentedUnitIds($client_id) {
@@ -549,6 +523,41 @@ public function getHomepageRentedUnits($limit = 12) {
         return $stmt->fetchAll();
     } catch (PDOException $e) { 
         return []; 
+    }
+}
+
+public function getBusinessPhotosForSpaces($space_ids) {
+    if (empty($space_ids)) return [];
+    
+    try {
+        $placeholders = implode(',', array_fill(0, count($space_ids), '?'));
+        $sql = "SELECT cs.Space_ID, cs.BusinessPhoto 
+                FROM clientspace cs 
+                WHERE cs.Space_ID IN ($placeholders) AND cs.active = 1";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($space_ids);
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $photos_by_space = [];
+        foreach ($result as $row) {
+            $space_id = $row['Space_ID'];
+            $photos = [];
+            
+            if (!empty($row['BusinessPhoto'])) {
+                $decoded_photos = json_decode($row['BusinessPhoto'], true);
+                if (is_array($decoded_photos)) {
+                    $photos = array_values(array_filter($decoded_photos));
+                }
+            }
+            
+            $photos_by_space[$space_id] = $photos;
+        }
+        
+        return $photos_by_space;
+    } catch (PDOException $e) {
+        error_log("getBusinessPhotosForSpaces PDOException: " . $e->getMessage());
+        return [];
     }
 }
 
