@@ -562,6 +562,17 @@ public function getBusinessPhotosForSpaces($space_ids) {
 }
 
 
+public function getClientSpaceBusinessPhotos($cs_id) {
+    try {
+        $sql = "SELECT BusinessPhoto FROM clientspace WHERE CS_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$cs_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("getClientSpaceBusinessPhotos PDOException: " . $e->getMessage());
+        return null;
+    }
+}
 
     // --- Feedback and Testimonials ---
     public function saveFeedback($invoice_id, $rating, $comments) {
