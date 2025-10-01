@@ -1740,7 +1740,6 @@ public function deleteSpacePhoto($space_id, $photo_index) {
     $stmt = $this->pdo->prepare("SELECT Photo FROM space WHERE Space_ID = ?");
     $stmt->execute([$space_id]);
     $space = $stmt->fetch(PDO::FETCH_ASSOC);
-
     $photos = [];
     if ($space && !empty($space['Photo'])) {
         $photos = json_decode($space['Photo'], true) ?: [];
