@@ -913,14 +913,16 @@ public function removeSpacePhoto($space_id, $photo_filename) {
         }
     }
 
- public function getAllJobTypes() {
-    $sql = "SELECT JobType_ID, JobType_Name, Icon FROM jobtype ORDER BY JobType_Name";
-    try {
-        return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        return [];
+
+       public function getAllJobTypes() {
+        $sql = "SELECT JobType_ID, JobType_Name FROM jobtype ORDER BY JobType_Name";
+        try {
+            return $this->pdo->query($sql)->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
+
 
 
     public function addJobType($jobTypeName) {
@@ -1481,25 +1483,24 @@ public function acceptRentalRequest($request_id) {
     }
 
 
-public function addJobTypeWithIcon($name, $icon) {
-    $stmt = $this->conn->prepare("INSERT INTO jobtype (JobType_Name, Icon) VALUES (?, ?)");
-    return $stmt->execute([$name, $icon]);
-}
 
 
-   public function getAllHandymenWithJobTypes() {
-    $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, h.Phone,
-                   jt.JobType_ID, jt.JobType_Name, jt.Icon
-            FROM handyman h
-            LEFT JOIN handymanjob hj ON h.Handyman_ID = hj.Handyman_ID
-            LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
-            ORDER BY h.Handyman_fn";
-    try {
-        return $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        return [];
+
+    public function getAllHandymenWithJobTypes() {
+        $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, 
+                       GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ') AS JobTypes
+                FROM handyman h
+                LEFT JOIN handymanjob hj ON h.Handyman_ID = hj.Handyman_ID
+                LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
+                GROUP BY h.Handyman_ID
+                ORDER BY h.Handyman_fn";
+        try {
+            return $this->pdo->query($sql)->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
+
 
     public function updateMaintenanceRequest($request_id, $new_status, $handyman_id) {
         $current = $this->runQuery("SELECT Status FROM maintenancerequest WHERE Request_ID = ?", [$request_id]);
