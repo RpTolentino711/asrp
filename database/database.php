@@ -1266,15 +1266,18 @@ public function getMaintenanceStats($startDate, $endDate) {
 }
 
 public function getTotalRentalRequests($startDate, $endDate) {
+    // Include the time component to cover the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         COUNT(*) as total_rental_requests,
-        COUNT(CASE WHEN Status = 'Pending' AND Flow_Status = 'new' THEN 1 END) as pending_rentals,
+        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
         COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
         COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
         FROM rentalrequest 
         WHERE Requested_At BETWEEN ? AND ?";
     
-    $result = $this->getRow($sql, [$startDate, $endDate]);
+    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
     return [
         'total' => $result['total_rental_requests'] ?? 0,
         'pending' => $result['pending_rentals'] ?? 0,
