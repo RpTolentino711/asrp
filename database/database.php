@@ -1483,6 +1483,28 @@ public function acceptRentalRequest($request_id) {
     }
 
 
+public function getMonthlyEarningsStats($startDate, $endDate) {
+    $sql = "SELECT 
+        COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
+        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
+        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ? AND is_deleted = 0) as new_messages_count
+        FROM invoice 
+        WHERE Status = 'paid' 
+        AND Created_At BETWEEN ? AND ?";
+    
+    return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
+}
+
+public function getAdminDashboardCounts() {
+    // Enhanced counts with accurate overdue tracking
+    $sql = "SELECT 
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending') as pending_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices";
+    
+    return $this->getRow($sql);
+}
 
 
 
