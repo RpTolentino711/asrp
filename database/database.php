@@ -86,38 +86,27 @@ public function updatePasswordByEmail($email, $hashedPassword) {
 
 
 
-public function updateUnitPhotos($space_id, $client_id, $json_photos) {
-    try {
-        $sql = "UPDATE clientspace SET BusinessPhoto = ? WHERE Space_ID = ? AND Client_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        $result = $stmt->execute([$json_photos, $space_id, $client_id]);
-        
-        if (!$result) {
-            error_log("updateUnitPhotos failed: " . print_r([$sql, $json_photos, $space_id, $client_id], true));
-        }
-        return $result;
-    } catch (PDOException $e) {
-        error_log("updateUnitPhotos PDOException: " . $e->getMessage());
-        return false;
-    }
-}
+
 
 
 
 public function getUnitPhotosForClient($client_id) {
     try {
-        $sql = "SELECT Space_ID, BusinessPhoto
+        $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5
                 FROM clientspace
                 WHERE Client_ID = ?";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$client_id]);
         $photos = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            // Decode the JSON array from BusinessPhoto column
-            $photo_array = !empty($row['BusinessPhoto']) ? json_decode($row['BusinessPhoto'], true) : [];
-            
-            // Ensure it's a valid array
-            $photos[$row['Space_ID']] = is_array($photo_array) ? $photo_array : [];
+            $photos[$row['Space_ID']] = array_values(array_filter([
+                $row['BusinessPhoto'],    // Include the main BusinessPhoto
+                $row['BusinessPhoto1'],
+                $row['BusinessPhoto2'],
+                $row['BusinessPhoto3'],
+                $row['BusinessPhoto4'],
+                $row['BusinessPhoto5'],
+            ]));
         }
         return $photos;
     } catch (PDOException $e) {
@@ -126,13 +115,12 @@ public function getUnitPhotosForClient($client_id) {
     }
 }
 
-
 public function getAllUnitPhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
     
     // Prepare placeholders for array of unit IDs
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, BusinessPhoto 
+    $sql = "SELECT Space_ID, BusinessPhoto, BusinessPhoto1, BusinessPhoto2, BusinessPhoto3, BusinessPhoto4, BusinessPhoto5 
             FROM clientspace 
             WHERE Space_ID IN ($placeholders)";
     
@@ -141,17 +129,17 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     
     $photos = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        // Decode the JSON array from BusinessPhoto column
-        $photo_array = !empty($row['BusinessPhoto']) ? json_decode($row['BusinessPhoto'], true) : [];
-        
-        // Ensure it's a valid array
-        $photos[$row['Space_ID']] = is_array($photo_array) ? $photo_array : [];
+        $photos[$row['Space_ID']] = array_values(array_filter([
+            $row['BusinessPhoto'],    // Added the main BusinessPhoto
+            $row['BusinessPhoto1'],
+            $row['BusinessPhoto2'],
+            $row['BusinessPhoto3'],
+            $row['BusinessPhoto4'],
+            $row['BusinessPhoto5'],
+        ]));
     }
     return $photos;
 }
-
-
-
 
 public function addUnitPhoto($space_id, $client_id, $filename) {
     try {
@@ -913,8 +901,7 @@ public function removeSpacePhoto($space_id, $photo_filename) {
         }
     }
 
-
-       public function getAllJobTypes() {
+    public function getAllJobTypes() {
         $sql = "SELECT JobType_ID, JobType_Name FROM jobtype ORDER BY JobType_Name";
         try {
             return $this->pdo->query($sql)->fetchAll();
@@ -922,7 +909,6 @@ public function removeSpacePhoto($space_id, $photo_filename) {
             return [];
         }
     }
-
 
 
     public function addJobType($jobTypeName) {
@@ -1484,6 +1470,7 @@ public function acceptRentalRequest($request_id) {
 
 
 
+
     public function getAllHandymenWithJobTypes() {
         $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, 
                        GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ') AS JobTypes
@@ -1498,7 +1485,6 @@ public function acceptRentalRequest($request_id) {
             return [];
         }
     }
-
 
     public function updateMaintenanceRequest($request_id, $new_status, $handyman_id) {
         $current = $this->runQuery("SELECT Status FROM maintenancerequest WHERE Request_ID = ?", [$request_id]);
@@ -1993,86 +1979,6 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
   
     
 
-    public function getMonthlyEarningsStats($startDate, $endDate) {
-    try {
-        // Get total earnings and paid invoices count
-        $sql1 = "SELECT 
-            COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
-            COUNT(*) as paid_invoices_count
-            FROM invoice 
-            WHERE Status = 'paid' 
-            AND Created_At BETWEEN ? AND ?";
-        
-        $stmt1 = $this->conn->prepare($sql1);
-        $stmt1->execute([$startDate, $endDate]);
-        $invoiceData = $stmt1->fetch(PDO::FETCH_ASSOC);
-        
-        // Get new messages count
-        $sql2 = "SELECT COUNT(*) as new_messages_count 
-                FROM free_message 
-                WHERE Sent_At BETWEEN ? AND ? 
-                AND is_deleted = 0";
-        
-        $stmt2 = $this->conn->prepare($sql2);
-        $stmt2->execute([$startDate, $endDate]);
-        $messageData = $stmt2->fetch(PDO::FETCH_ASSOC);
-        
-        return [
-            'total_earnings' => $invoiceData['total_earnings'] ?? 0,
-            'paid_invoices_count' => $invoiceData['paid_invoices_count'] ?? 0,
-            'new_messages_count' => $messageData['new_messages_count'] ?? 0
-        ];
-        
-    } catch (PDOException $e) {
-        error_log("Database Error: " . $e->getMessage());
-        return [
-            'total_earnings' => 0,
-            'paid_invoices_count' => 0,
-            'new_messages_count' => 0
-        ];
-    }
-}
-
-public function getAdminDashboardCounts() {
-    try {
-        $counts = [];
-        
-        // Pending rentals
-        $sql1 = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending'";
-        $stmt1 = $this->conn->prepare($sql1);
-        $stmt1->execute();
-        $counts['pending_rentals'] = $stmt1->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-        
-        // Pending maintenance
-        $sql2 = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')";
-        $stmt2 = $this->conn->prepare($sql2);
-        $stmt2->execute();
-        $counts['pending_maintenance'] = $stmt2->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-        
-        // Unpaid invoices
-        $sql3 = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'";
-        $stmt3 = $this->conn->prepare($sql3);
-        $stmt3->execute();
-        $counts['unpaid_invoices'] = $stmt3->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-        
-        // Overdue invoices
-        $sql4 = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()";
-        $stmt4 = $this->conn->prepare($sql4);
-        $stmt4->execute();
-        $counts['overdue_invoices'] = $stmt4->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
-        
-        return $counts;
-        
-    } catch (PDOException $e) {
-        error_log("Database Error: " . $e->getMessage());
-        return [
-            'pending_rentals' => 0,
-            'pending_maintenance' => 0,
-            'unpaid_invoices' => 0,
-            'overdue_invoices' => 0
-        ];
-    }
-}
 
 }
 
