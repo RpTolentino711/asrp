@@ -1218,17 +1218,22 @@ public function getPendingRentalRequests() {
     
 
 public function getMonthlyEarningsStats($startDate, $endDate) {
+    // Include the time component to cover the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ? AND is_deleted = 1) as new_messages_count
+        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ?) as new_messages_count
         FROM invoice 
         WHERE Status = 'paid' 
         AND Created_At BETWEEN ? AND ?";
     
-    return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
+    return $this->getRow($sql, [
+        $startDate, $endDateWithTime, 
+        $startDate, $endDateWithTime
+    ]);
 }
-
 
 
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
@@ -1238,6 +1243,9 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         $endDate = date('Y-m-t');
     }
     
+    // Add time component to include the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
@@ -1245,12 +1253,13 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as overdue_invoices";
     
     return $this->getRow($sql, [
-        $startDate, $endDate, 
-        $startDate, $endDate,
-        $startDate, $endDate,
-        $startDate, $endDate
+        $startDate, $endDateWithTime, 
+        $startDate, $endDateWithTime,
+        $startDate, $endDateWithTime,
+        $startDate, $endDateWithTime
     ]);
 }
+
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
@@ -1289,6 +1298,9 @@ public function getTotalRentalRequests($startDate, $endDate) {
 
 
 public function getTotalMaintenanceRequests($startDate, $endDate) {
+    // Add time component to include the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         COUNT(*) as total_maintenance,
         COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted_requests,
@@ -1297,7 +1309,7 @@ public function getTotalMaintenanceRequests($startDate, $endDate) {
         FROM maintenancerequest 
         WHERE RequestDate BETWEEN ? AND ?";
     
-    $result = $this->getRow($sql, [$startDate, $endDate]);
+    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
     return [
         'total' => $result['total_maintenance'] ?? 0,
         'submitted' => $result['submitted_requests'] ?? 0,
