@@ -1215,68 +1215,51 @@ public function getPendingRentalRequests() {
 
 
 
-
-
-
-public function getAdminDashboardCounts($startDate = null, $endDate = null) {
-    // If no dates provided, use current month
-    if (!$startDate || !$endDate) {
-        $startDate = date('Y-m-01');
-        $endDate = date('Y-m-t');
-    }
-    
-    $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND InvoiceDate BETWEEN ? AND ?) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND InvoiceDate BETWEEN ? AND ?) as overdue_invoices";
-    
-    return $this->getRow($sql, [
-        $startDate, $endDate, 
-        $startDate, $endDate,
-        $startDate, $endDate,
-        $startDate, $endDate
-    ]);
-}
-
-
-
-
-ublic function getMonthlyEarningsStats($startDate, $endDate) {
+public function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
         (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ? AND is_deleted = 0) as new_messages_count
         FROM invoice 
         WHERE Status = 'paid' 
-        AND InvoiceDate BETWEEN ? AND ?";
+        AND Created_At BETWEEN ? AND ?";
     
     return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
 }
 
+public function getAdminDashboardCounts() {
+    // Enhanced counts with accurate overdue tracking
+    $sql = "SELECT 
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending') as pending_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices";
+    
+    return $this->getRow($sql);
+}
 
 
     
-public function getLatestPendingRequests($limit = 5) {
-    $sql = "SELECT rr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName, 
-                   rr.StartDate, rr.EndDate, rr.Status, rr.Requested_At
-            FROM rentalrequest rr
-            LEFT JOIN client c ON rr.Client_ID = c.Client_ID
-            LEFT JOIN space s ON rr.Space_ID = s.Space_ID
-            WHERE rr.Status = 'Pending'
-            ORDER BY rr.Requested_At DESC
-            LIMIT ?";
 
-    try {
-        $stmt = $this->conn->prepare($sql);
-        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("Error in getLatestPendingRequests: " . $e->getMessage());
-        return [];
+    public function getLatestPendingRequests($limit = 5) {
+        $sql = "SELECT rr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName, 
+                       rr.StartDate, rr.EndDate, rr.Status, rr.Requested_At
+                FROM rentalrequest rr
+                LEFT JOIN client c ON rr.Client_ID = c.Client_ID
+                LEFT JOIN space s ON rr.Space_ID = s.Space_ID
+                WHERE rr.Status = 'Pending'
+                ORDER BY rr.Requested_At DESC
+                LIMIT :limit";
+
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
 
   
 
