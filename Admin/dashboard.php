@@ -48,9 +48,18 @@ $total_maintenance_requests = $maintenanceRequestsData['total'] ?? 0;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
     $msg_id = intval($_POST['soft_delete_msg_id']);
     $db->executeStatement("UPDATE free_message SET is_deleted = 1 WHERE Message_ID = ?", [$msg_id]);
-    $filterParam = isset($_GET['filter']) ? 'filter=' . urlencode($_GET['filter']) : '';
-    header("Location: dashboard.php" . ($filterParam ? "?$filterParam" : ""));
-    exit();
+    
+    // If it's an AJAX request, return JSON response
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'message_id' => $msg_id]);
+        exit();
+    } else {
+        // Traditional form submission
+        $filterParam = isset($_GET['filter']) ? 'filter=' . urlencode($_GET['filter']) : '';
+        header("Location: dashboard.php" . ($filterParam ? "?$filterParam" : ""));
+        exit();
+    }
 }
 
 $latest_requests = $db->getLatestPendingRequests(5);
@@ -428,6 +437,8 @@ function timeAgo($datetime) {
         
         .monthly-stat {
             text-align: center;
+            position: relative;
+            cursor: help;
         }
         
         .monthly-stat-value {
@@ -445,6 +456,47 @@ function timeAgo($datetime) {
             font-size: 0.7rem;
             opacity: 0.7;
             margin-top: 0.25rem;
+            cursor: help;
+            position: relative;
+        }
+
+        /* Tooltip Styles */
+        .tooltip-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-hover {
+            position: relative;
+        }
+
+        .tooltip-hover:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .tooltip-hover:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            margin-bottom: -5px;
         }
         
         /* Dashboard Cards */
@@ -527,6 +579,7 @@ function timeAgo($datetime) {
             border-left: 3px solid transparent;
             border-bottom: 1px solid #f3f4f6;
             transition: var(--transition);
+            position: relative;
         }
         
         .message-item:hover {
@@ -553,6 +606,12 @@ function timeAgo($datetime) {
         .message-content {
             color: #4b5563;
             margin-bottom: 0.75rem;
+        }
+
+        .message-actions {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
         }
         
         /* Filter Buttons */
@@ -808,6 +867,10 @@ function timeAgo($datetime) {
             .stat-card:hover {
                 transform: none;
             }
+
+            .tooltip-hover::after {
+                display: none;
+            }
         }
         
         /* Animations */
@@ -1028,7 +1091,8 @@ function timeAgo($datetime) {
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $rentalRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Rental Requests</div>
-                        <div class="monthly-stat-subtext small">
+                        <div class="monthly-stat-subtext tooltip-hover" 
+                             data-tooltip="P: Pending (Awaiting approval) | A: Accepted (Approved requests) | R: Rejected (Declined requests)">
                             P:<?= $rentalRequestsData['pending'] ?? 0 ?> 
                             A:<?= $rentalRequestsData['accepted'] ?? 0 ?> 
                             R:<?= $rentalRequestsData['rejected'] ?? 0 ?>
@@ -1041,7 +1105,8 @@ function timeAgo($datetime) {
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $maintenanceRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Maintenance</div>
-                        <div class="monthly-stat-subtext small">
+                        <div class="monthly-stat-subtext tooltip-hover" 
+                             data-tooltip="S: Submitted (New requests) | IP: In Progress (Being worked on) | C: Completed (Finished requests)">
                             S:<?= $maintenanceRequestsData['submitted'] ?? 0 ?> 
                             IP:<?= $maintenanceRequestsData['in_progress'] ?? 0 ?> 
                             C:<?= $maintenanceRequestsData['completed'] ?? 0 ?>
@@ -1262,11 +1327,77 @@ function timeAgo($datetime) {
             .then(res => res.text())
             .then(html => {
                 document.getElementById('messageBoardContainer').innerHTML = html;
+                
+                // Add event listeners to delete buttons after loading messages
+                document.querySelectorAll('.delete-message-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const messageId = this.getAttribute('data-message-id');
+                        handleMessageDelete(messageId);
+                    });
+                });
             })
             .catch(err => {
                 document.getElementById('messageBoardContainer').innerHTML = 
                     '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading messages</p></div>';
             });
+    }
+
+    // Handle message deletion
+    function handleMessageDelete(messageId) {
+        if (!confirm('Are you sure you want to delete this message?')) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('soft_delete_msg_id', messageId);
+
+        fetch('dashboard.php', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Remove the message from the UI
+                const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (messageElement) {
+                    messageElement.style.opacity = '0';
+                    setTimeout(() => {
+                        messageElement.remove();
+                        // Refresh the messages to update the count
+                        fetchMessages();
+                    }, 300);
+                }
+                // Show success message
+                showNotification('Message deleted successfully', 'success');
+            }
+        })
+        .catch(err => {
+            console.error('Error deleting message:', err);
+            showNotification('Error deleting message', 'error');
+        });
+    }
+
+    // Notification function
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
     }
 
     // Initial load and set up polling
@@ -1429,6 +1560,12 @@ function timeAgo($datetime) {
                 }, 300);
             }
         }, 5000);
+    });
+
+    // Tooltip functionality for status breakdowns
+    document.addEventListener('DOMContentLoaded', function() {
+        // Tooltips are handled by CSS hover effects with data-tooltip attributes
+        console.log('Tooltips enabled for status breakdowns');
     });
     </script>
 </body>
