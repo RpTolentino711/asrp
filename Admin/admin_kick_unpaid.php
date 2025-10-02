@@ -300,6 +300,11 @@ function getCurrentUnitPrice($db, $space_id) {
             font-size: 0.8rem;
         }
 
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .filter-tabs {
             display: flex;
             gap: 1rem;
@@ -561,6 +566,12 @@ function getCurrentUnitPrice($db, $space_id) {
                             </thead>
                             <tbody>
                                 <?php foreach($all_renters as $row): ?>
+                                    <?php
+                                    // Determine if kick button should be enabled
+                                    $is_overdue = ($row['DaysOverdue'] > 0);
+                                    $is_due_today = ($row['DaysOverdue'] == 0);
+                                    $can_kick = ($is_overdue || $is_due_today) && $row['Status'] == 'unpaid';
+                                    ?>
                                     <tr class="renter-row" data-status="<?= $row['DaysOverdue'] > 0 ? 'overdue' : ($row['DaysOverdue'] == 0 ? 'due_today' : 'current') ?>">
                                         <td>
                                             <div class="d-flex align-items-center">
@@ -611,17 +622,20 @@ function getCurrentUnitPrice($db, $space_id) {
                                                 <input type="hidden" name="kick_client_id" value="<?= $row['Client_ID'] ?>">
                                                 <input type="hidden" name="kick_space_id" value="<?= $row['Space_ID'] ?>">
                                                 <input type="hidden" name="kick_request_id" value="<?= $row['Request_ID'] ?? '' ?>">
-                                                <?php if ($row['Status'] == 'unpaid' && $row['DaysOverdue'] >= 0): ?>
-                                                    <button type="submit" class="btn btn-sm btn-danger">
-                                                        <i class="fas fa-user-slash me-1"></i>Kick & Free Unit
-                                                    </button>
-                                                <?php elseif ($row['Status'] == 'unpaid'): ?>
-                                                    <button type="submit" class="btn btn-sm btn-warning">
-                                                        <i class="fas fa-exclamation-triangle me-1"></i>Force Kick
-                                                    </button>
+                                                
+                                                <?php if ($can_kick): ?>
+                                                    <?php if ($row['DaysOverdue'] > 0): ?>
+                                                        <button type="submit" class="btn btn-sm btn-danger">
+                                                            <i class="fas fa-user-slash me-1"></i>Kick & Free Unit
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <button type="submit" class="btn btn-sm btn-warning">
+                                                            <i class="fas fa-exclamation-triangle me-1"></i>Force Kick
+                                                        </button>
+                                                    <?php endif; ?>
                                                 <?php else: ?>
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                        <i class="fas fa-user-times me-1"></i>Admin Kick
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled title="Cannot kick - Client is not overdue">
+                                                        <i class="fas fa-ban me-1"></i>Kick Disabled
                                                     </button>
                                                 <?php endif; ?>
                                             </form>
