@@ -1993,6 +1993,87 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
   
     
 
+    public function getMonthlyEarningsStats($startDate, $endDate) {
+    try {
+        // Get total earnings and paid invoices count
+        $sql1 = "SELECT 
+            COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
+            COUNT(*) as paid_invoices_count
+            FROM invoice 
+            WHERE Status = 'paid' 
+            AND Created_At BETWEEN ? AND ?";
+        
+        $stmt1 = $this->conn->prepare($sql1);
+        $stmt1->execute([$startDate, $endDate]);
+        $invoiceData = $stmt1->fetch(PDO::FETCH_ASSOC);
+        
+        // Get new messages count
+        $sql2 = "SELECT COUNT(*) as new_messages_count 
+                FROM free_message 
+                WHERE Sent_At BETWEEN ? AND ? 
+                AND is_deleted = 0";
+        
+        $stmt2 = $this->conn->prepare($sql2);
+        $stmt2->execute([$startDate, $endDate]);
+        $messageData = $stmt2->fetch(PDO::FETCH_ASSOC);
+        
+        return [
+            'total_earnings' => $invoiceData['total_earnings'] ?? 0,
+            'paid_invoices_count' => $invoiceData['paid_invoices_count'] ?? 0,
+            'new_messages_count' => $messageData['new_messages_count'] ?? 0
+        ];
+        
+    } catch (PDOException $e) {
+        error_log("Database Error: " . $e->getMessage());
+        return [
+            'total_earnings' => 0,
+            'paid_invoices_count' => 0,
+            'new_messages_count' => 0
+        ];
+    }
+}
+
+public function getAdminDashboardCounts() {
+    try {
+        $counts = [];
+        
+        // Pending rentals
+        $sql1 = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending'";
+        $stmt1 = $this->conn->prepare($sql1);
+        $stmt1->execute();
+        $counts['pending_rentals'] = $stmt1->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
+        
+        // Pending maintenance
+        $sql2 = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')";
+        $stmt2 = $this->conn->prepare($sql2);
+        $stmt2->execute();
+        $counts['pending_maintenance'] = $stmt2->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
+        
+        // Unpaid invoices
+        $sql3 = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'";
+        $stmt3 = $this->conn->prepare($sql3);
+        $stmt3->execute();
+        $counts['unpaid_invoices'] = $stmt3->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
+        
+        // Overdue invoices
+        $sql4 = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()";
+        $stmt4 = $this->conn->prepare($sql4);
+        $stmt4->execute();
+        $counts['overdue_invoices'] = $stmt4->fetch(PDO::FETCH_ASSOC)['count'] ?? 0;
+        
+        return $counts;
+        
+    } catch (PDOException $e) {
+        error_log("Database Error: " . $e->getMessage());
+        return [
+            'pending_rentals' => 0,
+            'pending_maintenance' => 0,
+            'unpaid_invoices' => 0,
+            'overdue_invoices' => 0
+        ];
+    }
+}
+
 
 }
 
