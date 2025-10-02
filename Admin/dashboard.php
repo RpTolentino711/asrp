@@ -269,89 +269,7 @@ function timeAgo($datetime) {
             font-size: 1rem;
         }
         
-        /* Stats Summary Button */
-        .stats-summary-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: var(--border-radius);
-            padding: 1.5rem 2rem;
-            margin-bottom: 1.5rem;
-            width: 100%;
-            text-align: left;
-            cursor: pointer;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stats-summary-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        
-        .stats-summary-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.1);
-        }
-        
-        .stats-summary-content {
-            position: relative;
-            z-index: 2;
-        }
-        
-        .stats-summary-title {
-            font-size: 1.1rem;
-            margin-bottom: 1rem;
-            opacity: 0.9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .stats-summary-amount {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .stats-summary-period {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            margin-bottom: 1rem;
-        }
-        
-        .stats-summary-toggle {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            border-radius: 50%;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-        
-        .stats-summary-toggle.collapsed i {
-            transform: rotate(-90deg);
-        }
-        
-        /* Stats Dropdown Content */
-        .stats-dropdown-content {
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1.5rem;
-        }
-        
+        /* Month Picker Card */
         .month-picker-card {
             background: white;
             border-radius: var(--border-radius);
@@ -459,7 +377,44 @@ function timeAgo($datetime) {
             margin-top: 0.25rem;
         }
         
-        /* Monthly Stats */
+        /* Monthly Summary Section */
+        .monthly-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .monthly-summary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .monthly-summary-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .monthly-title {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        .monthly-amount {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
         .monthly-stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -704,14 +659,6 @@ function timeAgo($datetime) {
                 font-size: 1.5rem;
             }
 
-            .stats-summary-btn {
-                padding: 1rem 1.5rem;
-            }
-
-            .stats-summary-amount {
-                font-size: 2rem;
-            }
-
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 1rem;
@@ -734,6 +681,14 @@ function timeAgo($datetime) {
 
             .stat-label {
                 font-size: 0.8rem;
+            }
+
+            .monthly-summary {
+                padding: 1.5rem;
+            }
+
+            .monthly-amount {
+                font-size: 2rem;
             }
 
             .monthly-stats {
@@ -824,11 +779,11 @@ function timeAgo($datetime) {
                 padding: 0.75rem;
             }
 
-            .stats-summary-btn {
+            .monthly-summary {
                 padding: 1rem;
             }
 
-            .stats-summary-amount {
+            .monthly-amount {
                 font-size: 1.75rem;
             }
         }
@@ -1005,18 +960,60 @@ function timeAgo($datetime) {
             </div>
         </div>
         
-        <!-- Stats Summary Button -->
-        <button class="stats-summary-btn animate-fade-in" type="button" data-bs-toggle="collapse" data-bs-target="#statsDropdownContent">
-            <div class="stats-summary-content">
-                <div class="stats-summary-title">
-                    <span>Monthly Revenue - <?= $monthName ?></span>
-                    <button class="stats-summary-toggle collapsed" type="button">
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
+        <!-- Month/Year Picker Card -->
+        <div class="month-picker-card animate-fade-in">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="mb-3">Select Period for Statistics</h5>
+                    <form method="get" class="row g-3 align-items-end">
+                        <div class="col-md-4 col-6">
+                            <label for="month" class="form-label">Month</label>
+                            <select id="month" name="month" class="form-select">
+                                <?php for($m = 1; $m <= 12; $m++): ?>
+                                    <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
+                                        <?= date('F', mktime(0,0,0,$m,1)) ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-6">
+                            <label for="year" class="form-label">Year</label>
+                            <select id="year" name="year" class="form-select">
+                                <?php for($y = date('Y'); $y >= 2023; $y--): ?>
+                                    <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
+                                        <?= $y ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary flex-fill">
+                                    <i class="fas fa-filter me-1"></i> Apply Filter
+                                </button>
+                                <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
+                                   class="btn btn-danger" target="_blank" title="Export PDF Report">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
+                                    <i class="fas fa-sync"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                <div class="stats-summary-amount">₱<?= number_format($total_earnings, 2) ?></div>
-                <div class="stats-summary-period">Period: <?= date('M d', strtotime($startDate)) ?> - <?= date('M d, Y', strtotime($endDate)) ?></div>
-                
+                <div class="col-md-4 text-md-end">
+                    <div class="text-muted small">Period: <?= date('M d', strtotime($startDate)) ?> - <?= date('M d, Y', strtotime($endDate)) ?></div>
+                    <div class="text-success fw-bold mt-1">₱<?= number_format($total_earnings, 2) ?> Revenue</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Monthly Earnings Summary -->
+        <div class="monthly-summary animate-fade-in">
+            <div class="monthly-summary-content">
+                <div class="monthly-title">Monthly Revenue - <?= $monthName ?></div>
+                <div class="monthly-amount">₱<?= number_format($total_earnings, 2) ?></div>
                 <div class="monthly-stats">
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $total_rental_requests ?></div>
@@ -1033,59 +1030,6 @@ function timeAgo($datetime) {
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $new_messages_count ?></div>
                         <div class="monthly-stat-label">Messages</div>
-                    </div>
-                </div>
-            </div>
-        </button>
-
-        <!-- Stats Dropdown Content -->
-        <div class="collapse" id="statsDropdownContent">
-            <div class="stats-dropdown-content animate-fade-in">
-                <div class="month-picker-card">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h5 class="mb-3">Select Period for Statistics</h5>
-                            <form method="get" class="row g-3 align-items-end">
-                                <div class="col-md-4 col-6">
-                                    <label for="month" class="form-label">Month</label>
-                                    <select id="month" name="month" class="form-select">
-                                        <?php for($m = 1; $m <= 12; $m++): ?>
-                                            <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
-                                                <?= date('F', mktime(0,0,0,$m,1)) ?>
-                                            </option>
-                                        <?php endfor; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 col-6">
-                                    <label for="year" class="form-label">Year</label>
-                                    <select id="year" name="year" class="form-select">
-                                        <?php for($y = date('Y'); $y >= 2023; $y--): ?>
-                                            <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
-                                                <?= $y ?>
-                                            </option>
-                                        <?php endfor; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 col-12">
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary flex-fill">
-                                            <i class="fas fa-filter me-1"></i> Apply Filter
-                                        </button>
-                                        <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
-                                           class="btn btn-danger" target="_blank" title="Export PDF Report">
-                                            <i class="fas fa-file-pdf"></i>
-                                        </a>
-                                        <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
-                                            <i class="fas fa-sync"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="col-md-4 text-md-end">
-                            <div class="text-muted small">Current Selection</div>
-                            <div class="text-success fw-bold mt-1">₱<?= number_format($total_earnings, 2) ?> Revenue</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1264,15 +1208,6 @@ function timeAgo($datetime) {
             mobileOverlay.classList.remove('active');
         }
     });
-
-    // Stats summary toggle animation
-    const statsToggle = document.querySelector('.stats-summary-toggle');
-    if (statsToggle) {
-        statsToggle.addEventListener('click', function(e) {
-            e.stopPropagation();
-            this.classList.toggle('collapsed');
-        });
-    }
 
     // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
     function fetchDashboardCounts() {
