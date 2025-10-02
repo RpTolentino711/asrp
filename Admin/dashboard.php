@@ -33,7 +33,6 @@ $pending_maintenance = $counts['pending_maintenance'] ?? 0;
 $unpaid_invoices = $counts['unpaid_invoices'] ?? 0;
 $overdue_invoices = $counts['overdue_invoices'] ?? 0;
 $total_earnings = $monthlyStats['total_earnings'] ?? 0;
-$paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 
 // UPDATED: Handle the new array return types
@@ -438,7 +437,6 @@ function timeAgo($datetime) {
         .monthly-stat {
             text-align: center;
             position: relative;
-            cursor: help;
         }
         
         .monthly-stat-value {
@@ -457,17 +455,12 @@ function timeAgo($datetime) {
             opacity: 0.7;
             margin-top: 0.25rem;
             cursor: help;
-            position: relative;
         }
 
         /* Tooltip Styles */
-        .tooltip-wrapper {
-            position: relative;
-            display: inline-block;
-        }
-
         .tooltip-hover {
             position: relative;
+            cursor: help;
         }
 
         .tooltip-hover:hover::after {
@@ -640,62 +633,6 @@ function timeAgo($datetime) {
             border-color: var(--primary);
         }
 
-        /* Mobile Card Layout */
-        .mobile-card {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border-left: 4px solid var(--primary);
-        }
-
-        .mobile-card-header {
-            font-weight: 600;
-            font-size: 1rem;
-            color: var(--dark);
-            margin-bottom: 0.75rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .mobile-card-detail {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .mobile-card-detail .label {
-            font-weight: 500;
-            color: #6b7280;
-        }
-
-        .mobile-card-detail .value {
-            color: var(--dark);
-        }
-
-        /* Summary Cards */
-        .summary-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .summary-card {
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 1rem;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            border-top: 3px solid var(--primary);
-        }
-
-        .summary-card.warning { border-top-color: var(--warning); }
-        .summary-card.info { border-top-color: var(--info); }
-        
         /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
@@ -717,39 +654,9 @@ function timeAgo($datetime) {
                 padding: 1rem;
             }
 
-            .dashboard-header {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 1rem;
-                margin-bottom: 1.5rem;
-            }
-
-            .welcome-text h1 {
-                font-size: 1.5rem;
-            }
-
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 1rem;
-            }
-
-            .stat-card {
-                padding: 1rem;
-            }
-
-            .stat-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
-                margin-bottom: 0.75rem;
-            }
-
-            .stat-value {
-                font-size: 1.5rem;
-            }
-
-            .stat-label {
-                font-size: 0.8rem;
             }
 
             .monthly-summary {
@@ -763,66 +670,11 @@ function timeAgo($datetime) {
             .monthly-stats {
                 grid-template-columns: repeat(2, 1fr);
             }
-
-            .card-body {
-                padding: 1rem;
-            }
-
-            .card-header {
-                padding: 1rem;
-                font-size: 1rem;
-            }
-
-            .chart-container {
-                height: 250px;
-            }
-
-            .summary-cards {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 0.5rem;
-            }
-
-            .summary-card {
-                padding: 0.75rem;
-            }
         }
         
         @media (max-width: 768px) {
-            .main-content {
-                padding: 0.75rem;
-            }
-
             .stats-grid {
                 grid-template-columns: 1fr;
-            }
-
-            .chart-container {
-                height: 200px;
-            }
-
-            .message-board {
-                max-height: 300px;
-            }
-
-            .message-item {
-                padding: 0.75rem;
-            }
-
-            .form-control, .form-select {
-                font-size: 16px; /* Prevents zoom on iOS */
-            }
-
-            .summary-cards {
-                grid-template-columns: 1fr;
-            }
-
-            .filter-buttons {
-                justify-content: center;
-            }
-
-            .filter-btn {
-                flex: 1;
-                text-align: center;
             }
 
             .monthly-stats {
@@ -830,44 +682,8 @@ function timeAgo($datetime) {
             }
         }
 
-        @media (max-width: 480px) {
-            .welcome-text h1 {
-                font-size: 1.3rem;
-            }
-
-            .dashboard-card {
-                border-radius: 8px;
-            }
-
-            .btn {
-                font-size: 0.9rem;
-                padding: 0.75rem 1.5rem;
-            }
-
-            .form-control, .form-select {
-                padding: 0.75rem;
-            }
-
-            .monthly-summary {
-                padding: 1rem;
-            }
-
-            .monthly-amount {
-                font-size: 1.75rem;
-            }
-        }
-
         /* Touch-friendly improvements */
         @media (hover: none) and (pointer: coarse) {
-            .filter-btn, .nav-link, .mobile-menu-btn {
-                min-height: 44px;
-                min-width: 44px;
-            }
-
-            .stat-card:hover {
-                transform: none;
-            }
-
             .tooltip-hover::after {
                 display: none;
             }
@@ -881,40 +697,6 @@ function timeAgo($datetime) {
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Utilities */
-        .text-primary { color: var(--primary) !important; }
-        .text-danger { color: var(--danger) !important; }
-        .text-warning { color: var(--warning) !important; }
-        .text-info { color: var(--info) !important; }
-        .text-success { color: var(--secondary) !important; }
-        
-        .bg-primary-light { background: rgba(99, 102, 241, 0.1); }
-        .bg-danger-light { background: rgba(239, 68, 68, 0.1); }
-        .bg-warning-light { background: rgba(245, 158, 11, 0.1); }
-        .bg-info-light { background: rgba(6, 182, 212, 0.1); }
-        
-        .badge {
-            padding: 0.35rem 0.65rem;
-            font-weight: 600;
-            border-radius: 20px;
-            font-size: 0.75rem;
-        }
-        
-        .btn-primary {
-            background: var(--primary);
-            border-color: var(--primary);
-        }
-        
-        .btn-primary:hover {
-            background: var(--primary-dark);
-            border-color: var(--primary-dark);
-        }
-        
-        .btn-sm {
-            padding: 0.35rem 0.75rem;
-            font-size: 0.8rem;
         }
     </style>
 </head>
@@ -1092,15 +874,15 @@ function timeAgo($datetime) {
                         <div class="monthly-stat-value"><?= $rentalRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Rental Requests</div>
                         <div class="monthly-stat-subtext tooltip-hover" 
-                             data-tooltip="P: (Pending) | A: Accepted (Approved requests) | R: Rejected (Declined requests)">
+                             data-tooltip="P: Pending (Awaiting approval) | A: Accepted (Approved requests) | R: Rejected (Declined requests)">
                             P:<?= $rentalRequestsData['pending'] ?? 0 ?> 
                             A:<?= $rentalRequestsData['accepted'] ?? 0 ?> 
                             R:<?= $rentalRequestsData['rejected'] ?? 0 ?>
                         </div>
                     </div>
                     <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $paid_invoices_count ?></div>
-                        <div class="monthly-stat-label">Paid Invoices</div>
+                        <div class="monthly-stat-value"><?= $unpaid_invoices ?></div>
+                        <div class="monthly-stat-label">Unpaid Invoices</div>
                     </div>
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $maintenanceRequestsData['total'] ?? 0 ?></div>
@@ -1153,64 +935,6 @@ function timeAgo($datetime) {
                 <div class="stat-value" id="overdueInvoicesCount"><?= $overdue_invoices ?></div>
                 <div class="stat-label">Overdue Invoices</div>
                 <div class="stat-subtext">Past due date</div>
-            </div>
-        </div>
-        
-        <!-- Activity Overview Card -->
-        <div class="dashboard-card animate-fade-in">
-            <div class="card-header">
-                <i class="fas fa-chart-line"></i>
-                <span>Activity Overview - <?= $monthName ?></span>
-            </div>
-            <div class="card-body">
-                <!-- Mobile Summary Cards -->
-                <div class="summary-cards d-md-none">
-                    <div class="summary-card">
-                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_rentals']) ?></div>
-                        <div class="text-muted small">New Rentals</div>
-                    </div>
-                    <div class="summary-card warning">
-                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_maintenance']) ?></div>
-                        <div class="text-muted small">Maintenance</div>
-                    </div>
-                    <div class="summary-card info">
-                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_messages']) ?></div>
-                        <div class="text-muted small">Messages</div>
-                    </div>
-                </div>
-
-                <!-- Desktop Summary -->
-                <div class="row mb-4 d-none d-md-flex">
-                    <div class="col-md-6">
-                        <h6 class="text-primary mb-3">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
-                        <div class="d-flex flex-wrap gap-4">
-                            <div class="bg-primary-light p-3 rounded">
-                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_rentals']) ?></div>
-                                <div class="text-muted small">New Rentals</div>
-                            </div>
-                            <div class="bg-warning-light p-3 rounded">
-                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_maintenance']) ?></div>
-                                <div class="text-muted small">Maintenance Requests</div>
-                            </div>
-                            <div class="bg-info-light p-3 rounded">
-                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_messages']) ?></div>
-                                <div class="text-muted small">Messages</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="chart-container">
-                            <canvas id="activityChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Mobile Chart -->
-                <div class="d-md-none">
-                    <div class="chart-container">
-                        <canvas id="activityChart"></canvas>
-                    </div>
-                </div>
             </div>
         </div>
         
@@ -1434,139 +1158,6 @@ function timeAgo($datetime) {
         fetchLatestRequests();
         fetchMessages();
     }, 10000);
-
-    // Chart initialization
-    const chartData = <?= json_encode($chartData) ?>;
-    const ctx = document.getElementById('activityChart').getContext('2d');
-
-    let lastFocusedIndex = null;
-    const activityChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: chartData.labels,
-            datasets: [
-                {
-                    label: 'New Rentals',
-                    data: chartData.new_rentals,
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                    tension: 0.3,
-                    fill: true
-                },
-                {
-                    label: 'Maintenance Requests',
-                    data: chartData.new_maintenance,
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    tension: 0.3,
-                    fill: true
-                },
-                {
-                    label: 'Messages',
-                    data: chartData.new_messages,
-                    borderColor: '#06b6d4',
-                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                    tension: 0.3,
-                    fill: true
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { 
-                legend: { 
-                    position: 'top',
-                    labels: { 
-                        color: '#374151',
-                        usePointStyle: true,
-                        padding: window.innerWidth <= 768 ? 10 : 20,
-                        font: {
-                            size: window.innerWidth <= 768 ? 10 : 12
-                        }
-                    }
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    titleColor: '#1f2937',
-                    bodyColor: '#374151',
-                    borderColor: '#e5e7eb',
-                    borderWidth: 1,
-                    padding: 10,
-                    cornerRadius: 8
-                }
-            },
-            interaction: {
-                mode: 'nearest',
-                axis: 'x',
-                intersect: false
-            },
-            scales: {
-                x: { 
-                    grid: { display: false },
-                    ticks: { 
-                        color: '#6b7280',
-                        font: {
-                            size: window.innerWidth <= 768 ? 10 : 11
-                        }
-                    }
-                },
-                y: { 
-                    beginAtZero: true,
-                    grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                    ticks: { 
-                        color: '#6b7280',
-                        font: {
-                            size: window.innerWidth <= 768 ? 10 : 11
-                        }
-                    }
-                }
-            },
-            elements: {
-                point: {
-                    radius: window.innerWidth <= 768 ? 2 : 4,
-                    hoverRadius: window.innerWidth <= 768 ? 4 : 6
-                }
-            }
-        }
-    });
-
-    // Handle window resize for chart responsiveness
-    window.addEventListener('resize', () => {
-        if (activityChart) {
-            const isMobile = window.innerWidth <= 768;
-            activityChart.options.plugins.legend.labels.padding = isMobile ? 10 : 20;
-            activityChart.options.plugins.legend.labels.font.size = isMobile ? 10 : 12;
-            activityChart.options.scales.x.ticks.font.size = isMobile ? 10 : 11;
-            activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
-            activityChart.options.elements.point.radius = isMobile ? 2 : 4;
-            activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
-            activityChart.update();
-        }
-    });
-
-    // Auto-hide notifications after 5 seconds
-    document.querySelectorAll('.alert').forEach(alert => {
-        setTimeout(() => {
-            if (alert.parentNode) {
-                alert.style.opacity = '0';
-                alert.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.remove();
-                    }
-                }, 300);
-            }
-        }, 5000);
-    });
-
-    // Tooltip functionality for status breakdowns
-    document.addEventListener('DOMContentLoaded', function() {
-        // Tooltips are handled by CSS hover effects with data-tooltip attributes
-        console.log('Tooltips enabled for status breakdowns');
-    });
     </script>
 </body>
 </html>
