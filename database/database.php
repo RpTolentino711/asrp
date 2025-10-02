@@ -1215,17 +1215,30 @@ public function getPendingRentalRequests() {
 
 
 
+
+
 public function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
-        COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
-        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ? AND is_deleted = 0) as new_messages_count
-        FROM invoice 
-        WHERE Status = 'paid' 
-        AND Created_At BETWEEN ? AND ?";
+                COALESCE(SUM(InvoiceTotal), 0) AS total_earnings,
+                COUNT(CASE WHEN Status = 'paid' THEN 1 END) AS paid_invoices_count,
+                (SELECT COUNT(*) 
+                   FROM free_message 
+                  WHERE Sent_At BETWEEN ? AND ? 
+                    AND is_deleted = 0) AS new_messages_count,
+                (SELECT COUNT(*) 
+                   FROM rentalrequest 
+                  WHERE RequestDate BETWEEN ? AND ?) AS new_rentals_count
+            FROM invoice 
+            WHERE Status = 'paid' 
+              AND Created_At BETWEEN ? AND ?";
     
-    return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
+    return $this->getRow($sql, [
+        $startDate, $endDate,   // for messages
+        $startDate, $endDate,   // for rental requests
+        $startDate, $endDate    // for invoices
+    ]);
 }
+
 
 
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
@@ -1248,6 +1261,9 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         $startDate, $endDate
     ]);
 }
+
+
+
 
 
     
