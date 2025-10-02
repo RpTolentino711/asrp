@@ -9,40 +9,32 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
-// --- Month/Year Picker Helper ---
-function getMonthYearRange($month, $year) {
-    if ($month && $year) {
-        $start = "$year-" . str_pad($month, 2, "0", STR_PAD_LEFT) . "-01";
-        $end = date("Y-m-t", strtotime($start));
-    } elseif ($year) {
-        $start = "$year-01-01";
-        $end = "$year-12-31";
-    } else {
-        $start = date("Y-m-01");
-        $end = date("Y-m-t");
-    }
-    return [$start, $end];
-}
+// Get selected month/year from request or use current month
+$selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : date('m');
+$selectedYear = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
 
-$selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : null;
-$selectedYear = isset($_GET['year']) ? (int)$_GET['year'] : null;
-list($startDate, $endDate) = getMonthYearRange($selectedMonth, $selectedYear);
+// Validate month and year
+if ($selectedMonth < 1 || $selectedMonth > 12) $selectedMonth = date('m');
+if ($selectedYear < 2020 || $selectedYear > 2030) $selectedYear = date('Y');
 
-// Get enhanced dashboard statistics with accurate invoice data
+// Get date range for the selected month/year
+$startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . "-01";
+$endDate = date("Y-m-t", strtotime($startDate));
+$monthName = date('F Y', strtotime($startDate));
+
+// Get statistics for the selected period
 $counts = $db->getAdminDashboardCounts();
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
+$chartData = $db->getAdminMonthChartData($startDate, $endDate);
 
-// Enhanced statistics with accurate invoice tracking
+// Extract values
 $pending = $counts['pending_rentals'] ?? 0;
 $pending_maintenance = $counts['pending_maintenance'] ?? 0;
 $unpaid_invoices = $counts['unpaid_invoices'] ?? 0;
-$overdue_invoices = $counts['overdue_invoices'] ?? 0; // More accurate overdue count
+$overdue_invoices = $counts['overdue_invoices'] ?? 0;
 $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
-
-// Chart Data for activities
-$chartData = $db->getAdminMonthChartData($startDate, $endDate);
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -72,14 +64,6 @@ function timeAgo($datetime) {
     if ($diff->h > 0) return $diff->h . ' hours ago';
     if ($diff->i > 0) return $diff->i . ' minutes ago';
     return 'Just now';
-}
-
-// Get current month name for display
-$currentMonthName = date('F Y');
-if ($selectedMonth && $selectedYear) {
-    $currentMonthName = date('F Y', strtotime("$selectedYear-$selectedMonth-01"));
-} elseif ($selectedYear) {
-    $currentMonthName = "Year $selectedYear";
 }
 ?>
 <!DOCTYPE html>
@@ -281,6 +265,24 @@ if ($selectedMonth && $selectedYear) {
             font-size: 1rem;
         }
         
+        /* Month Picker Card */
+        .month-picker-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+        }
+        
+        .period-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -371,41 +373,6 @@ if ($selectedMonth && $selectedYear) {
             margin-top: 0.25rem;
         }
         
-        /* Dashboard Cards */
-        .dashboard-card {
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 2rem;
-            overflow: hidden;
-        }
-        
-        .card-header {
-            padding: 1.25rem 1.5rem;
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
-            font-weight: 600;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .card-header i {
-            color: var(--primary);
-        }
-        
-        .card-body {
-            padding: 1.5rem;
-        }
-        
-        /* Activity Chart */
-        .chart-container {
-            position: relative;
-            height: 300px;
-            width: 100%;
-        }
-        
         /* Monthly Summary Section */
         .monthly-summary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -464,6 +431,41 @@ if ($selectedMonth && $selectedYear) {
         .monthly-stat-label {
             font-size: 0.8rem;
             opacity: 0.8;
+        }
+        
+        /* Dashboard Cards */
+        .dashboard-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .card-header i {
+            color: var(--primary);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Activity Chart */
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
         }
         
         /* Table Styling */
@@ -947,17 +949,66 @@ if ($selectedMonth && $selectedYear) {
         <div class="dashboard-header">
             <div class="welcome-text">
                 <h1>Welcome back, Admin</h1>
-                <p>Here's what's happening with your properties today</p>
+                <p>Here's what's happening with your properties</p>
             </div>
             <div class="header-actions d-none d-md-block">
-                <span class="text-muted"><?= date('l, F j, Y') ?></span>
+                <span class="period-badge"><?= $monthName ?></span>
+            </div>
+        </div>
+        
+        <!-- Month/Year Picker Card -->
+        <div class="month-picker-card animate-fade-in">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="mb-3">Select Period for Statistics</h5>
+                    <form method="get" class="row g-3 align-items-end">
+                        <div class="col-md-4 col-6">
+                            <label for="month" class="form-label">Month</label>
+                            <select id="month" name="month" class="form-select">
+                                <?php for($m = 1; $m <= 12; $m++): ?>
+                                    <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
+                                        <?= date('F', mktime(0,0,0,$m,1)) ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-6">
+                            <label for="year" class="form-label">Year</label>
+                            <select id="year" name="year" class="form-select">
+                                <?php for($y = date('Y'); $y >= 2023; $y--): ?>
+                                    <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
+                                        <?= $y ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary flex-fill">
+                                    <i class="fas fa-filter me-1"></i> Apply Filter
+                                </button>
+                                <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
+                                   class="btn btn-danger" target="_blank" title="Export PDF Report">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
+                                    <i class="fas fa-sync"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <div class="text-muted small">Period: <?= date('M d', strtotime($startDate)) ?> - <?= date('M d, Y', strtotime($endDate)) ?></div>
+                    <div class="text-success fw-bold mt-1">₱<?= number_format($total_earnings, 2) ?> Revenue</div>
+                </div>
             </div>
         </div>
         
         <!-- Monthly Earnings Summary -->
         <div class="monthly-summary animate-fade-in">
             <div class="monthly-summary-content">
-                <div class="monthly-title">Monthly Revenue - <?= $currentMonthName ?></div>
+                <div class="monthly-title">Monthly Revenue - <?= $monthName ?></div>
                 <div class="monthly-amount">₱<?= number_format($total_earnings, 2) ?></div>
                 <div class="monthly-stats">
                     <div class="monthly-stat">
@@ -1020,37 +1071,9 @@ if ($selectedMonth && $selectedYear) {
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-chart-line"></i>
-                <span>Activity Overview - <?= $currentMonthName ?></span>
+                <span>Activity Overview - <?= $monthName ?></span>
             </div>
             <div class="card-body">
-                <form class="row g-3 align-items-end mb-4" method="get">
-                    <div class="col-md-4 col-6">
-                        <label for="month" class="form-label">Month</label>
-                        <select id="month" name="month" class="form-select">
-                            <option value="">All Months</option>
-                            <?php for($m = 1; $m <= 12; $m++): ?>
-                                <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
-                                    <?= date('F', mktime(0,0,0,$m,1)) ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4 col-6">
-                        <label for="year" class="form-label">Year</label>
-                        <select id="year" name="year" class="form-select">
-                            <option value="">All Years</option>
-                            <?php for($y = date('Y'); $y >= 2023; $y--): ?>
-                                <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
-                                    <?= $y ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4 col-12">
-                        <button class="btn btn-primary w-100" type="submit">Apply Filter</button>
-                    </div>
-                </form>
-                
                 <!-- Mobile Summary Cards -->
                 <div class="summary-cards d-md-none">
                     <div class="summary-card">
@@ -1365,28 +1388,6 @@ if ($selectedMonth && $selectedYear) {
             activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
             activityChart.options.elements.point.radius = isMobile ? 2 : 4;
             activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
-            activityChart.update();
-        }
-    });
-
-    // Click anywhere outside the chart to reset to showing all datasets
-    document.addEventListener('click', function(e) {
-        const chartBox = ctx.canvas.getBoundingClientRect();
-        // Detect if click is within the chart area
-        if (
-            e.target === ctx.canvas ||
-            (e.clientX >= chartBox.left && e.clientX <= chartBox.right && 
-             e.clientY >= chartBox.top && e.clientY <= chartBox.bottom)
-        ) {
-            // Click was inside chart area, do nothing
-            return;
-        }
-        // Click was outside, reset if focused
-        if (lastFocusedIndex !== null) {
-            activityChart.data.datasets.forEach((ds, i) => {
-                activityChart.setDatasetVisibility(i, true);
-            });
-            lastFocusedIndex = null;
             activityChart.update();
         }
     });
