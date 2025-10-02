@@ -36,9 +36,13 @@ $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 
-// NEW: Get accurate counts for the period
-$total_rental_requests = $db->getTotalRentalRequests($startDate, $endDate);
-$total_maintenance_requests = $db->getTotalMaintenanceRequests($startDate, $endDate);
+// UPDATED: Handle the new array return types
+$rentalRequestsData = $db->getTotalRentalRequests($startDate, $endDate);
+$maintenanceRequestsData = $db->getTotalMaintenanceRequests($startDate, $endDate);
+
+// Extract totals from the arrays
+$total_rental_requests = $rentalRequestsData['total'] ?? 0;
+$total_maintenance_requests = $maintenanceRequestsData['total'] ?? 0;
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -435,6 +439,12 @@ function timeAgo($datetime) {
         .monthly-stat-label {
             font-size: 0.8rem;
             opacity: 0.8;
+        }
+
+        .monthly-stat-subtext {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-top: 0.25rem;
         }
         
         /* Dashboard Cards */
@@ -1016,16 +1026,26 @@ function timeAgo($datetime) {
                 <div class="monthly-amount">₱<?= number_format($total_earnings, 2) ?></div>
                 <div class="monthly-stats">
                     <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $total_rental_requests ?></div>
+                        <div class="monthly-stat-value"><?= $rentalRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Rental Requests</div>
+                        <div class="monthly-stat-subtext small">
+                            P:<?= $rentalRequestsData['pending'] ?? 0 ?> 
+                            A:<?= $rentalRequestsData['accepted'] ?? 0 ?> 
+                            R:<?= $rentalRequestsData['rejected'] ?? 0 ?>
+                        </div>
                     </div>
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $paid_invoices_count ?></div>
                         <div class="monthly-stat-label">Paid Invoices</div>
                     </div>
                     <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $total_maintenance_requests ?></div>
+                        <div class="monthly-stat-value"><?= $maintenanceRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Maintenance</div>
+                        <div class="monthly-stat-subtext small">
+                            S:<?= $maintenanceRequestsData['submitted'] ?? 0 ?> 
+                            IP:<?= $maintenanceRequestsData['in_progress'] ?? 0 ?> 
+                            C:<?= $maintenanceRequestsData['completed'] ?? 0 ?>
+                        </div>
                     </div>
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $new_messages_count ?></div>

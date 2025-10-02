@@ -1239,10 +1239,10 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     }
     
     $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Created_At BETWEEN ? AND ?) as overdue_invoices";
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as overdue_invoices";
     
     return $this->getRow($sql, [
         $startDate, $endDate, 
@@ -1266,20 +1266,41 @@ public function getMaintenanceStats($startDate, $endDate) {
 }
 
 public function getTotalRentalRequests($startDate, $endDate) {
-    $sql = "SELECT COUNT(*) as total_rental_requests 
-            FROM rentalrequest 
-            WHERE Requested_At BETWEEN ? AND ?";
+    $sql = "SELECT 
+        COUNT(*) as total_rental_requests,
+        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
+        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
+        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
+        FROM rentalrequest 
+        WHERE Requested_At BETWEEN ? AND ?";
+    
     $result = $this->getRow($sql, [$startDate, $endDate]);
-    return $result['total_rental_requests'] ?? 0;
+    return [
+        'total' => $result['total_rental_requests'] ?? 0,
+        'pending' => $result['pending_rentals'] ?? 0,
+        'accepted' => $result['accepted_rentals'] ?? 0,
+        'rejected' => $result['rejected_rentals'] ?? 0
+    ];
 }
 
 
+
 public function getTotalMaintenanceRequests($startDate, $endDate) {
-    $sql = "SELECT COUNT(*) as total_maintenance 
-            FROM maintenancerequest 
-            WHERE RequestDate BETWEEN ? AND ?";
+    $sql = "SELECT 
+        COUNT(*) as total_maintenance,
+        COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted_requests,
+        COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress_requests,
+        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed_requests
+        FROM maintenancerequest 
+        WHERE RequestDate BETWEEN ? AND ?";
+    
     $result = $this->getRow($sql, [$startDate, $endDate]);
-    return $result['total_maintenance'] ?? 0;
+    return [
+        'total' => $result['total_maintenance'] ?? 0,
+        'submitted' => $result['submitted_requests'] ?? 0,
+        'in_progress' => $result['in_progress_requests'] ?? 0,
+        'completed' => $result['completed_requests'] ?? 0
+    ];
 }
 
     
