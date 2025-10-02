@@ -1240,7 +1240,9 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
 }
 
 
-public function getMonthlyEarningsStats($startDate, $endDate) {
+
+
+ublic function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
@@ -1255,26 +1257,26 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
 
 
     
+public function getLatestPendingRequests($limit = 5) {
+    $sql = "SELECT rr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName, 
+                   rr.StartDate, rr.EndDate, rr.Status, rr.Requested_At
+            FROM rentalrequest rr
+            LEFT JOIN client c ON rr.Client_ID = c.Client_ID
+            LEFT JOIN space s ON rr.Space_ID = s.Space_ID
+            WHERE rr.Status = 'Pending'
+            ORDER BY rr.Requested_At DESC
+            LIMIT ?";
 
-    public function getLatestPendingRequests($limit = 5) {
-        $sql = "SELECT rr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName, 
-                       rr.StartDate, rr.EndDate, rr.Status, rr.Requested_At
-                FROM rentalrequest rr
-                LEFT JOIN client c ON rr.Client_ID = c.Client_ID
-                LEFT JOIN space s ON rr.Space_ID = s.Space_ID
-                WHERE rr.Status = 'Pending'
-                ORDER BY rr.Requested_At DESC
-                LIMIT :limit";
-
-        try {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
-            return $stmt->fetchAll();
-        } catch (PDOException $e) {
-            return [];
-        }
+    try {
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error in getLatestPendingRequests: " . $e->getMessage());
+        return [];
     }
+}
 
   
 
