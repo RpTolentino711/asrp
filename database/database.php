@@ -1213,6 +1213,11 @@ public function getPendingRentalRequests() {
         return $this->runQuery($sql, [$username]);
     }
 
+
+
+
+
+
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     // If no dates provided, use current month
     if (!$startDate || !$endDate) {
@@ -1223,8 +1228,8 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     $sql = "SELECT 
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Created_At BETWEEN ? AND ?) as overdue_invoices";
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND InvoiceDate BETWEEN ? AND ?) as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND InvoiceDate BETWEEN ? AND ?) as overdue_invoices";
     
     return $this->getRow($sql, [
         $startDate, $endDate, 
@@ -1234,6 +1239,7 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     ]);
 }
 
+
 public function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
@@ -1241,10 +1247,12 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
         (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ? AND is_deleted = 0) as new_messages_count
         FROM invoice 
         WHERE Status = 'paid' 
-        AND Created_At BETWEEN ? AND ?";
+        AND InvoiceDate BETWEEN ? AND ?";
     
     return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
 }
+
+
 
     
 

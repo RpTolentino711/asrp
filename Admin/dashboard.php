@@ -9,27 +9,36 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
-// --- Month/Year Picker Helper ---
-function getMonthYearRange($month, $year) {
-    if ($month && $year) {
-        $start = "$year-" . str_pad($month, 2, "0", STR_PAD_LEFT) . "-01";
-        $end = date("Y-m-t", strtotime($start));
-    } elseif ($year) {
-        $start = "$year-01-01";
-        $end = "$year-12-31";
-    } else {
-        $start = date("Y-m-01");
-        $end = date("Y-m-t");
-    }
-    return [$start, $end];
-}
+// Get selected month/year from request or use current month
+$selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : date('m');
+$selectedYear = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
 
-$selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : null;
-$selectedYear = isset($_GET['year']) ? (int)$_GET['year'] : null;
-list($startDate, $endDate) = getMonthYearRange($selectedMonth, $selectedYear);
+// Validate month and year
+if ($selectedMonth < 1 || $selectedMonth > 12) $selectedMonth = date('m');
+if ($selectedYear < 2020 || $selectedYear > 2030) $selectedYear = date('Y');
 
-// Chart Data for activities (no invoice)
+// Get date range for the selected month/year
+$startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . "-01";
+$endDate = date("Y-m-t", strtotime($startDate));
+$monthName = date('F Y', strtotime($startDate));
+
+// Get statistics for the selected period
+$counts = $db->getAdminDashboardCounts();
+$monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
 $chartData = $db->getAdminMonthChartData($startDate, $endDate);
+
+// Extract values
+$pending = $counts['pending_rentals'] ?? 0;
+$pending_maintenance = $counts['pending_maintenance'] ?? 0;
+$unpaid_invoices = $counts['unpaid_invoices'] ?? 0;
+$overdue_invoices = $counts['overdue_invoices'] ?? 0;
+$total_earnings = $monthlyStats['total_earnings'] ?? 0;
+$paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
+$new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
+
+// Calculate totals for the period
+$total_rent_requests = array_sum($chartData['new_rentals'] ?? []);
+$total_maintenance_requests = array_sum($chartData['new_maintenance'] ?? []);
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -40,12 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])
     exit();
 }
 
-// Dashboard counts, rental requests, etc.
-$counts = $db->getAdminDashboardCounts();
-$pending = $counts['pending_rentals'] ?? 0;
-$pending_maintenance = $counts['pending_maintenance'] ?? 0;
-$unpaid_invoices = $counts['unpaid_invoices'] ?? 0;
-$unpaid_due_invoices = $counts['unpaid_due_invoices'] ?? 0;
 $latest_requests = $db->getLatestPendingRequests(5);
 
 // Message filter logic
@@ -266,6 +269,95 @@ function timeAgo($datetime) {
             font-size: 1rem;
         }
         
+        /* Stats Toggle Button */
+        .stats-toggle-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.3);
+        }
+        
+        .stats-toggle-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(99, 102, 241, 0.4);
+        }
+        
+        .stats-toggle-btn .chevron {
+            transition: var(--transition);
+        }
+        
+        .stats-toggle-btn.collapsed .chevron {
+            transform: rotate(-90deg);
+        }
+        
+        /* Collapsible Stats Section */
+        .stats-collapse {
+            transition: var(--transition);
+        }
+        
+        .stats-collapse.collapsing {
+            transition: height 0.3s ease;
+        }
+        
+        /* Month Picker Card */
+        .month-picker-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1.5rem;
+        }
+        
+        .period-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        /* Quick Stats */
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .quick-stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.25rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .quick-stat-card.earnings { border-left-color: var(--secondary); }
+        .quick-stat-card.rentals { border-left-color: var(--primary); }
+        .quick-stat-card.maintenance { border-left-color: var(--warning); }
+        
+        .quick-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        
+        .quick-stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -281,6 +373,20 @@ function timeAgo($datetime) {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             transition: var(--transition);
             border-left: 4px solid var(--primary);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+            opacity: 0;
+            transition: var(--transition);
         }
         
         .stat-card:hover {
@@ -288,10 +394,15 @@ function timeAgo($datetime) {
             box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
         }
         
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+        
         .stat-card.rentals { border-left-color: var(--primary); }
         .stat-card.maintenance { border-left-color: var(--warning); }
         .stat-card.invoices { border-left-color: var(--info); }
         .stat-card.overdue { border-left-color: var(--danger); }
+        .stat-card.earnings { border-left-color: var(--secondary); }
         
         .stat-icon {
             width: 50px;
@@ -302,22 +413,99 @@ function timeAgo($datetime) {
             justify-content: center;
             margin-bottom: 1rem;
             font-size: 1.25rem;
+            transition: var(--transition);
+        }
+        
+        .stat-card:hover .stat-icon {
+            transform: scale(1.1);
         }
         
         .stat-card.rentals .stat-icon { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
         .stat-card.maintenance .stat-icon { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
         .stat-card.invoices .stat-icon { background: rgba(6, 182, 212, 0.1); color: var(--info); }
         .stat-card.overdue .stat-icon { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .stat-card.earnings .stat-icon { background: rgba(16, 185, 129, 0.1); color: var(--secondary); }
         
         .stat-value {
             font-size: 2rem;
             font-weight: 700;
             margin-bottom: 0.25rem;
+            transition: var(--transition);
+        }
+        
+        .stat-card:hover .stat-value {
+            color: var(--primary);
         }
         
         .stat-label {
             color: #6b7280;
             font-weight: 500;
+        }
+        
+        .stat-subtext {
+            font-size: 0.8rem;
+            color: #9ca3af;
+            margin-top: 0.25rem;
+        }
+        
+        /* Monthly Summary Section */
+        .monthly-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .monthly-summary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .monthly-summary-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .monthly-title {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        .monthly-amount {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .monthly-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .monthly-stat {
+            text-align: center;
+        }
+        
+        .monthly-stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .monthly-stat-label {
+            font-size: 0.8rem;
+            opacity: 0.8;
         }
         
         /* Dashboard Cards */
@@ -566,6 +754,18 @@ function timeAgo($datetime) {
                 font-size: 0.8rem;
             }
 
+            .monthly-summary {
+                padding: 1.5rem;
+            }
+
+            .monthly-amount {
+                font-size: 2rem;
+            }
+
+            .monthly-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
             .card-body {
                 padding: 1rem;
             }
@@ -586,6 +786,10 @@ function timeAgo($datetime) {
 
             .summary-card {
                 padding: 0.75rem;
+            }
+
+            .quick-stats {
+                grid-template-columns: 1fr;
             }
         }
         
@@ -626,6 +830,10 @@ function timeAgo($datetime) {
                 flex: 1;
                 text-align: center;
             }
+
+            .monthly-stats {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 480px) {
@@ -644,6 +852,14 @@ function timeAgo($datetime) {
 
             .form-control, .form-select {
                 padding: 0.75rem;
+            }
+
+            .monthly-summary {
+                padding: 1rem;
+            }
+
+            .monthly-amount {
+                font-size: 1.75rem;
             }
         }
 
@@ -770,8 +986,8 @@ function timeAgo($datetime) {
                     <?php if ($unpaid_invoices > 0): ?>
                         <span class="badge badge-notification bg-info"><?= $unpaid_invoices ?></span>
                     <?php endif; ?>
-                    <?php if ($unpaid_due_invoices > 0): ?>
-                        <span class="badge badge-notification bg-danger">Due: <?= $unpaid_due_invoices ?></span>
+                    <?php if ($overdue_invoices > 0): ?>
+                        <span class="badge badge-notification bg-danger">Overdue: <?= $overdue_invoices ?></span>
                     <?php endif; ?>
                 </a>
             </div>
@@ -812,126 +1028,174 @@ function timeAgo($datetime) {
         <div class="dashboard-header">
             <div class="welcome-text">
                 <h1>Welcome back, Admin</h1>
-                <p>Here's what's happening with your properties today</p>
+                <p>Here's what's happening with your properties</p>
             </div>
-            <div class="header-actions d-none d-md-block">
-                <span class="text-muted"><?= date('l, F j, Y') ?></span>
-            </div>
-        </div>
-        
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card rentals animate-fade-in">
-                <div class="stat-icon">
-                    <i class="fas fa-clipboard-check"></i>
-                </div>
-                <div class="stat-value" id="pendingRentalsCount"><?= $pending ?></div>
-                <div class="stat-label">Pending Rentals</div>
-            </div>
-            <div class="stat-card maintenance animate-fade-in" style="animation-delay: 0.1s;">
-                <div class="stat-icon">
-                    <i class="fas fa-tools"></i>
-                </div>
-                <div class="stat-value" id="pendingMaintenanceCount"><?= $pending_maintenance ?></div>
-                <div class="stat-label">Maintenance Requests</div>
-            </div>
-            <div class="stat-card invoices animate-fade-in" style="animation-delay: 0.2s;">
-                <div class="stat-icon">
-                    <i class="fas fa-file-invoice"></i>
-                </div>
-                <div class="stat-value" id="unpaidInvoicesCount"><?= $unpaid_invoices ?></div>
-                <div class="stat-label">Unpaid Invoices</div>
-            </div>
-            <div class="stat-card overdue animate-fade-in" style="animation-delay: 0.3s;">
-                <div class="stat-icon">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                <div class="stat-value" id="overdueInvoicesCount"><?= $unpaid_due_invoices ?></div>
-                <div class="stat-label">Overdue Invoices</div>
+            <div class="header-actions">
+                <button class="stats-toggle-btn" type="button" data-bs-toggle="collapse" data-bs-target="#statsSection" aria-expanded="false" aria-controls="statsSection">
+                    <i class="fas fa-chart-bar me-1"></i>
+                    Monthly Statistics
+                    <i class="fas fa-chevron-down chevron ms-1"></i>
+                </button>
             </div>
         </div>
         
-        <!-- Activity Overview Card -->
-        <div class="dashboard-card animate-fade-in">
-            <div class="card-header">
-                <i class="fas fa-chart-line"></i>
-                <span>Activity Overview</span>
+        <!-- Quick Stats (Always Visible) -->
+        <div class="quick-stats animate-fade-in">
+            <div class="quick-stat-card earnings">
+                <div class="quick-stat-value text-success">₱<?= number_format($total_earnings, 2) ?></div>
+                <div class="quick-stat-label">Monthly Revenue</div>
             </div>
-            <div class="card-body">
-                <form class="row g-3 align-items-end mb-4" method="get">
-                    <div class="col-md-4 col-6">
-                        <label for="month" class="form-label">Month</label>
-                        <select id="month" name="month" class="form-select">
-                            <option value="">All Months</option>
-                            <?php for($m = 1; $m <= 12; $m++): ?>
-                                <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
-                                    <?= date('F', mktime(0,0,0,$m,1)) ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
+            <div class="quick-stat-card rentals">
+                <div class="quick-stat-value text-primary"><?= $total_rent_requests ?></div>
+                <div class="quick-stat-label">Rent Requests</div>
+            </div>
+            <div class="quick-stat-card maintenance">
+                <div class="quick-stat-value text-warning"><?= $total_maintenance_requests ?></div>
+                <div class="quick-stat-label">Maintenance Requests</div>
+            </div>
+        </div>
+        
+        <!-- Collapsible Statistics Section -->
+        <div class="collapse" id="statsSection">
+            <!-- Month/Year Picker Card -->
+            <div class="month-picker-card animate-fade-in">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="mb-3">Select Period for Detailed Statistics</h5>
+                        <form method="get" class="row g-3 align-items-end">
+                            <div class="col-md-4 col-6">
+                                <label for="month" class="form-label">Month</label>
+                                <select id="month" name="month" class="form-select">
+                                    <?php for($m = 1; $m <= 12; $m++): ?>
+                                        <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
+                                            <?= date('F', mktime(0,0,0,$m,1)) ?>
+                                        </option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4 col-6">
+                                <label for="year" class="form-label">Year</label>
+                                <select id="year" name="year" class="form-select">
+                                    <?php for($y = date('Y'); $y >= 2023; $y--): ?>
+                                        <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
+                                            <?= $y ?>
+                                        </option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4 col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary flex-fill">
+                                        <i class="fas fa-filter me-1"></i> Apply Filter
+                                    </button>
+                                    <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
+                                       class="btn btn-danger" target="_blank" title="Export PDF Report">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
+                                    <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
+                                        <i class="fas fa-sync"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </form>
                     </div>
-                    <div class="col-md-4 col-6">
-                        <label for="year" class="form-label">Year</label>
-                        <select id="year" name="year" class="form-select">
-                            <option value="">All Years</option>
-                            <?php for($y = date('Y'); $y >= 2023; $y--): ?>
-                                <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
-                                    <?= $y ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-4 col-12">
-                        <button class="btn btn-primary w-100" type="submit">Apply Filter</button>
-                    </div>
-                </form>
-                
-                <!-- Mobile Summary Cards -->
-                <div class="summary-cards d-md-none">
-                    <div class="summary-card">
-                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_rentals']) ?></div>
-                        <div class="text-muted small">New Rentals</div>
-                    </div>
-                    <div class="summary-card warning">
-                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_maintenance']) ?></div>
-                        <div class="text-muted small">Maintenance</div>
-                    </div>
-                    <div class="summary-card info">
-                        <div class="fw-bold fs-6"><?= array_sum($chartData['new_messages']) ?></div>
-                        <div class="text-muted small">Messages</div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="text-muted small">Period: <?= date('M d', strtotime($startDate)) ?> - <?= date('M d, Y', strtotime($endDate)) ?></div>
+                        <div class="text-success fw-bold mt-1">₱<?= number_format($total_earnings, 2) ?> Revenue</div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card rentals animate-fade-in">
+                    <div class="stat-icon">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <div class="stat-value" id="pendingRentalsCount"><?= $pending ?></div>
+                    <div class="stat-label">Pending Rentals</div>
+                    <div class="stat-subtext">Awaiting approval</div>
+                </div>
+                <div class="stat-card maintenance animate-fade-in" style="animation-delay: 0.1s;">
+                    <div class="stat-icon">
+                        <i class="fas fa-tools"></i>
+                    </div>
+                    <div class="stat-value" id="pendingMaintenanceCount"><?= $pending_maintenance ?></div>
+                    <div class="stat-label">Maintenance Requests</div>
+                    <div class="stat-subtext">Need attention</div>
+                </div>
+                <div class="stat-card invoices animate-fade-in" style="animation-delay: 0.2s;">
+                    <div class="stat-icon">
+                        <i class="fas fa-file-invoice"></i>
+                    </div>
+                    <div class="stat-value" id="unpaidInvoicesCount"><?= $unpaid_invoices ?></div>
+                    <div class="stat-label">Unpaid Invoices</div>
+                    <div class="stat-subtext">Total outstanding</div>
+                </div>
+                <div class="stat-card overdue animate-fade-in" style="animation-delay: 0.3s;">
+                    <div class="stat-icon">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div class="stat-value" id="overdueInvoicesCount"><?= $overdue_invoices ?></div>
+                    <div class="stat-label">Overdue Invoices</div>
+                    <div class="stat-subtext">Past due date</div>
+                </div>
+            </div>
+            
+            <!-- Activity Overview Card -->
+            <div class="dashboard-card animate-fade-in">
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Activity Overview - <?= $monthName ?></span>
+                </div>
+                <div class="card-body">
+                    <!-- Mobile Summary Cards -->
+                    <div class="summary-cards d-md-none">
+                        <div class="summary-card">
+                            <div class="fw-bold fs-6"><?= array_sum($chartData['new_rentals']) ?></div>
+                            <div class="text-muted small">New Rentals</div>
+                        </div>
+                        <div class="summary-card warning">
+                            <div class="fw-bold fs-6"><?= array_sum($chartData['new_maintenance']) ?></div>
+                            <div class="text-muted small">Maintenance</div>
+                        </div>
+                        <div class="summary-card info">
+                            <div class="fw-bold fs-6"><?= array_sum($chartData['new_messages']) ?></div>
+                            <div class="text-muted small">Messages</div>
+                        </div>
+                    </div>
 
-                <!-- Desktop Summary -->
-                <div class="row mb-4 d-none d-md-flex">
-                    <div class="col-md-6">
-                        <h6 class="text-primary mb-3">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
-                        <div class="d-flex flex-wrap gap-4">
-                            <div class="bg-primary-light p-3 rounded">
-                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_rentals']) ?></div>
-                                <div class="text-muted small">New Rentals</div>
+                    <!-- Desktop Summary -->
+                    <div class="row mb-4 d-none d-md-flex">
+                        <div class="col-md-6">
+                            <h6 class="text-primary mb-3">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
+                            <div class="d-flex flex-wrap gap-4">
+                                <div class="bg-primary-light p-3 rounded">
+                                    <div class="fw-bold fs-5"><?= array_sum($chartData['new_rentals']) ?></div>
+                                    <div class="text-muted small">New Rentals</div>
+                                </div>
+                                <div class="bg-warning-light p-3 rounded">
+                                    <div class="fw-bold fs-5"><?= array_sum($chartData['new_maintenance']) ?></div>
+                                    <div class="text-muted small">Maintenance Requests</div>
+                                </div>
+                                <div class="bg-info-light p-3 rounded">
+                                    <div class="fw-bold fs-5"><?= array_sum($chartData['new_messages']) ?></div>
+                                    <div class="text-muted small">Messages</div>
+                                </div>
                             </div>
-                            <div class="bg-warning-light p-3 rounded">
-                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_maintenance']) ?></div>
-                                <div class="text-muted small">Maintenance Requests</div>
-                            </div>
-                            <div class="bg-info-light p-3 rounded">
-                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_messages']) ?></div>
-                                <div class="text-muted small">Messages</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="chart-container">
+                                <canvas id="activityChart"></canvas>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
+
+                    <!-- Mobile Chart -->
+                    <div class="d-md-none">
                         <div class="chart-container">
                             <canvas id="activityChart"></canvas>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Mobile Chart -->
-                <div class="d-md-none">
-                    <div class="chart-container">
-                        <canvas id="activityChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -1017,6 +1281,18 @@ function timeAgo($datetime) {
         }
     });
 
+    // Toggle button state management
+    const statsToggleBtn = document.querySelector('.stats-toggle-btn');
+    const statsSection = document.getElementById('statsSection');
+    
+    statsSection.addEventListener('show.bs.collapse', function () {
+        statsToggleBtn.classList.remove('collapsed');
+    });
+    
+    statsSection.addEventListener('hide.bs.collapse', function () {
+        statsToggleBtn.classList.add('collapsed');
+    });
+
     // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
     function fetchDashboardCounts() {
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
@@ -1026,7 +1302,7 @@ function timeAgo($datetime) {
                     document.getElementById('pendingRentalsCount').textContent = data.pending_rentals ?? 0;
                     document.getElementById('pendingMaintenanceCount').textContent = data.pending_maintenance ?? 0;
                     document.getElementById('unpaidInvoicesCount').textContent = data.unpaid_invoices ?? 0;
-                    document.getElementById('overdueInvoicesCount').textContent = data.unpaid_due_invoices ?? 0;
+                    document.getElementById('overdueInvoicesCount').textContent = data.overdue_invoices ?? 0;
                 }
             })
             .catch(err => console.log('Error fetching dashboard counts:', err));
@@ -1200,28 +1476,6 @@ function timeAgo($datetime) {
             activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
             activityChart.options.elements.point.radius = isMobile ? 2 : 4;
             activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
-            activityChart.update();
-        }
-    });
-
-    // Click anywhere outside the chart to reset to showing all datasets
-    document.addEventListener('click', function(e) {
-        const chartBox = ctx.canvas.getBoundingClientRect();
-        // Detect if click is within the chart area
-        if (
-            e.target === ctx.canvas ||
-            (e.clientX >= chartBox.left && e.clientX <= chartBox.right && 
-             e.clientY >= chartBox.top && e.clientY <= chartBox.bottom)
-        ) {
-            // Click was inside chart area, do nothing
-            return;
-        }
-        // Click was outside, reset if focused
-        if (lastFocusedIndex !== null) {
-            activityChart.data.datasets.forEach((ds, i) => {
-                activityChart.setDatasetVisibility(i, true);
-            });
-            lastFocusedIndex = null;
             activityChart.update();
         }
     });
