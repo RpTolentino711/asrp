@@ -1092,7 +1092,7 @@ function timeAgo($datetime) {
                         <div class="monthly-stat-value"><?= $rentalRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Rental Requests</div>
                         <div class="monthly-stat-subtext tooltip-hover" 
-                             data-tooltip="P: Pending (Awaiting approval) | A: Accepted (Approved requests) | R: Rejected (Declined requests)">
+                             data-tooltip="P: (Pending) | A: Accepted (Approved requests) | R: Rejected (Declined requests)">
                             P:<?= $rentalRequestsData['pending'] ?? 0 ?> 
                             A:<?= $rentalRequestsData['accepted'] ?? 0 ?> 
                             R:<?= $rentalRequestsData['rejected'] ?? 0 ?>
