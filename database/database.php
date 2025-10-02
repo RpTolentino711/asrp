@@ -1229,7 +1229,6 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
 }
 
-
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     // If no dates provided, use current month
     if (!$startDate || !$endDate) {
@@ -1251,9 +1250,18 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     ]);
 }
 
-
-
-
+// New function specifically for maintenance statistics
+public function getMaintenanceStats($startDate, $endDate) {
+    $sql = "SELECT 
+        COUNT(*) as total_maintenance,
+        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed_maintenance,
+        COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress_maintenance,
+        COUNT(CASE WHEN Status IN ('Submitted', 'In Progress') THEN 1 END) as pending_maintenance
+        FROM maintenancerequest 
+        WHERE RequestDate BETWEEN ? AND ?";
+    
+    return $this->getRow($sql, [$startDate, $endDate]);
+}
 
     
 

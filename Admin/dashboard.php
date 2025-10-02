@@ -27,6 +27,9 @@ $counts = $db->getAdminDashboardCounts();
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
 $chartData = $db->getAdminMonthChartData($startDate, $endDate);
 
+// NEW: Get maintenance request stats for the selected period
+$maintenanceStats = $db->getMaintenanceStats($startDate, $endDate);
+
 // Extract values
 $pending = $counts['pending_rentals'] ?? 0;
 $pending_maintenance = $counts['pending_maintenance'] ?? 0;
@@ -35,6 +38,11 @@ $overdue_invoices = $counts['overdue_invoices'] ?? 0;
 $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
+
+// NEW: Extract maintenance stats
+$total_maintenance = $maintenanceStats['total_maintenance'] ?? 0;
+$completed_maintenance = $maintenanceStats['completed_maintenance'] ?? 0;
+$in_progress_maintenance = $maintenanceStats['in_progress_maintenance'] ?? 0;
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -432,6 +440,61 @@ function timeAgo($datetime) {
             font-size: 0.8rem;
             opacity: 0.8;
         }
+
+        /* Maintenance Dropdown */
+        .maintenance-dropdown {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .maintenance-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 0.5rem 0;
+            width: 100%;
+            text-align: left;
+        }
+
+        .maintenance-toggle i {
+            transition: transform 0.3s ease;
+        }
+
+        .maintenance-toggle.collapsed i {
+            transform: rotate(-90deg);
+        }
+
+        .maintenance-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .maintenance-detail {
+            text-align: center;
+        }
+
+        .maintenance-detail-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .maintenance-detail-label {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
         
         /* Dashboard Cards */
         .dashboard-card {
@@ -691,6 +754,10 @@ function timeAgo($datetime) {
                 grid-template-columns: repeat(2, 1fr);
             }
 
+            .maintenance-details {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
             .card-body {
                 padding: 1rem;
             }
@@ -753,6 +820,10 @@ function timeAgo($datetime) {
             }
 
             .monthly-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .maintenance-details {
                 grid-template-columns: 1fr;
             }
         }
@@ -1016,16 +1087,40 @@ function timeAgo($datetime) {
                         <div class="monthly-stat-label">Paid Invoices</div>
                     </div>
                     <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $unpaid_invoices ?></div>
-                        <div class="monthly-stat-label">Unpaid</div>
-                    </div>
-                    <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $overdue_invoices ?></div>
-                        <div class="monthly-stat-label">Overdue</div>
+                        <div class="monthly-stat-value"><?= $total_maintenance ?></div>
+                        <div class="monthly-stat-label">Maintenance</div>
                     </div>
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $new_messages_count ?></div>
-                        <div class="monthly-stat-label">New Messages</div>
+                        <div class="monthly-stat-label">Messages</div>
+                    </div>
+                </div>
+
+                <!-- Maintenance Request Dropdown -->
+                <div class="maintenance-dropdown">
+                    <button class="maintenance-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#maintenanceDetails">
+                        <i class="fas fa-chevron-down"></i>
+                        Maintenance Request Details
+                    </button>
+                    <div class="collapse" id="maintenanceDetails">
+                        <div class="maintenance-details">
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $total_maintenance ?></div>
+                                <div class="maintenance-detail-label">Total Requests</div>
+                            </div>
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $completed_maintenance ?></div>
+                                <div class="maintenance-detail-label">Completed</div>
+                            </div>
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $in_progress_maintenance ?></div>
+                                <div class="maintenance-detail-label">In Progress</div>
+                            </div>
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $pending_maintenance ?></div>
+                                <div class="maintenance-detail-label">Pending</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1204,6 +1299,14 @@ function timeAgo($datetime) {
             mobileOverlay.classList.remove('active');
         }
     });
+
+    // Maintenance dropdown toggle
+    const maintenanceToggle = document.querySelector('.maintenance-toggle');
+    if (maintenanceToggle) {
+        maintenanceToggle.addEventListener('click', function() {
+            this.classList.toggle('collapsed');
+        });
+    }
 
     // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
     function fetchDashboardCounts() {
