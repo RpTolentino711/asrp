@@ -1229,6 +1229,8 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     return $this->getRow($sql, [$startDate, $endDate, $startDate, $endDate]);
 }
 
+
+
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     // If no dates provided, use current month
     if (!$startDate || !$endDate) {
@@ -1270,6 +1272,16 @@ public function getTotalRentalRequests($startDate, $endDate) {
     $result = $this->getRow($sql, [$startDate, $endDate]);
     return $result['total_rental_requests'] ?? 0;
 }
+
+
+public function getTotalMaintenanceRequests($startDate, $endDate) {
+    $sql = "SELECT COUNT(*) as total_maintenance 
+            FROM maintenancerequest 
+            WHERE RequestDate BETWEEN ? AND ?";
+    $result = $this->getRow($sql, [$startDate, $endDate]);
+    return $result['total_maintenance'] ?? 0;
+}
+
     
 
     public function getLatestPendingRequests($limit = 5) {
