@@ -1099,10 +1099,6 @@ function timeAgo($datetime) {
                         </div>
                     </div>
                     <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $paid_invoices_count ?></div>
-                        <div class="monthly-stat-label">Paid Invoices</div>
-                    </div>
-                    <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $maintenanceRequestsData['total'] ?? 0 ?></div>
                         <div class="monthly-stat-label">Maintenance</div>
                         <div class="monthly-stat-subtext tooltip-hover" 
