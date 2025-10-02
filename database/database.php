@@ -1213,18 +1213,28 @@ public function getPendingRentalRequests() {
         return $this->runQuery($sql, [$username]);
     }
 
-public function getAdminDashboardCounts() {
-    // Enhanced counts with accurate overdue tracking
-    $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending') as pending_rentals,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices";
+public function getAdminDashboardCounts($startDate = null, $endDate = null) {
+    // If no dates provided, use current month
+    if (!$startDate || !$endDate) {
+        $startDate = date('Y-m-01');
+        $endDate = date('Y-m-t');
+    }
     
-    return $this->getRow($sql);
+    $sql = "SELECT 
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Created_At BETWEEN ? AND ?) as overdue_invoices";
+    
+    return $this->getRow($sql, [
+        $startDate, $endDate, 
+        $startDate, $endDate,
+        $startDate, $endDate,
+        $startDate, $endDate
+    ]);
 }
 
- public function getMonthlyEarningsStats($startDate, $endDate) {
+public function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
