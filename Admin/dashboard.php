@@ -1,4 +1,4 @@
-<?php
+make it like this <?php
 session_start();
 require '../database/database.php';
 
@@ -27,6 +27,9 @@ $counts = $db->getAdminDashboardCounts();
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
 $chartData = $db->getAdminMonthChartData($startDate, $endDate);
 
+// NEW: Get maintenance request stats for the selected period
+$maintenanceStats = $db->getMaintenanceStats($startDate, $endDate);
+
 // Extract values
 $pending = $counts['pending_rentals'] ?? 0;
 $pending_maintenance = $counts['pending_maintenance'] ?? 0;
@@ -35,6 +38,11 @@ $overdue_invoices = $counts['overdue_invoices'] ?? 0;
 $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
+
+// NEW: Extract maintenance stats
+$total_maintenance = $maintenanceStats['total_maintenance'] ?? 0;
+$completed_maintenance = $maintenanceStats['completed_maintenance'] ?? 0;
+$in_progress_maintenance = $maintenanceStats['in_progress_maintenance'] ?? 0;
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -88,9 +96,9 @@ function timeAgo($datetime) {
             --dark: #1f2937;
             --darker: #111827;
             --light: #f3f4f6;
-            --sidebar-width: 260px;
+            --sidebar-width: 280px;
             --header-height: 70px;
-            --border-radius: 10px;
+            --border-radius: 12px;
             --transition: all 0.3s ease;
         }
         
@@ -102,12 +110,11 @@ function timeAgo($datetime) {
         
         body {
             font-family: 'Inter', sans-serif;
-            background: #f8fafc;
+            background: linear-gradient(to right, #f8fafc, #f1f5f9);
             color: #374151;
             min-height: 100vh;
             overflow-x: hidden;
             position: relative;
-            font-size: 14px;
         }
 
         /* Mobile Menu Overlay */
@@ -146,7 +153,7 @@ function timeAgo($datetime) {
         .mobile-menu-btn {
             background: none;
             border: none;
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             color: var(--dark);
             padding: 0.5rem;
             border-radius: 8px;
@@ -159,7 +166,7 @@ function timeAgo($datetime) {
 
         .mobile-brand {
             font-weight: 700;
-            font-size: 1rem;
+            font-size: 1.1rem;
             color: var(--dark);
         }
         
@@ -170,7 +177,7 @@ function timeAgo($datetime) {
             height: 100vh;
             background: linear-gradient(180deg, var(--dark), var(--darker));
             color: white;
-            padding: 1.25rem 0.75rem;
+            padding: 1.5rem 1rem;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
             z-index: 1000;
             transition: var(--transition);
@@ -178,9 +185,9 @@ function timeAgo($datetime) {
         }
         
         .sidebar-header {
-            padding: 0 0 1.25rem 0;
+            padding: 0 0 1.5rem 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.5rem;
         }
         
         .sidebar-brand {
@@ -188,32 +195,31 @@ function timeAgo($datetime) {
             align-items: center;
             gap: 0.75rem;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.35rem;
             color: white;
             text-decoration: none;
-            padding: 0 0.5rem;
         }
         
         .sidebar-brand i {
             color: var(--primary);
-            font-size: 1.25rem;
+            font-size: 1.5rem;
         }
         
         .nav-item {
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
             position: relative;
         }
         
         .nav-link {
             display: flex;
             align-items: center;
-            padding: 0.6rem 0.75rem;
+            padding: 0.75rem 1rem;
             color: rgba(255, 255, 255, 0.85);
             border-radius: var(--border-radius);
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
-            font-size: 0.85rem;
+            font-size: 0.95rem;
         }
         
         .nav-link:hover, .nav-link.active {
@@ -222,18 +228,18 @@ function timeAgo($datetime) {
         }
         
         .nav-link i {
-            width: 20px;
-            margin-right: 0.6rem;
-            font-size: 0.9rem;
+            width: 24px;
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
         }
         
         .badge-notification {
             position: absolute;
-            right: 0.75rem;
+            right: 1rem;
             top: 50%;
             transform: translateY(-50%);
-            font-size: 0.65rem;
-            padding: 0.2rem 0.4rem;
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
             border-radius: 20px;
             font-weight: 600;
         }
@@ -241,7 +247,7 @@ function timeAgo($datetime) {
         /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
-            padding: 1.5rem;
+            padding: 2rem;
             transition: var(--transition);
         }
         
@@ -250,137 +256,54 @@ function timeAgo($datetime) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
             padding-bottom: 1rem;
             border-bottom: 1px solid #e5e7eb;
         }
         
         .welcome-text h1 {
             font-weight: 700;
-            font-size: 1.5rem;
+            font-size: 1.8rem;
             color: var(--dark);
             margin-bottom: 0.25rem;
         }
         
         .welcome-text p {
             color: #6b7280;
-            font-size: 0.85rem;
+            font-size: 1rem;
         }
         
-        /* Stats Summary Button */
-        .stats-summary-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: var(--border-radius);
-            padding: 1.25rem 1.5rem;
-            margin-bottom: 1.25rem;
-            width: 100%;
-            text-align: left;
-            cursor: pointer;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stats-summary-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        
-        .stats-summary-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.1);
-        }
-        
-        .stats-summary-content {
-            position: relative;
-            z-index: 2;
-        }
-        
-        .stats-summary-title {
-            font-size: 0.95rem;
-            margin-bottom: 0.75rem;
-            opacity: 0.9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .stats-summary-amount {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .stats-summary-period {
-            font-size: 0.8rem;
-            opacity: 0.8;
-            margin-bottom: 0.75rem;
-        }
-        
-        .stats-summary-toggle {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            border-radius: 50%;
-            width: 28px;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-            font-size: 0.8rem;
-        }
-        
-        .stats-summary-toggle.collapsed i {
-            transform: rotate(-90deg);
-        }
-        
-        /* Stats Dropdown Content */
-        .stats-dropdown-content {
+        /* Month Picker Card */
+        .month-picker-card {
             background: white;
             border-radius: var(--border-radius);
             padding: 1.5rem;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1.25rem;
-        }
-        
-        .month-picker-card {
-            background: white;
-            border-radius: var(--border-radius);
-            padding: 1.25rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.5rem;
         }
         
         .period-badge {
             background: var(--primary);
             color: white;
-            padding: 0.4rem 0.8rem;
+            padding: 0.5rem 1rem;
             border-radius: 20px;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
         }
         
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
         }
         
         .stat-card {
             background: white;
             border-radius: var(--border-radius);
-            padding: 1.25rem;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
             transition: var(--transition);
             border-left: 4px solid var(--primary);
             position: relative;
@@ -400,8 +323,8 @@ function timeAgo($datetime) {
         }
         
         .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
         }
         
         .stat-card:hover::before {
@@ -415,19 +338,19 @@ function timeAgo($datetime) {
         .stat-card.earnings { border-left-color: var(--secondary); }
         
         .stat-icon {
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 0.75rem;
-            font-size: 1rem;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
             transition: var(--transition);
         }
         
         .stat-card:hover .stat-icon {
-            transform: scale(1.05);
+            transform: scale(1.1);
         }
         
         .stat-card.rentals .stat-icon { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
@@ -437,7 +360,7 @@ function timeAgo($datetime) {
         .stat-card.earnings .stat-icon { background: rgba(16, 185, 129, 0.1); color: var(--secondary); }
         
         .stat-value {
-            font-size: 1.5rem;
+            font-size: 2rem;
             font-weight: 700;
             margin-bottom: 0.25rem;
             transition: var(--transition);
@@ -450,21 +373,57 @@ function timeAgo($datetime) {
         .stat-label {
             color: #6b7280;
             font-weight: 500;
-            font-size: 0.8rem;
         }
         
         .stat-subtext {
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             color: #9ca3af;
             margin-top: 0.25rem;
         }
         
-        /* Monthly Stats */
+        /* Monthly Summary Section */
+        .monthly-summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .monthly-summary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .monthly-summary-content {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .monthly-title {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        
+        .monthly-amount {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
         .monthly-stats {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 0.75rem;
-            margin-top: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
         }
         
         .monthly-stat {
@@ -472,13 +431,68 @@ function timeAgo($datetime) {
         }
         
         .monthly-stat-value {
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             font-weight: 600;
             margin-bottom: 0.25rem;
         }
         
         .monthly-stat-label {
-            font-size: 0.7rem;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        /* Maintenance Dropdown */
+        .maintenance-dropdown {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .maintenance-toggle {
+            background: none;
+            border: none;
+            color: white;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            padding: 0.5rem 0;
+            width: 100%;
+            text-align: left;
+        }
+
+        .maintenance-toggle i {
+            transition: transform 0.3s ease;
+        }
+
+        .maintenance-toggle.collapsed i {
+            transform: rotate(-90deg);
+        }
+
+        .maintenance-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .maintenance-detail {
+            text-align: center;
+        }
+
+        .maintenance-detail-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .maintenance-detail-label {
+            font-size: 0.75rem;
             opacity: 0.8;
         }
         
@@ -486,35 +500,34 @@ function timeAgo($datetime) {
         .dashboard-card {
             background: white;
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
             overflow: hidden;
         }
         
         .card-header {
-            padding: 1rem 1.25rem;
+            padding: 1.25rem 1.5rem;
             background: white;
             border-bottom: 1px solid #e5e7eb;
             font-weight: 600;
-            font-size: 0.95rem;
+            font-size: 1.1rem;
             display: flex;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.75rem;
         }
         
         .card-header i {
             color: var(--primary);
-            font-size: 0.9rem;
         }
         
         .card-body {
-            padding: 1.25rem;
+            padding: 1.5rem;
         }
         
         /* Activity Chart */
         .chart-container {
             position: relative;
-            height: 250px;
+            height: 300px;
             width: 100%;
         }
         
@@ -528,23 +541,20 @@ function timeAgo($datetime) {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            font-size: 0.8rem;
         }
         
         .custom-table th {
             background-color: #f9fafb;
-            padding: 0.6rem 0.8rem;
+            padding: 0.75rem 1rem;
             font-weight: 600;
             text-align: left;
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
-            font-size: 0.75rem;
         }
         
         .custom-table td {
-            padding: 0.8rem;
+            padding: 1rem;
             border-bottom: 1px solid #f3f4f6;
-            font-size: 0.8rem;
         }
         
         .custom-table tr:last-child td {
@@ -557,12 +567,12 @@ function timeAgo($datetime) {
         
         /* Message Board */
         .message-board {
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
         }
         
         .message-item {
-            padding: 0.8rem;
+            padding: 1rem;
             border-left: 3px solid transparent;
             border-bottom: 1px solid #f3f4f6;
             transition: var(--transition);
@@ -580,35 +590,33 @@ function timeAgo($datetime) {
         .message-user {
             font-weight: 600;
             color: var(--dark);
-            margin-bottom: 0.2rem;
-            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
         }
         
         .message-meta {
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             color: #6b7280;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.5rem;
         }
         
         .message-content {
             color: #4b5563;
-            margin-bottom: 0.6rem;
-            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
         }
         
         /* Filter Buttons */
         .filter-buttons {
             display: flex;
-            gap: 0.4rem;
-            margin-bottom: 0.8rem;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
             flex-wrap: wrap;
         }
         
         .filter-btn {
-            padding: 0.4rem 0.8rem;
+            padding: 0.5rem 1rem;
             border-radius: var(--border-radius);
             font-weight: 500;
-            font-size: 0.75rem;
+            font-size: 0.9rem;
             transition: var(--transition);
             border: 1px solid #e5e7eb;
             background: white;
@@ -627,16 +635,16 @@ function timeAgo($datetime) {
             background: white;
             border-radius: var(--border-radius);
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 0.8rem;
-            padding: 0.8rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
             border-left: 4px solid var(--primary);
         }
 
         .mobile-card-header {
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 1rem;
             color: var(--dark);
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.75rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -645,8 +653,8 @@ function timeAgo($datetime) {
         .mobile-card-detail {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 0.4rem;
-            font-size: 0.75rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
         }
 
         .mobile-card-detail .label {
@@ -661,15 +669,15 @@ function timeAgo($datetime) {
         /* Summary Cards */
         .summary-cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 0.8rem;
-            margin-bottom: 1.25rem;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .summary-card {
             background: white;
             border-radius: var(--border-radius);
-            padding: 0.8rem;
+            padding: 1rem;
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
             border-top: 3px solid var(--primary);
@@ -682,7 +690,7 @@ function timeAgo($datetime) {
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
-                width: 260px;
+                width: 280px;
             }
             
             .sidebar.active {
@@ -702,25 +710,17 @@ function timeAgo($datetime) {
             .dashboard-header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 0.8rem;
-                margin-bottom: 1.25rem;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
             }
 
             .welcome-text h1 {
-                font-size: 1.3rem;
-            }
-
-            .stats-summary-btn {
-                padding: 1rem 1.25rem;
-            }
-
-            .stats-summary-amount {
-                font-size: 1.75rem;
+                font-size: 1.5rem;
             }
 
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 0.8rem;
+                gap: 1rem;
             }
 
             .stat-card {
@@ -728,21 +728,33 @@ function timeAgo($datetime) {
             }
 
             .stat-icon {
-                width: 35px;
-                height: 35px;
-                font-size: 0.9rem;
-                margin-bottom: 0.6rem;
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+                margin-bottom: 0.75rem;
             }
 
             .stat-value {
-                font-size: 1.25rem;
+                font-size: 1.5rem;
             }
 
             .stat-label {
-                font-size: 0.75rem;
+                font-size: 0.8rem;
+            }
+
+            .monthly-summary {
+                padding: 1.5rem;
+            }
+
+            .monthly-amount {
+                font-size: 2rem;
             }
 
             .monthly-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .maintenance-details {
                 grid-template-columns: repeat(2, 1fr);
             }
 
@@ -751,12 +763,12 @@ function timeAgo($datetime) {
             }
 
             .card-header {
-                padding: 0.8rem 1rem;
-                font-size: 0.9rem;
+                padding: 1rem;
+                font-size: 1rem;
             }
 
             .chart-container {
-                height: 200px;
+                height: 250px;
             }
 
             .summary-cards {
@@ -765,7 +777,7 @@ function timeAgo($datetime) {
             }
 
             .summary-card {
-                padding: 0.6rem;
+                padding: 0.75rem;
             }
         }
         
@@ -779,19 +791,19 @@ function timeAgo($datetime) {
             }
 
             .chart-container {
-                height: 180px;
+                height: 200px;
             }
 
             .message-board {
-                max-height: 250px;
+                max-height: 300px;
             }
 
             .message-item {
-                padding: 0.6rem;
+                padding: 0.75rem;
             }
 
             .form-control, .form-select {
-                font-size: 16px;
+                font-size: 16px; /* Prevents zoom on iOS */
             }
 
             .summary-cards {
@@ -810,11 +822,15 @@ function timeAgo($datetime) {
             .monthly-stats {
                 grid-template-columns: 1fr;
             }
+
+            .maintenance-details {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 480px) {
             .welcome-text h1 {
-                font-size: 1.1rem;
+                font-size: 1.3rem;
             }
 
             .dashboard-card {
@@ -822,21 +838,20 @@ function timeAgo($datetime) {
             }
 
             .btn {
-                font-size: 0.8rem;
-                padding: 0.6rem 1.25rem;
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
             }
 
             .form-control, .form-select {
-                padding: 0.6rem;
-                font-size: 14px;
+                padding: 0.75rem;
             }
 
-            .stats-summary-btn {
-                padding: 0.8rem 1rem;
+            .monthly-summary {
+                padding: 1rem;
             }
 
-            .stats-summary-amount {
-                font-size: 1.5rem;
+            .monthly-amount {
+                font-size: 1.75rem;
             }
         }
 
@@ -875,17 +890,15 @@ function timeAgo($datetime) {
         .bg-info-light { background: rgba(6, 182, 212, 0.1); }
         
         .badge {
-            padding: 0.3rem 0.5rem;
+            padding: 0.35rem 0.65rem;
             font-weight: 600;
             border-radius: 20px;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
         }
         
         .btn-primary {
             background: var(--primary);
             border-color: var(--primary);
-            font-size: 0.8rem;
-            padding: 0.5rem 1rem;
         }
         
         .btn-primary:hover {
@@ -894,18 +907,8 @@ function timeAgo($datetime) {
         }
         
         .btn-sm {
-            padding: 0.3rem 0.6rem;
-            font-size: 0.75rem;
-        }
-
-        .form-control, .form-select {
+            padding: 0.35rem 0.75rem;
             font-size: 0.8rem;
-            padding: 0.5rem 0.75rem;
-        }
-
-        .form-label {
-            font-size: 0.8rem;
-            margin-bottom: 0.4rem;
         }
     </style>
 </head>
@@ -1024,25 +1027,67 @@ function timeAgo($datetime) {
             </div>
         </div>
         
-        <!-- Stats Summary Button -->
-        <button class="stats-summary-btn animate-fade-in" type="button" data-bs-toggle="collapse" data-bs-target="#statsDropdownContent">
-            <div class="stats-summary-content">
-                <div class="stats-summary-title">
-                    <span>Monthly Revenue - <?= $monthName ?></span>
-                    <button class="stats-summary-toggle collapsed" type="button">
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
+        <!-- Month/Year Picker Card -->
+        <div class="month-picker-card animate-fade-in">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h5 class="mb-3">Select Period for Statistics</h5>
+                    <form method="get" class="row g-3 align-items-end">
+                        <div class="col-md-4 col-6">
+                            <label for="month" class="form-label">Month</label>
+                            <select id="month" name="month" class="form-select">
+                                <?php for($m = 1; $m <= 12; $m++): ?>
+                                    <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
+                                        <?= date('F', mktime(0,0,0,$m,1)) ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-6">
+                            <label for="year" class="form-label">Year</label>
+                            <select id="year" name="year" class="form-select">
+                                <?php for($y = date('Y'); $y >= 2023; $y--): ?>
+                                    <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
+                                        <?= $y ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4 col-12">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary flex-fill">
+                                    <i class="fas fa-filter me-1"></i> Apply Filter
+                                </button>
+                                <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
+                                   class="btn btn-danger" target="_blank" title="Export PDF Report">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                                <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
+                                    <i class="fas fa-sync"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </form>
                 </div>
-                <div class="stats-summary-amount">₱<?= number_format($total_earnings, 2) ?></div>
-                <div class="stats-summary-period">Period: <?= date('M d', strtotime($startDate)) ?> - <?= date('M d, Y', strtotime($endDate)) ?></div>
-                
+                <div class="col-md-4 text-md-end">
+                    <div class="text-muted small">Period: <?= date('M d', strtotime($startDate)) ?> - <?= date('M d, Y', strtotime($endDate)) ?></div>
+                    <div class="text-success fw-bold mt-1">₱<?= number_format($total_earnings, 2) ?> Revenue</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Monthly Earnings Summary -->
+        <div class="monthly-summary animate-fade-in">
+            <div class="monthly-summary-content">
+                <div class="monthly-title">Monthly Revenue - <?= $monthName ?></div>
+                <div class="monthly-amount">₱<?= number_format($total_earnings, 2) ?></div>
                 <div class="monthly-stats">
                     <div class="monthly-stat">
                         <div class="monthly-stat-value"><?= $paid_invoices_count ?></div>
                         <div class="monthly-stat-label">Paid Invoices</div>
                     </div>
                     <div class="monthly-stat">
-                        <div class="monthly-stat-value"><?= $pending_maintenance ?></div>
+                        <div class="monthly-stat-value"><?= $total_maintenance ?></div>
                         <div class="monthly-stat-label">Maintenance</div>
                     </div>
                     <div class="monthly-stat">
@@ -1050,56 +1095,31 @@ function timeAgo($datetime) {
                         <div class="monthly-stat-label">Messages</div>
                     </div>
                 </div>
-            </div>
-        </button>
 
-        <!-- Stats Dropdown Content -->
-        <div class="collapse" id="statsDropdownContent">
-            <div class="stats-dropdown-content animate-fade-in">
-                <div class="month-picker-card">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h5 class="mb-3" style="font-size: 1rem;">Select Period for Statistics</h5>
-                            <form method="get" class="row g-3 align-items-end">
-                                <div class="col-md-4 col-6">
-                                    <label for="month" class="form-label">Month</label>
-                                    <select id="month" name="month" class="form-select">
-                                        <?php for($m = 1; $m <= 12; $m++): ?>
-                                            <option value="<?= $m ?>" <?= ($selectedMonth == $m ? 'selected' : '') ?>>
-                                                <?= date('F', mktime(0,0,0,$m,1)) ?>
-                                            </option>
-                                        <?php endfor; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 col-6">
-                                    <label for="year" class="form-label">Year</label>
-                                    <select id="year" name="year" class="form-select">
-                                        <?php for($y = date('Y'); $y >= 2023; $y--): ?>
-                                            <option value="<?= $y ?>" <?= ($selectedYear == $y ? 'selected' : '') ?>>
-                                                <?= $y ?>
-                                            </option>
-                                        <?php endfor; ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4 col-12">
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary flex-fill">
-                                            <i class="fas fa-filter me-1"></i> Apply Filter
-                                        </button>
-                                        <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
-                                           class="btn btn-danger" target="_blank" title="Export PDF Report">
-                                            <i class="fas fa-file-pdf"></i>
-                                        </a>
-                                        <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
-                                            <i class="fas fa-sync"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="col-md-4 text-md-end">
-                            <div class="text-muted small">Current Selection</div>
-                            <div class="text-success fw-bold mt-1">₱<?= number_format($total_earnings, 2) ?> Revenue</div>
+                <!-- Maintenance Request Dropdown -->
+                <div class="maintenance-dropdown">
+                    <button class="maintenance-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#maintenanceDetails">
+                        <i class="fas fa-chevron-down"></i>
+                        Maintenance Request Details
+                    </button>
+                    <div class="collapse" id="maintenanceDetails">
+                        <div class="maintenance-details">
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $total_maintenance ?></div>
+                                <div class="maintenance-detail-label">Total Requests</div>
+                            </div>
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $completed_maintenance ?></div>
+                                <div class="maintenance-detail-label">Completed</div>
+                            </div>
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $in_progress_maintenance ?></div>
+                                <div class="maintenance-detail-label">In Progress</div>
+                            </div>
+                            <div class="maintenance-detail">
+                                <div class="maintenance-detail-value"><?= $pending_maintenance ?></div>
+                                <div class="maintenance-detail-label">Pending</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1168,19 +1188,19 @@ function timeAgo($datetime) {
                 <!-- Desktop Summary -->
                 <div class="row mb-4 d-none d-md-flex">
                     <div class="col-md-6">
-                        <h6 class="text-primary mb-3" style="font-size: 0.9rem;">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
-                        <div class="d-flex flex-wrap gap-3">
-                            <div class="bg-primary-light p-2 rounded" style="font-size: 0.8rem;">
-                                <div class="fw-bold"><?= array_sum($chartData['new_rentals']) ?></div>
-                                <div class="text-muted">New Rentals</div>
+                        <h6 class="text-primary mb-3">Summary for <?= date('M d, Y', strtotime($startDate)) ?> to <?= date('M d, Y', strtotime($endDate)) ?></h6>
+                        <div class="d-flex flex-wrap gap-4">
+                            <div class="bg-primary-light p-3 rounded">
+                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_rentals']) ?></div>
+                                <div class="text-muted small">New Rentals</div>
                             </div>
-                            <div class="bg-warning-light p-2 rounded" style="font-size: 0.8rem;">
-                                <div class="fw-bold"><?= array_sum($chartData['new_maintenance']) ?></div>
-                                <div class="text-muted">Maintenance</div>
+                            <div class="bg-warning-light p-3 rounded">
+                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_maintenance']) ?></div>
+                                <div class="text-muted small">Maintenance Requests</div>
                             </div>
-                            <div class="bg-info-light p-2 rounded" style="font-size: 0.8rem;">
-                                <div class="fw-bold"><?= array_sum($chartData['new_messages']) ?></div>
-                                <div class="text-muted">Messages</div>
+                            <div class="bg-info-light p-3 rounded">
+                                <div class="fw-bold fs-5"><?= array_sum($chartData['new_messages']) ?></div>
+                                <div class="text-muted small">Messages</div>
                             </div>
                         </div>
                     </div>
@@ -1280,11 +1300,10 @@ function timeAgo($datetime) {
         }
     });
 
-    // Stats summary toggle animation
-    const statsToggle = document.querySelector('.stats-summary-toggle');
-    if (statsToggle) {
-        statsToggle.addEventListener('click', function(e) {
-            e.stopPropagation();
+    // Maintenance dropdown toggle
+    const maintenanceToggle = document.querySelector('.maintenance-toggle');
+    if (maintenanceToggle) {
+        maintenanceToggle.addEventListener('click', function() {
             this.classList.toggle('collapsed');
         });
     }
@@ -1409,9 +1428,9 @@ function timeAgo($datetime) {
                     labels: { 
                         color: '#374151',
                         usePointStyle: true,
-                        padding: window.innerWidth <= 768 ? 8 : 15,
+                        padding: window.innerWidth <= 768 ? 10 : 20,
                         font: {
-                            size: window.innerWidth <= 768 ? 9 : 11
+                            size: window.innerWidth <= 768 ? 10 : 12
                         }
                     }
                 },
@@ -1423,14 +1442,8 @@ function timeAgo($datetime) {
                     bodyColor: '#374151',
                     borderColor: '#e5e7eb',
                     borderWidth: 1,
-                    padding: 8,
-                    cornerRadius: 6,
-                    titleFont: {
-                        size: 11
-                    },
-                    bodyFont: {
-                        size: 10
-                    }
+                    padding: 10,
+                    cornerRadius: 8
                 }
             },
             interaction: {
@@ -1444,7 +1457,7 @@ function timeAgo($datetime) {
                     ticks: { 
                         color: '#6b7280',
                         font: {
-                            size: window.innerWidth <= 768 ? 9 : 10
+                            size: window.innerWidth <= 768 ? 10 : 11
                         }
                     }
                 },
@@ -1454,15 +1467,15 @@ function timeAgo($datetime) {
                     ticks: { 
                         color: '#6b7280',
                         font: {
-                            size: window.innerWidth <= 768 ? 9 : 10
+                            size: window.innerWidth <= 768 ? 10 : 11
                         }
                     }
                 }
             },
             elements: {
                 point: {
-                    radius: window.innerWidth <= 768 ? 2 : 3,
-                    hoverRadius: window.innerWidth <= 768 ? 3 : 5
+                    radius: window.innerWidth <= 768 ? 2 : 4,
+                    hoverRadius: window.innerWidth <= 768 ? 4 : 6
                 }
             }
         }
@@ -1472,12 +1485,12 @@ function timeAgo($datetime) {
     window.addEventListener('resize', () => {
         if (activityChart) {
             const isMobile = window.innerWidth <= 768;
-            activityChart.options.plugins.legend.labels.padding = isMobile ? 8 : 15;
-            activityChart.options.plugins.legend.labels.font.size = isMobile ? 9 : 11;
-            activityChart.options.scales.x.ticks.font.size = isMobile ? 9 : 10;
-            activityChart.options.scales.y.ticks.font.size = isMobile ? 9 : 10;
-            activityChart.options.elements.point.radius = isMobile ? 2 : 3;
-            activityChart.options.elements.point.hoverRadius = isMobile ? 3 : 5;
+            activityChart.options.plugins.legend.labels.padding = isMobile ? 10 : 20;
+            activityChart.options.plugins.legend.labels.font.size = isMobile ? 10 : 12;
+            activityChart.options.scales.x.ticks.font.size = isMobile ? 10 : 11;
+            activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
+            activityChart.options.elements.point.radius = isMobile ? 2 : 4;
+            activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
             activityChart.update();
         }
     });
