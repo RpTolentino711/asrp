@@ -13,7 +13,7 @@ $job_types = $db->getAllJobTypes();
 <head>
     <title>Professional Services - ASRT Commercial Spaces</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, minimum-scale=1.0, maximum-scale=5.0">
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
@@ -56,7 +56,7 @@ $job_types = $db->getAllJobTypes();
         --border-radius-sm: 8px;
         --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-
+    
     * {
         margin: 0;
         padding: 0;
@@ -71,7 +71,7 @@ $job_types = $db->getAllJobTypes();
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         line-height: 1.6;
         color: var(--secondary);
-        background: var(--light);
+        background: linear-gradient(to right, #f8fafc, #f1f5f9);
         min-height: 100vh;
         display: flex;
         flex-direction: column;
@@ -430,28 +430,27 @@ $job_types = $db->getAllJobTypes();
                 if (!empty($job_types)) {
                     $delay = 0;
                     foreach ($job_types as $row) {
-                        // Use the actual icon from database
+                        // Use the actual icon from database with automatic fallback
                         $icon_filename = $row['Icon'] ?? 'default-icon.png';
                         $img_src = "uploads/jobtype_icons/" . $icon_filename;
                         
-                        // Fallback to default icon if file doesn't exist
+                        // Fallback system with auto-check
+                        $name_upper = strtoupper($row['JobType_Name']);
+                        $fallback_icons = [
+                            "CARPENTRY" => "IMG/show/CARPENTRY.png",
+                            "ELECTRICAL" => "IMG/show/ELECTRICAL.png",
+                            "PLUMBING" => "IMG/show/PLUMBING.png",
+                            "PAINTING" => "IMG/show/PAINTING.png",
+                            "APPLIANCE REPAIR" => "IMG/show/APPLIANCE.png",
+                            "PIPELINE" => "IMG/show/PLUMBING.png"
+                        ];
+
+                        // If the uploaded file doesn't exist, use fallback
                         if (!file_exists($img_src)) {
-                            $img_src = "IMG/show/wifi.png"; // Your default fallback
+                            $img_src = isset($fallback_icons[$name_upper]) ? $fallback_icons[$name_upper] : "IMG/show/wifi.png";
                         }
                         
-                        $name_upper = strtoupper($row['JobType_Name']);
-                        
-                        // Service descriptions
-                        $descriptions = [
-                            "CARPENTRY" => "Custom woodwork, repairs, and installations",
-                            "ELECTRICAL" => "Wiring, installations, and electrical repairs",
-                            "PLUMBING" => "Pipe repairs, installations, and water systems",
-                            "PAINTING" => "Interior and exterior painting services",
-                            "APPLIANCE REPAIR" => "Equipment maintenance and repairs",
-                            "PIPELINE" => "Pipe systems and plumbing installations"
-                        ];
-                        
-                        $description = isset($descriptions[$name_upper]) ? $descriptions[$name_upper] : "Professional maintenance service";
+                        $description = "Professional maintenance service";
                         $delay += 100;
                         
                         echo '<div class="col-6 col-sm-4 col-md-3 col-lg-2 animate-on-scroll" style="animation-delay: ' . $delay . 'ms;">';
@@ -514,6 +513,7 @@ $job_types = $db->getAllJobTypes();
     <?php require('footer.php'); ?>
 
     <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Smooth scroll animations
@@ -549,14 +549,6 @@ $job_types = $db->getAllJobTypes();
                         setTimeout(() => {
                             this.classList.remove('loading');
                         }, 3000);
-                    }
-                });
-
-                // Enhanced hover effects with sound feedback (optional)
-                card.addEventListener('mouseenter', function() {
-                    if (!this.classList.contains('disabled')) {
-                        // Optional: Add subtle sound feedback
-                        // new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp56hVFApGn+DyvmY').play().catch(e => {});
                     }
                 });
             });
@@ -615,6 +607,20 @@ $job_types = $db->getAllJobTypes();
                     });
                 }
             });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 992) {
+                // Close mobile menu if open
+                var navbarCollapse = document.getElementById('navbarNav');
+                if (navbarCollapse) {
+                    var bsCollapse = bootstrap.Collapse.getInstance(navbarCollapse);
+                    if (bsCollapse) {
+                        bsCollapse.hide();
+                    }
+                }
+            }
         });
     </script>
 </body>

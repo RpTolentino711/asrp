@@ -1999,10 +1999,12 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
 
 public function addJobTypeWithImage($jobTypeName, $iconFile) {
     try {
-        // Handle file upload
-        $uploadDir = 'uploads/jobtype_icons/';
+        // Handle file upload - AUTO CREATE DIRECTORY
+        $uploadDir = __DIR__ . "/../uploads/jobtype_icons/";
+        
+        // Automatically create directory if it doesn't exist
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
+            mkdir($uploadDir, 0777, true); // The 'true' creates nested directories
         }
         
         $fileName = 'jobtype_' . time() . '_' . uniqid() . '.' . pathinfo($iconFile['name'], PATHINFO_EXTENSION);
