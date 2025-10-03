@@ -15,7 +15,7 @@ $edit = false;
 $edit_data = ['Handyman_ID' => '', 'Handyman_fn' => '', 'Handyman_ln' => '', 'Phone' => '', 'JobType_ID' => ''];
 $msg = '';
 
-// --- Handle DELETE Request ---
+// --- Handle DELETE Handyman Request ---
 if (isset($_GET['delete'])) {
     $hid = intval($_GET['delete']);
     if ($db->deleteHandyman($hid)) {
@@ -33,6 +33,32 @@ if (isset($_GET['delete_jobtype'])) {
         header("Location: admin_add_handyman.php?msg=jobtype_deleted");
     } else {
         header("Location: admin_add_handyman.php?msg=jobtype_delete_error");
+    }
+    exit;
+}
+
+// --- Handle DELETE Icon Request ---
+if (isset($_GET['delete_icon'])) {
+    $jid = intval($_GET['delete_icon']);
+    
+    // Get job type details first
+    $jobtype = $db->getJobTypeById($jid);
+    if ($jobtype && !empty($jobtype['Icon'])) {
+        $icon_path = '../uploads/jobtype_icons/' . $jobtype['Icon'];
+        
+        // Delete the icon file
+        if (file_exists($icon_path)) {
+            unlink($icon_path);
+        }
+        
+        // Update database to remove icon reference
+        if ($db->updateJobTypeIcon($jid, null)) {
+            header("Location: admin_add_handyman.php?msg=icon_deleted");
+        } else {
+            header("Location: admin_add_handyman.php?msg=icon_delete_error");
+        }
+    } else {
+        header("Location: admin_add_handyman.php?msg=icon_delete_error");
     }
     exit;
 }
@@ -69,6 +95,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     Job type name cannot be empty.
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>';
+        }
+    } 
+    // Update job type icon
+    elseif (isset($_POST['update_jobtype_icon'])) {
+        $jobtype_id = intval($_POST['jobtype_id'] ?? 0);
+        
+        if ($jobtype_id > 0 && isset($_FILES['JobIcon']) && $_FILES['JobIcon']['error'] === UPLOAD_ERR_OK) {
+            // Get old icon to delete it
+            $old_jobtype = $db->getJobTypeById($jobtype_id);
+            $old_icon_path = null;
+            if ($old_jobtype && !empty($old_jobtype['Icon'])) {
+                $old_icon_path = '../uploads/jobtype_icons/' . $old_jobtype['Icon'];
+            }
+            
+            // Upload new icon
+            if ($db->updateJobTypeWithImage($jobtype_id, $_FILES['JobIcon'])) {
+                // Delete old icon file after successful upload
+                if ($old_icon_path && file_exists($old_icon_path)) {
+                    unlink($old_icon_path);
+                }
+                header("Location: admin_add_handyman.php?msg=icon_updated");
+                exit;
+            } else {
+                $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to update job type icon. Please try again.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>';
+            }
         }
     } else {
         // Handle adding/updating a handyman
@@ -137,8 +192,11 @@ if (isset($_GET['msg'])) {
         'deleted' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Handyman has been removed from the system!'],
         'jobtype_added' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'New job type has been added successfully!'],
         'jobtype_deleted' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Job type has been deleted successfully!'],
+        'icon_deleted' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Job type icon has been removed successfully!'],
+        'icon_updated' => ['type' => 'success', 'icon' => 'check-circle', 'text' => 'Job type icon has been updated successfully!'],
         'error' => ['type' => 'danger', 'icon' => 'exclamation-circle', 'text' => 'An error occurred. Please try again.'],
-        'jobtype_delete_error' => ['type' => 'danger', 'icon' => 'exclamation-circle', 'text' => 'Failed to delete job type. It may be assigned to handymen.']
+        'jobtype_delete_error' => ['type' => 'danger', 'icon' => 'exclamation-circle', 'text' => 'Failed to delete job type. It may be assigned to handymen.'],
+        'icon_delete_error' => ['type' => 'danger', 'icon' => 'exclamation-circle', 'text' => 'Failed to delete job type icon. Please try again.']
     ];
     
     if (isset($alert_messages[$msg_type])) {
@@ -515,6 +573,14 @@ if (isset($_GET['msg'])) {
             border: 2px solid #e5e7eb;
         }
 
+        .jobtype-icon-lg {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+        }
+
         .jobtype-icon-preview {
             width: 60px;
             height: 60px;
@@ -529,6 +595,38 @@ if (isset($_GET['msg'])) {
             display: flex;
             gap: 0.5rem;
             flex-wrap: wrap;
+        }
+
+        /* Small Action Buttons */
+        .btn-action-sm {
+            padding: 0.4rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        
+        .btn-update {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        
+        .btn-update:hover {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .icon-actions {
+            display: flex;
+            gap: 0.3rem;
+            justify-content: center;
         }
         
         /* Empty State */
@@ -587,7 +685,7 @@ if (isset($_GET['msg'])) {
             color: var(--secondary);
         }
 
-        /* File Upload Styling */
+        /* File Upload Styling - FIXED */
         .file-upload-container {
             border: 2px dashed #d1d5db;
             border-radius: var(--border-radius);
@@ -595,6 +693,7 @@ if (isset($_GET['msg'])) {
             text-align: center;
             transition: var(--transition);
             background: #f9fafb;
+            position: relative;
         }
 
         .file-upload-container:hover {
@@ -608,12 +707,21 @@ if (isset($_GET['msg'])) {
         }
 
         .file-input {
-            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
         }
 
         .file-upload-label {
             cursor: pointer;
             display: block;
+            position: relative;
+            z-index: 5;
         }
 
         .file-upload-icon {
@@ -626,6 +734,11 @@ if (isset($_GET['msg'])) {
             margin-top: 1rem;
             font-size: 0.9rem;
             color: #6b7280;
+        }
+
+        /* Update Icon Modal */
+        .update-icon-modal .modal-dialog {
+            max-width: 500px;
         }
         
         /* Mobile Responsive */
@@ -679,6 +792,11 @@ if (isset($_GET['msg'])) {
 
             .file-upload-container {
                 padding: 1.5rem;
+            }
+
+            .icon-actions {
+                flex-direction: column;
+                align-items: center;
             }
         }
         
@@ -959,8 +1077,10 @@ if (isset($_GET['msg'])) {
                         <div class="col-md-5 mb-3">
                             <label class="form-label"><i class="fas fa-image me-2"></i>Job Type Icon *</label>
                             
-                            <!-- File Upload Area -->
+                            <!-- File Upload Area - FIXED -->
                             <div class="file-upload-container" id="fileUploadContainer">
+                                <input type="file" name="JobIcon" id="JobIcon" class="file-input" 
+                                       accept="image/*" required onchange="handleFileSelect(this)">
                                 <label for="JobIcon" class="file-upload-label">
                                     <div class="file-upload-icon">
                                         <i class="fas fa-cloud-upload-alt"></i>
@@ -975,8 +1095,6 @@ if (isset($_GET['msg'])) {
                                         <p class="text-success mb-0" id="fileName"></p>
                                     </div>
                                 </label>
-                                <input type="file" name="JobIcon" id="JobIcon" class="file-input" 
-                                       accept="image/*" required onchange="previewImage(this)">
                             </div>
                         </div>
                         <div class="col-md-2 mb-3">
@@ -1015,17 +1133,73 @@ if (isset($_GET['msg'])) {
                                             <?php if ($jt['Icon'] && file_exists('uploads/jobtype_icons/' . $jt['Icon'])): ?>
                                                 <img src="uploads/jobtype_icons/<?= htmlspecialchars($jt['Icon']) ?>" 
                                                      alt="<?= htmlspecialchars($jt['JobType_Name']) ?>" 
-                                                     class="jobtype-icon">
+                                                     class="jobtype-icon-lg">
                                             <?php else: ?>
                                                 <i class="fas fa-wrench fa-2x" style="color: var(--primary);"></i>
                                             <?php endif; ?>
                                         </td>
                                         <td><strong><?= htmlspecialchars($jt['JobType_Name']) ?></strong></td>
                                         <td>
-                                            <button onclick="confirmDeleteJobType(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')" 
-                                                    class="btn-action btn-delete" title="Delete">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
+                                            <div class="icon-actions">
+                                                <!-- Update Icon Button -->
+                                                <button type="button" class="btn-action-sm btn-update" title="Update Icon" 
+                                                        data-bs-toggle="modal" data-bs-target="#updateIconModal<?= $jt['JobType_ID'] ?>">
+                                                    <i class="fas fa-sync-alt"></i>
+                                                </button>
+                                                
+                                                <!-- Delete Icon Button -->
+                                                <?php if ($jt['Icon'] && file_exists('uploads/jobtype_icons/' . $jt['Icon'])): ?>
+                                                <button onclick="confirmDeleteIcon(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')" 
+                                                        class="btn-action-sm btn-delete" title="Delete Icon">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                                <?php endif; ?>
+                                                
+                                                <!-- Delete Job Type Button -->
+                                                <button onclick="confirmDeleteJobType(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')" 
+                                                        class="btn-action-sm btn-delete" title="Delete Job Type">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </div>
+
+                                            <!-- Update Icon Modal -->
+                                            <div class="modal fade update-icon-modal" id="updateIconModal<?= $jt['JobType_ID'] ?>" tabindex="-1" aria-hidden="true">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <div class="modal-header">
+                                                            <h5 class="modal-title">Update Icon for <?= htmlspecialchars($jt['JobType_Name']) ?></h5>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <form method="POST" enctype="multipart/form-data">
+                                                            <div class="modal-body">
+                                                                <input type="hidden" name="jobtype_id" value="<?= $jt['JobType_ID'] ?>">
+                                                                <div class="file-upload-container">
+                                                                    <input type="file" name="JobIcon" class="file-input" 
+                                                                           accept="image/*" required onchange="handleFileSelect(this, 'updatePreview<?= $jt['JobType_ID'] ?>')">
+                                                                    <div class="file-upload-label">
+                                                                        <div class="file-upload-icon">
+                                                                            <i class="fas fa-cloud-upload-alt"></i>
+                                                                        </div>
+                                                                        <h5>Click to upload new icon</h5>
+                                                                        <p class="text-muted mb-2">or drag and drop</p>
+                                                                        <p class="file-info">PNG, JPG, GIF up to 2MB</p>
+                                                                        
+                                                                        <!-- Image Preview -->
+                                                                        <div id="updatePreview<?= $jt['JobType_ID'] ?>" class="mt-3" style="display: none;">
+                                                                            <img class="jobtype-icon-preview" src="" alt="Preview">
+                                                                            <p class="text-success mb-0"></p>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                <button type="submit" name="update_jobtype_icon" class="btn btn-primary">Update Icon</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -1068,12 +1242,12 @@ if (isset($_GET['msg'])) {
             });
         });
 
-        // File upload and preview functionality
-        function previewImage(input) {
-            const preview = document.getElementById('previewImage');
-            const fileName = document.getElementById('fileName');
-            const imagePreview = document.getElementById('imagePreview');
-            const fileUploadContainer = document.getElementById('fileUploadContainer');
+        // Fixed file upload functionality
+        function handleFileSelect(input, previewId = 'imagePreview') {
+            const preview = document.getElementById(previewId);
+            const fileName = preview ? preview.querySelector('p') : null;
+            const previewImage = preview ? preview.querySelector('img') : null;
+            const fileUploadContainer = input.closest('.file-upload-container');
 
             if (input.files && input.files[0]) {
                 const file = input.files[0];
@@ -1096,11 +1270,13 @@ if (isset($_GET['msg'])) {
                 const reader = new FileReader();
                 
                 reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    fileName.textContent = file.name;
-                    imagePreview.style.display = 'block';
-                    fileUploadContainer.style.borderColor = '#10b981';
-                    fileUploadContainer.style.background = 'rgba(16, 185, 129, 0.05)';
+                    if (previewImage) previewImage.src = e.target.result;
+                    if (fileName) fileName.textContent = file.name;
+                    if (preview) preview.style.display = 'block';
+                    if (fileUploadContainer) {
+                        fileUploadContainer.style.borderColor = '#10b981';
+                        fileUploadContainer.style.background = 'rgba(16, 185, 129, 0.05)';
+                    }
                 }
                 
                 reader.readAsDataURL(input.files[0]);
@@ -1108,33 +1284,33 @@ if (isset($_GET['msg'])) {
         }
 
         // Drag and drop functionality
-        const fileUploadContainer = document.getElementById('fileUploadContainer');
-        const fileInput = document.getElementById('JobIcon');
-
-        fileUploadContainer.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileUploadContainer.classList.add('dragover');
-        });
-
-        fileUploadContainer.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            fileUploadContainer.classList.remove('dragover');
-        });
-
-        fileUploadContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileUploadContainer.classList.remove('dragover');
+        document.querySelectorAll('.file-upload-container').forEach(container => {
+            const fileInput = container.querySelector('.file-input');
             
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                previewImage(fileInput);
-            }
-        });
+            container.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                container.classList.add('dragover');
+            });
 
-        // Click to upload
-        fileUploadContainer.addEventListener('click', () => {
-            fileInput.click();
+            container.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                container.classList.remove('dragover');
+            });
+
+            container.addEventListener('drop', (e) => {
+                e.preventDefault();
+                container.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    // Find the correct preview ID
+                    const form = container.closest('form');
+                    const isUpdate = form && form.querySelector('input[name="update_jobtype_icon"]');
+                    const previewId = isUpdate ? container.querySelector('[id^="updatePreview"]').id : 'imagePreview';
+                    handleFileSelect(fileInput, previewId);
+                }
+            });
         });
 
         // Confirmation dialogs
@@ -1147,6 +1323,12 @@ if (isset($_GET['msg'])) {
         function confirmDeleteJobType(jobTypeId, jobTypeName) {
             if (confirm(`Are you sure you want to delete the job type "${jobTypeName}"?\n\nThis will remove it from all handymen assigned to this job type.`)) {
                 window.location.href = '?delete_jobtype=' + jobTypeId;
+            }
+        }
+
+        function confirmDeleteIcon(jobTypeId, jobTypeName) {
+            if (confirm(`Are you sure you want to delete the icon for "${jobTypeName}"?\n\nThe job type will remain but will use a default icon.`)) {
+                window.location.href = '?delete_icon=' + jobTypeId;
             }
         }
 
@@ -1171,6 +1353,22 @@ if (isset($_GET['msg'])) {
                 sidebar.classList.remove('active');
                 mobileOverlay.classList.remove('active');
             }
+        });
+
+        // Reset file input when modal is closed
+        document.querySelectorAll('.update-icon-modal').forEach(modal => {
+            modal.addEventListener('hidden.bs.modal', function () {
+                const fileInput = this.querySelector('input[type="file"]');
+                const preview = this.querySelector('[id^="updatePreview"]');
+                if (fileInput) fileInput.value = '';
+                if (preview) {
+                    preview.style.display = 'none';
+                    const img = preview.querySelector('img');
+                    const p = preview.querySelector('p');
+                    if (img) img.src = '';
+                    if (p) p.textContent = '';
+                }
+            });
         });
     </script>
 </body>

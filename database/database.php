@@ -480,7 +480,57 @@ public function getHomepageRentedUnits($limit = 12) {
         return []; 
     }
 }
+public function updateJobTypeIcon($jobTypeId, $icon) {
+    $sql = "UPDATE jobtype SET Icon = ? WHERE JobType_ID = ?";
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([$icon, $jobTypeId]);
+    } catch (PDOException $e) {
+        error_log("Error updating job type icon: " . $e->getMessage());
+        return false;
+    }
+}
 
+
+
+public function getJobTypeById($jobTypeId) {
+    $sql = "SELECT * FROM jobtype WHERE JobType_ID = ?";
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$jobTypeId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error getting job type by ID: " . $e->getMessage());
+        return null;
+    }
+}
+
+
+public function updateJobTypeWithImage($jobTypeId, $iconFile) {
+    try {
+        // Handle file upload - AUTO CREATE DIRECTORY
+        $uploadDir = __DIR__ . "/../uploads/jobtype_icons/";
+        
+        // Automatically create directory if it doesn't exist
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+        
+        $fileName = 'jobtype_' . time() . '_' . uniqid() . '.' . pathinfo($iconFile['name'], PATHINFO_EXTENSION);
+        $uploadPath = $uploadDir . $fileName;
+        
+        if (move_uploaded_file($iconFile['tmp_name'], $uploadPath)) {
+            $sql = "UPDATE jobtype SET Icon = ? WHERE JobType_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$fileName, $jobTypeId]);
+        } else {
+            return false;
+        }
+    } catch (PDOException $e) {
+        error_log("Error updating job type with image: " . $e->getMessage());
+        return false;
+    }
+}
 
 
     // --- Feedback and Testimonials ---
@@ -2004,7 +2054,7 @@ public function addJobTypeWithImage($jobTypeName, $iconFile) {
         
         // Automatically create directory if it doesn't exist
         if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true); // The 'true' creates nested directories
+            mkdir($uploadDir, 0777, true);
         }
         
         $fileName = 'jobtype_' . time() . '_' . uniqid() . '.' . pathinfo($iconFile['name'], PATHINFO_EXTENSION);
@@ -2018,7 +2068,7 @@ public function addJobTypeWithImage($jobTypeName, $iconFile) {
             return false;
         }
     } catch (PDOException $e) {
-        error_log("Error adding job type: " . $e->getMessage());
+        error_log("Error adding job type with image: " . $e->getMessage());
         return false;
     }
 }
