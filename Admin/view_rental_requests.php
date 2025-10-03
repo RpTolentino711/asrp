@@ -8,6 +8,8 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header('Location: login.php');
     exit();
 }
+
+// $pending_requests = $db->getPendingRentalRequests();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -33,7 +35,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             --sidebar-width: 280px;
             --border-radius: 12px;
             --transition: all 0.3s ease;
-            --mobile-header-height: 60px;
         }
         
         * {
@@ -47,59 +48,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             background: linear-gradient(to right, #f8fafc, #f1f5f9);
             color: #374151;
             min-height: 100vh;
-        }
-
-        /* Mobile Overlay */
-        .mobile-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-            display: none;
-        }
-
-        .mobile-overlay.active {
-            display: block;
-        }
-
-        /* Mobile Header */
-        .mobile-header {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--mobile-header-height);
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
-            z-index: 1001;
-            padding: 0 1rem;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .mobile-menu-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            color: var(--dark);
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: var(--transition);
-        }
-
-        .mobile-menu-btn:hover {
-            background: rgba(0,0,0,0.1);
-        }
-
-        .mobile-brand {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: var(--dark);
         }
         
         /* Sidebar Styling */
@@ -279,67 +227,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         .custom-table tr:hover {
             background-color: #f9fafb;
         }
-
-        /* Mobile Card Layout */
-        .mobile-card {
-            display: none;
-            background: white;
-            border-radius: var(--border-radius);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 1rem;
-            padding: 1.25rem;
-            border-left: 4px solid var(--primary);
-        }
-
-        .mobile-card-header {
-            font-weight: 600;
-            font-size: 1.1rem;
-            color: var(--dark);
-            margin-bottom: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        .mobile-card-id {
-            background: var(--primary);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .mobile-card-detail {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.75rem;
-            font-size: 0.9rem;
-        }
-
-        .mobile-card-detail .label {
-            font-weight: 500;
-            color: #6b7280;
-            min-width: 100px;
-        }
-
-        .mobile-card-detail .value {
-            color: var(--dark);
-            text-align: right;
-            flex: 1;
-        }
-
-        .mobile-actions {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }
-
-        .mobile-actions .btn {
-            flex: 1;
-            padding: 0.75rem;
-            font-size: 0.9rem;
-        }
         
         /* Client Info with Hover Tooltip */
         .client-info {
@@ -467,14 +354,14 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             .sidebar.active {
                 transform: translateX(0);
             }
-
-            .mobile-header {
-                display: flex;
-            }
             
             .main-content {
                 margin-left: 0;
-                margin-top: var(--mobile-header-height);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
                 padding: 1rem;
             }
             
@@ -483,62 +370,30 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 align-items: flex-start;
                 gap: 1rem;
             }
-
-            .page-title h1 {
-                font-size: 1.5rem;
-            }
-
-            .title-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
-            }
-
-            /* Hide desktop table, show mobile cards */
-            .table-container {
-                display: none;
-            }
-
-            .mobile-card {
-                display: block;
-            }
-
-            .card-body {
-                padding: 1rem;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .main-content {
-                padding: 0.75rem;
-            }
-
-            .mobile-card {
-                padding: 1rem;
-            }
-
-            .mobile-card-detail {
-                flex-direction: column;
-                gap: 0.25rem;
-            }
-
-            .mobile-card-detail .value {
-                text-align: left;
-            }
-
-            .mobile-actions {
-                flex-direction: column;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .page-title h1 {
-                font-size: 1.3rem;
-            }
-
-            .mobile-card-header {
-                flex-direction: column;
+            
+            .action-buttons {
+                display: flex;
                 gap: 0.5rem;
+            }
+            
+            .btn-action {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+            }
+            
+            /* Mobile tooltip adjustments */
+            .client-tooltip {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                max-width: 280px;
+                white-space: normal;
+                text-align: center;
+            }
+            
+            .client-tooltip::after {
+                display: none;
             }
         }
         
@@ -554,22 +409,8 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     </style>
 </head>
 <body>
-    <!-- Mobile Overlay -->
-    <div class="mobile-overlay" id="mobileOverlay"></div>
-
-    <!-- Mobile Header -->
-    <div class="mobile-header">
-        <button class="mobile-menu-btn" id="mobileMenuBtn">
-            <i class="fas fa-bars"></i>
-        </button>
-        <div class="mobile-brand">
-            ASRT Admin
-        </div>
-        <div></div>
-    </div>
-
     <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
+    <div class="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
                 <i class="fas fa-crown"></i>
@@ -698,51 +539,19 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Mobile menu functionality
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const sidebar = document.getElementById('sidebar');
-        const mobileOverlay = document.getElementById('mobileOverlay');
-
-        function toggleMobileMenu() {
-            sidebar.classList.toggle('active');
-            mobileOverlay.classList.toggle('active');
-        }
-
-        mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-        mobileOverlay.addEventListener('click', toggleMobileMenu);
-
-        // Close mobile menu when clicking on nav links
-        document.querySelectorAll('.nav-link').forEach(link => {
-            link.addEventListener('click', () => {
-                if (window.innerWidth <= 992) {
-                    sidebar.classList.remove('active');
-                    mobileOverlay.classList.remove('active');
-                }
+    // --- LIVE ADMIN: AJAX Polling for Pending Rental Requests ---
+    function fetchPendingRequests() {
+        fetch('../AJAX/ajax_admin_pending_requests.php')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('pendingRequestsContainer').innerHTML = html;
+                // Update count badge
+                const match = html.match(/data-count="(\d+)"/);
+                if (match) document.getElementById('pendingCount').textContent = match[1];
             });
-        });
-
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            if (window.innerWidth > 992) {
-                sidebar.classList.remove('active');
-                mobileOverlay.classList.remove('active');
-            }
-        });
-
-        // --- LIVE ADMIN: AJAX Polling for Pending Rental Requests ---
-        function fetchPendingRequests() {
-            fetch('../AJAX/ajax_admin_pending_requests.php')
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById('pendingRequestsContainer').innerHTML = html;
-                    // Update count badge
-                    const match = html.match(/data-count="(\d+)"/);
-                    if (match) document.getElementById('pendingCount').textContent = match[1];
-                });
-        }
-        setInterval(fetchPendingRequests, 10000); // every 10s
-        document.addEventListener('DOMContentLoaded', fetchPendingRequests);
-
+    }
+    setInterval(fetchPendingRequests, 10000); // every 10s
+    document.addEventListener('DOMContentLoaded', fetchPendingRequests);
         // SweetAlert for success/error messages
         <?php if (isset($_SESSION['admin_message'])): ?>
             Swal.fire({
