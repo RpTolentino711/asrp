@@ -417,7 +417,7 @@ public function getRentedUnits($client_id) {
         }
     }
 
-  public function getHomepageAvailableUnits($limit = 20) {
+  public function getHomepageAvailableUnits($limit = 6) {
     // Only show units that are available to rent (Flow_Status = 'new')
     $sql = "SELECT s.*, st.SpaceTypeName
             FROM space s
@@ -440,7 +440,7 @@ public function getRentedUnits($client_id) {
 
 
 
-public function getHomepageRentedUnits($limit = 20) {
+public function getHomepageRentedUnits($limit = 12) {
     $sql = "SELECT 
             s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
             sa.StartDate, sa.EndDate,
@@ -562,7 +562,7 @@ public function updateJobTypeWithImage($jobTypeId, $iconFile) {
 
 
     
-    public function getHomepageTestimonials($limit = 20) {
+    public function getHomepageTestimonials($limit = 6) {
     $sql = "SELECT cf.*, c.Client_fn, c.Client_ln
         FROM clientfeedback cf
         JOIN invoice i ON cf.CS_ID = i.Invoice_ID
@@ -739,53 +739,17 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
         return false;
     }
 }
- 
-
-public function updateMaintenanceCompletionPhoto($request_id, $completion_photo) {
-    try {
-        $sql = "UPDATE maintenancerequest 
-                SET CompletionPhoto = ?, Status = 'Completed' 
-                WHERE Request_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([$completion_photo, $request_id]);
-    } catch (PDOException $e) {
-        error_log("Error updating completion photo: " . $e->getMessage());
-        return false;
+    public function getClientMaintenanceHistory($client_id) {
+        $sql = "SELECT mr.Request_ID, mr.Space_ID, s.Name AS SpaceName, mr.RequestDate, mr.Status,
+                       (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory WHERE Request_ID = mr.Request_ID) AS LastStatusDate,
+                       h.Handyman_fn, h.Handyman_ln, mr.Handyman_ID
+                FROM maintenancerequest mr
+                JOIN space s ON mr.Space_ID = s.Space_ID
+                LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+                WHERE mr.Client_ID = ?
+                ORDER BY mr.RequestDate DESC";
+        return $this->runQuery($sql, [$client_id], true);
     }
-}
-
-public function getMaintenanceRequestById($request_id) {
-    $sql = "SELECT 
-                mr.*,
-                s.Name as SpaceName,
-                c.Client_fn,
-                c.Client_ln,
-                c.Client_Email,
-                c.Client_Phone,
-                h.Handyman_fn,
-                h.Handyman_ln
-            FROM maintenancerequest mr
-            INNER JOIN space s ON mr.Space_ID = s.Space_ID
-            INNER JOIN client c ON mr.Client_ID = c.Client_ID
-            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
-            WHERE mr.Request_ID = ?";
-    return $this->runQuery($sql, [$request_id]);
-}
-
-
-public function getClientMaintenanceHistory($client_id) {
-    $sql = "SELECT mr.Request_ID, mr.Space_ID, s.Name AS SpaceName, mr.RequestDate, mr.Status,
-                   mr.IssuePhoto, mr.CompletionPhoto,
-                   (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory WHERE Request_ID = mr.Request_ID) AS LastStatusDate,
-                   h.Handyman_fn, h.Handyman_ln, mr.Handyman_ID
-            FROM maintenancerequest mr
-            JOIN space s ON mr.Space_ID = s.Space_ID
-            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
-            WHERE mr.Client_ID = ?
-            ORDER BY mr.RequestDate DESC";
-    return $this->runQuery($sql, [$client_id], true);
-}
-
 
     public function getMaintenanceHistoryForUnits(array $unit_ids, $client_id) {
         if (empty($unit_ids)) return [];
@@ -1570,26 +1534,26 @@ public function acceptRentalRequest($request_id) {
     }
 }
 
-public function getActiveMaintenanceRequests() {
-    $sql = "SELECT mr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS SpaceName, 
-                   mr.RequestDate, mr.Status, mr.Handyman_ID, mr.IssuePhoto, mr.CompletionPhoto,
-                   h.Handyman_fn, h.Handyman_ln,
-                   (SELECT GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ')
-                    FROM handymanjob hj
-                    JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
-                    WHERE hj.Handyman_ID = h.Handyman_ID) AS JobTypes
-            FROM maintenancerequest mr
-            JOIN client c ON mr.Client_ID = c.Client_ID
-            JOIN space s ON mr.Space_ID = s.Space_ID
-            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
-            WHERE mr.Status IN ('Submitted', 'In Progress')
-            ORDER BY mr.RequestDate DESC";
-    try {
-        return $this->pdo->query($sql)->fetchAll();
-    } catch (PDOException $e) {
-        return [];
+    public function getActiveMaintenanceRequests() {
+        $sql = "SELECT mr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS SpaceName, 
+                       mr.RequestDate, mr.Status, mr.Handyman_ID,
+                       h.Handyman_fn, h.Handyman_ln,
+                       (SELECT GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ')
+                        FROM handymanjob hj
+                        JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
+                        WHERE hj.Handyman_ID = h.Handyman_ID) AS JobTypes
+                FROM maintenancerequest mr
+                JOIN client c ON mr.Client_ID = c.Client_ID
+                JOIN space s ON mr.Space_ID = s.Space_ID
+                LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+                WHERE mr.Status IN ('Submitted', 'In Progress')
+                ORDER BY mr.RequestDate DESC";
+        try {
+            return $this->pdo->query($sql)->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
 
 
 
@@ -1611,33 +1575,28 @@ public function getActiveMaintenanceRequests() {
     }
 
 
-public function updateMaintenanceRequest($request_id, $new_status, $handyman_id, $completion_photo = null) {
-    $current = $this->runQuery("SELECT Status FROM maintenancerequest WHERE Request_ID = ?", [$request_id]);
-    $status_changed = ($current && $current['Status'] !== $new_status);
+    public function updateMaintenanceRequest($request_id, $new_status, $handyman_id) {
+        $current = $this->runQuery("SELECT Status FROM maintenancerequest WHERE Request_ID = ?", [$request_id]);
+        $status_changed = ($current && $current['Status'] !== $new_status);
 
-    $this->pdo->beginTransaction();
-    try {
-        // Update main request with optional completion photo
-        if ($completion_photo) {
-            $sql1 = "UPDATE maintenancerequest SET Status = ?, Handyman_ID = ?, CompletionPhoto = ? WHERE Request_ID = ?";
-            $this->executeStatement($sql1, [$new_status, $handyman_id, $completion_photo, $request_id]);
-        } else {
+        $this->pdo->beginTransaction();
+        try {
             $sql1 = "UPDATE maintenancerequest SET Status = ?, Handyman_ID = ? WHERE Request_ID = ?";
             $this->executeStatement($sql1, [$new_status, $handyman_id, $request_id]);
+            if ($status_changed) {
+                $sql2 = "INSERT INTO maintenancerequeststatushistory (Request_ID, StatusChangeDate, NewStatus) VALUES (?, NOW(), ?)";
+                $this->executeStatement($sql2, [$request_id, $new_status]);
+            }
+            $this->pdo->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            error_log("Failed to update maintenance request #{$request_id}: " . $e->getMessage());
+            return false;
         }
-        
-        if ($status_changed) {
-            $sql2 = "INSERT INTO maintenancerequeststatushistory (Request_ID, StatusChangeDate, NewStatus) VALUES (?, NOW(), ?)";
-            $this->executeStatement($sql2, [$request_id, $new_status]);
-        }
-        $this->pdo->commit();
-        return true;
-    } catch (Exception $e) {
-        $this->pdo->rollBack();
-        error_log("Failed to update maintenance request #{$request_id}: " . $e->getMessage());
-        return false;
     }
-}
+
+    
 
     public function updateClientStatus($client_id, $status) {
         $sql = "UPDATE client SET Status = ? WHERE Client_ID = ?";

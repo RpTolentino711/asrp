@@ -10,76 +10,23 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 }
 
 $message = '';
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    if (isset($_POST['update_request'])) {
-        $request_id = intval($_POST['request_id']);
-        $status = $_POST['status'];
-        $handyman_id = $_POST['handyman_id'] !== "" ? intval($_POST['handyman_id']) : null;
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['update_request'])) {
+    $request_id = intval($_POST['request_id']);
+    $status = $_POST['status'];
+    $handyman_id = $_POST['handyman_id'] !== "" ? intval($_POST['handyman_id']) : null;
 
-        // Handle completion photo upload
-        $completion_photo = null;
-        if ($status === 'Completed' && isset($_FILES['completion_photo']) && $_FILES['completion_photo']['error'] === UPLOAD_ERR_OK) {
-            $file = $_FILES['completion_photo'];
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-            
-            if (!in_array($file['type'], $allowed_types)) {
-                $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Invalid file type for completion photo. Please upload JPG, PNG, or GIF images only.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>';
-            } elseif ($file['size'] > 5 * 1024 * 1024) { // 5MB limit
-                $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Completion photo is too large (max 5MB). Please choose a smaller file.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>';
-            } else {
-                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-                $filename = "completion_" . time() . "_" . rand(1000, 9999) . "." . $ext;
-                $upload_dir = __DIR__ . "/../uploads/maintenance_completions/";
-                
-                // Create directory if it doesn't exist
-                if (!is_dir($upload_dir)) {
-                    mkdir($upload_dir, 0777, true);
-                }
-                
-                $filepath = $upload_dir . $filename;
-                if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                    $completion_photo = $filename;
-                } else {
-                    $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                                Failed to upload completion photo. Please try again.
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
-                }
-            }
-        }
-
-        // If status is completed and no photo was uploaded, show error
-        if ($status === 'Completed' && empty($completion_photo) {
-            $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Please upload a completion photo when marking request as completed.
+    if ($db->updateMaintenanceRequest($request_id, $status, $handyman_id)) {
+        $message = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Request #' . htmlspecialchars($request_id) . ' updated successfully.
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>';
-        } else {
-            // Update the maintenance request
-            if ($db->updateMaintenanceRequest($request_id, $status, $handyman_id, $completion_photo)) {
-                $message = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Request #' . htmlspecialchars($request_id) . ' updated successfully.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>';
-            } else {
-                $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Failed to update request #' . htmlspecialchars($request_id) . '.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>';
-            }
-        }
+    } else {
+        $message = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to update request #' . htmlspecialchars($request_id) . '.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>';
     }
 }
 
@@ -99,155 +46,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Add these new styles for photo functionality */
-        .photo-section {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: var(--border-radius);
-            padding: 1.25rem;
-            margin-top: 1rem;
-        }
-
-        .photo-upload-container {
-            border: 2px dashed #cbd5e1;
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            background: white;
-            position: relative;
-            margin-bottom: 1rem;
-        }
-
-        .photo-upload-container:hover {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.02);
-        }
-
-        .photo-upload-container.dragover {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        .photo-input {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-            z-index: 10;
-        }
-
-        .photo-upload-label {
-            cursor: pointer;
-            display: block;
-            position: relative;
-            z-index: 5;
-        }
-
-        .photo-upload-icon {
-            font-size: 2rem;
-            color: var(--primary);
-            margin-bottom: 0.75rem;
-        }
-
-        .photo-info {
-            margin-top: 0.75rem;
-            font-size: 0.8rem;
-            color: #64748b;
-        }
-
-        .photo-preview-container {
-            margin-top: 1rem;
-            text-align: center;
-        }
-
-        .photo-preview {
-            max-width: 150px;
-            max-height: 120px;
-            border-radius: 0.375rem;
-            border: 2px solid var(--success);
-            margin-bottom: 0.5rem;
-        }
-
-        .photo-requirements {
-            background: #f1f5f9;
-            border-radius: 0.375rem;
-            padding: 0.75rem;
-            font-size: 0.8rem;
-            color: #475569;
-            margin-top: 0.75rem;
-        }
-
-        .photo-requirements ul {
-            margin: 0;
-            padding-left: 1.25rem;
-        }
-
-        .photo-requirements li {
-            margin-bottom: 0.25rem;
-        }
-
-        .existing-photos {
-            margin-top: 1rem;
-        }
-
-        .photo-thumbnail {
-            width: 60px;
-            height: 45px;
-            object-fit: cover;
-            border-radius: 0.375rem;
-            border: 1px solid #e2e8f0;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .photo-thumbnail:hover {
-            transform: scale(1.1);
-        }
-
-        .photo-label {
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .photo-modal-img {
-            max-width: 100%;
-            max-height: 80vh;
-            object-fit: contain;
-        }
-
-        /* Status-specific photo requirements */
-        .photo-required {
-            border-left: 4px solid var(--danger);
-            background: rgba(239, 68, 68, 0.05);
-        }
-
-        /* Update existing styles for photo integration */
-        .mobile-form {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: var(--border-radius);
-            padding: 1.25rem;
-            margin-top: 1.25rem;
-        }
-
-        .completion-photo-section {
-            display: none;
-        }
-
-        .completion-photo-section.required {
-            display: block;
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        /* Your existing CSS remains the same below this point */
         :root {
             --primary: #6366f1;
             --primary-dark: #4f46e5;
@@ -1056,36 +854,22 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                     <th>Client</th>
                                     <th>Unit</th>
                                     <th>Date</th>
-                                    <th>Issue Photo</th>
                                     <th>Status</th>
                                     <th>Assign Handyman</th>
-                                    <th>Completion Photo</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach($active_requests as $row): ?>
                                 <tr>
-                                    <form method="post" enctype="multipart/form-data">
+                                    <form method="post">
                                         <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
                                         <td><span class="fw-medium">#<?= $row['Request_ID'] ?></span></td>
                                         <td><div class="fw-medium"><?= htmlspecialchars($row['Client_fn'] . " " . $row['Client_ln']) ?></div></td>
                                         <td><?= htmlspecialchars($row['SpaceName']) ?></td>
                                         <td><div class="text-muted"><?= htmlspecialchars($row['RequestDate']) ?></div></td>
                                         <td>
-                                            <?php if (!empty($row['IssuePhoto'])): ?>
-                                                <img src="../uploads/maintenance_issues/<?= htmlspecialchars($row['IssuePhoto']) ?>" 
-                                                     class="photo-thumbnail" 
-                                                     data-bs-toggle="modal" 
-                                                     data-bs-target="#photoModal"
-                                                     data-photo="../uploads/maintenance_issues/<?= htmlspecialchars($row['IssuePhoto']) ?>"
-                                                     alt="Issue Photo">
-                                            <?php else: ?>
-                                                <span class="text-muted">No photo</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <select name="status" class="form-select form-select-sm" onchange="toggleCompletionPhoto(this)">
+                                            <select name="status" class="form-select form-select-sm">
                                                 <option value="Submitted" <?= $row['Status'] === 'Submitted' ? 'selected' : '' ?>>Submitted</option>
                                                 <option value="In Progress" <?= $row['Status'] === 'In Progress' ? 'selected' : '' ?>>In Progress</option>
                                                 <option value="Completed" <?= $row['Status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
@@ -1105,20 +889,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                                 <div class="handyman-info">
                                                     Currently assigned: <?= htmlspecialchars($row['Handyman_fn'] . ' ' . $row['Handyman_ln']) ?>
                                                 </div>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <div class="completion-photo-section" style="display: <?= $row['Status'] === 'Completed' ? 'block' : 'none' ?>;">
-                                                <input type="file" name="completion_photo" accept="image/*" class="form-control form-control-sm">
-                                                <small class="text-muted">Required for completion</small>
-                                            </div>
-                                            <?php if (!empty($row['CompletionPhoto'])): ?>
-                                                <img src="../uploads/maintenance_completions/<?= htmlspecialchars($row['CompletionPhoto']) ?>" 
-                                                     class="photo-thumbnail mt-1" 
-                                                     data-bs-toggle="modal" 
-                                                     data-bs-target="#photoModal"
-                                                     data-photo="../uploads/maintenance_completions/<?= htmlspecialchars($row['CompletionPhoto']) ?>"
-                                                     alt="Completion Photo">
                                             <?php endif; ?>
                                         </td>
                                         <td>
@@ -1143,7 +913,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                 <div class="spinner"></div>
                             </div>
                             
-                            <form method="POST" action="" data-request-id="<?= $row['Request_ID'] ?>" enctype="multipart/form-data">
+                            <form method="POST" action="" data-request-id="<?= $row['Request_ID'] ?>">
                                 <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
                                 
                                 <div class="mobile-card-header">
@@ -1171,33 +941,10 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                     <span class="value"><?= htmlspecialchars(date('M j, Y', strtotime($row['RequestDate']))) ?></span>
                                 </div>
 
-                                <!-- Issue Photo -->
-                                <?php if (!empty($row['IssuePhoto'])): ?>
+                                <?php if (!empty($row['Description'])): ?>
                                 <div class="mobile-card-detail">
-                                    <span class="label"><i class="fas fa-camera me-1"></i>Issue Photo:</span>
-                                    <span class="value">
-                                        <img src="../uploads/maintenance_issues/<?= htmlspecialchars($row['IssuePhoto']) ?>" 
-                                             class="photo-thumbnail" 
-                                             data-bs-toggle="modal" 
-                                             data-bs-target="#photoModal"
-                                             data-photo="../uploads/maintenance_issues/<?= htmlspecialchars($row['IssuePhoto']) ?>"
-                                             alt="Issue Photo">
-                                    </span>
-                                </div>
-                                <?php endif; ?>
-
-                                <!-- Completion Photo -->
-                                <?php if (!empty($row['CompletionPhoto'])): ?>
-                                <div class="mobile-card-detail">
-                                    <span class="label"><i class="fas fa-check-circle me-1"></i>Completion:</span>
-                                    <span class="value">
-                                        <img src="../uploads/maintenance_completions/<?= htmlspecialchars($row['CompletionPhoto']) ?>" 
-                                             class="photo-thumbnail" 
-                                             data-bs-toggle="modal" 
-                                             data-bs-target="#photoModal"
-                                             data-photo="../uploads/maintenance_completions/<?= htmlspecialchars($row['CompletionPhoto']) ?>"
-                                             alt="Completion Photo">
-                                    </span>
+                                    <span class="label"><i class="fas fa-info-circle me-1"></i>Issue:</span>
+                                    <span class="value"><?= htmlspecialchars(substr($row['Description'], 0, 100)) ?><?= strlen($row['Description']) > 100 ? '...' : '' ?></span>
                                 </div>
                                 <?php endif; ?>
 
@@ -1213,7 +960,7 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                         <label for="status_<?= $row['Request_ID'] ?>">
                                             <i class="fas fa-tasks me-1"></i>Update Status
                                         </label>
-                                        <select name="status" id="status_<?= $row['Request_ID'] ?>" onchange="toggleMobileCompletionPhoto(this)">
+                                        <select name="status" id="status_<?= $row['Request_ID'] ?>">
                                             <option value="Submitted" <?= $row['Status'] === 'Submitted' ? 'selected' : '' ?>>Submitted</option>
                                             <option value="In Progress" <?= $row['Status'] === 'In Progress' ? 'selected' : '' ?>>In Progress</option>
                                             <option value="Completed" <?= $row['Status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
@@ -1234,39 +981,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                             <?php endforeach; ?>
                                         </select>
                                     </div>
-
-                                    <!-- Completion Photo Upload (Mobile) -->
-                                    <div class="completion-photo-section mobile-form-group" id="completion_photo_<?= $row['Request_ID'] ?>" style="display: <?= $row['Status'] === 'Completed' ? 'block' : 'none' ?>;">
-                                        <label for="completion_photo_input_<?= $row['Request_ID'] ?>">
-                                            <i class="fas fa-camera me-1"></i>Completion Photo (Required)
-                                        </label>
-                                        <div class="photo-upload-container">
-                                            <input type="file" name="completion_photo" id="completion_photo_input_<?= $row['Request_ID'] ?>" 
-                                                   class="photo-input" accept="image/*" onchange="handlePhotoSelect(this, 'completion_preview_<?= $row['Request_ID'] ?>')">
-                                            <label for="completion_photo_input_<?= $row['Request_ID'] ?>" class="photo-upload-label">
-                                                <div class="photo-upload-icon">
-                                                    <i class="fas fa-cloud-upload-alt"></i>
-                                                </div>
-                                                <h6>Upload Completion Photo</h6>
-                                                <p class="text-muted mb-1">or drag and drop</p>
-                                                <p class="photo-info">JPG, PNG, GIF up to 5MB</p>
-                                                
-                                                <!-- Image Preview -->
-                                                <div id="completion_preview_<?= $row['Request_ID'] ?>" class="photo-preview-container" style="display: none;">
-                                                    <img class="photo-preview" src="" alt="Preview">
-                                                    <p class="text-success mb-0" id="completion_file_name_<?= $row['Request_ID'] ?>"></p>
-                                                </div>
-                                            </label>
-                                        </div>
-                                        <div class="photo-requirements">
-                                            <strong>Photo Requirements:</strong>
-                                            <ul>
-                                                <li>Clear photo showing the completed work</li>
-                                                <li>Ensure the fix is visible and well-lit</li>
-                                                <li>Max file size: 5MB</li>
-                                            </ul>
-                                        </div>
-                                    </div>
                                     
                                     <button type="submit" name="update_request" class="mobile-save-btn">
                                         <i class="fas fa-save"></i> Save Changes
@@ -1286,21 +1000,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         </a>
                     </div>
                 <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- Photo Modal -->
-    <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Photo View</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body text-center">
-                    <img id="modalPhoto" class="photo-modal-img" src="" alt="Photo">
-                </div>
             </div>
         </div>
     </div>
@@ -1346,31 +1045,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 }, 250);
             });
 
-            // Photo modal functionality
-            const photoModal = document.getElementById('photoModal');
-            if (photoModal) {
-                photoModal.addEventListener('show.bs.modal', function(event) {
-                    const button = event.relatedTarget;
-                    const photoSrc = button.getAttribute('data-photo');
-                    const modalImage = document.getElementById('modalPhoto');
-                    modalImage.src = photoSrc;
-                });
-            }
-
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', function(e) {
-                    const statusSelect = this.querySelector('select[name="status"]');
-                    const completionPhotoInput = this.querySelector('input[name="completion_photo"]');
-                    
-                    // Check if status is completed and no completion photo is provided
-                    if (statusSelect && statusSelect.value === 'Completed') {
-                        if (!completionPhotoInput || !completionPhotoInput.files || completionPhotoInput.files.length === 0) {
-                            e.preventDefault();
-                            alert('Please upload a completion photo when marking the request as completed.');
-                            return false;
-                        }
-                    }
-
                     const submitBtn = this.querySelector('[type="submit"]');
                     const mobileCard = this.closest('.mobile-card');
                     
@@ -1387,6 +1063,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                         submitBtn.disabled = true;
                     }
+                    
+                    // Let the form submit normally - don't prevent default
                 });
             });
 
@@ -1404,101 +1082,27 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 }, 6000);
             });
 
+            document.addEventListener('change', function(e) {
+                if (e.target.name === 'status' && e.target.value === 'Completed') {
+                    const requestId = e.target.closest('form').dataset.requestId;
+                    if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request.')) {
+                        const options = e.target.options;
+                        for (let i = 0; i < options.length; i++) {
+                            if (options[i].defaultSelected) {
+                                e.target.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+            });
+
             document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape' && sidebar.classList.contains('active')) {
                     toggleMobileMenu();
                 }
             });
-
-            // Drag and drop functionality for photo upload
-            document.querySelectorAll('.photo-upload-container').forEach(container => {
-                const photoInput = container.querySelector('.photo-input');
-                
-                container.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    container.classList.add('dragover');
-                });
-
-                container.addEventListener('dragleave', (e) => {
-                    e.preventDefault();
-                    container.classList.remove('dragover');
-                });
-
-                container.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    container.classList.remove('dragover');
-                    
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        photoInput.files = files;
-                        const previewId = container.querySelector('.photo-preview-container').id;
-                        handlePhotoSelect(photoInput, previewId);
-                    }
-                });
-            });
         });
-
-        function toggleCompletionPhoto(select) {
-            const form = select.closest('form');
-            const completionSection = form.querySelector('.completion-photo-section');
-            if (select.value === 'Completed') {
-                completionSection.style.display = 'block';
-            } else {
-                completionSection.style.display = 'none';
-            }
-        }
-
-        function toggleMobileCompletionPhoto(select) {
-            const requestId = select.id.split('_')[1];
-            const completionSection = document.getElementById('completion_photo_' + requestId);
-            if (select.value === 'Completed') {
-                completionSection.style.display = 'block';
-                completionSection.classList.add('photo-required');
-            } else {
-                completionSection.style.display = 'none';
-                completionSection.classList.remove('photo-required');
-            }
-        }
-
-        function handlePhotoSelect(input, previewId) {
-            const preview = document.getElementById(previewId);
-            const fileName = document.getElementById(previewId.replace('preview', 'file_name'));
-            const previewImage = preview ? preview.querySelector('img') : null;
-            const photoUploadContainer = input.closest('.photo-upload-container');
-
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                
-                // Validate file type
-                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-                if (!validTypes.includes(file.type)) {
-                    alert('Please select a valid image file (JPEG, PNG, GIF).');
-                    input.value = '';
-                    return;
-                }
-                
-                // Validate file size (5MB)
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB.');
-                    input.value = '';
-                    return;
-                }
-
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    if (previewImage) previewImage.src = e.target.result;
-                    if (fileName) fileName.textContent = file.name;
-                    if (preview) preview.style.display = 'block';
-                    if (photoUploadContainer) {
-                        photoUploadContainer.style.borderColor = '#10b981';
-                        photoUploadContainer.style.background = 'rgba(16, 185, 129, 0.05)';
-                    }
-                }
-                
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
     </script>
 </body>
 </html>
