@@ -2090,7 +2090,65 @@ public function addJobTypeWithImage($jobTypeName, $iconFile) {
         return false;
     }
 }
-  
+  // Add to your Database class
+public function getInProgressMaintenanceRequests() {
+    $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName, 
+                   h.Handyman_fn, h.Handyman_ln 
+            FROM maintenancerequest mr
+            JOIN client c ON mr.Client_ID = c.Client_ID
+            JOIN space s ON mr.Space_ID = s.Space_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Status = 'In Progress'
+            ORDER BY mr.RequestDate DESC";
+    
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function getCompletedMaintenanceRequests() {
+    $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName, 
+                   h.Handyman_fn, h.Handyman_ln 
+            FROM maintenancerequest mr
+            JOIN client c ON mr.Client_ID = c.Client_ID
+            JOIN space s ON mr.Space_ID = s.Space_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Status = 'Completed'
+            ORDER BY mr.RequestDate DESC";
+    
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function getSubmittedMaintenanceRequests() {
+    $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName, 
+                   h.Handyman_fn, h.Handyman_ln 
+            FROM maintenancerequest mr
+            JOIN client c ON mr.Client_ID = c.Client_ID
+            JOIN space s ON mr.Space_ID = s.Space_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Status = 'Submitted'
+            ORDER BY mr.RequestDate DESC";
+    
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute();
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function getRequestCompletionDate($request_id) {
+    $sql = "SELECT StatusChangeDate 
+            FROM maintenancerequeststatushistory 
+            WHERE Request_ID = ? AND NewStatus = 'Completed' 
+            ORDER BY StatusChangeDate DESC 
+            LIMIT 1";
+    
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$request_id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    return $result ? $result['StatusChangeDate'] : null;
+}
     
 
 
