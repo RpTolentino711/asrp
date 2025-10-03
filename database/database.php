@@ -739,17 +739,53 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
         return false;
     }
 }
-    public function getClientMaintenanceHistory($client_id) {
-        $sql = "SELECT mr.Request_ID, mr.Space_ID, s.Name AS SpaceName, mr.RequestDate, mr.Status,
-                       (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory WHERE Request_ID = mr.Request_ID) AS LastStatusDate,
-                       h.Handyman_fn, h.Handyman_ln, mr.Handyman_ID
-                FROM maintenancerequest mr
-                JOIN space s ON mr.Space_ID = s.Space_ID
-                LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
-                WHERE mr.Client_ID = ?
-                ORDER BY mr.RequestDate DESC";
-        return $this->runQuery($sql, [$client_id], true);
+ 
+
+public function updateMaintenanceCompletionPhoto($request_id, $completion_photo) {
+    try {
+        $sql = "UPDATE maintenancerequest 
+                SET CompletionPhoto = ?, Status = 'Completed' 
+                WHERE Request_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([$completion_photo, $request_id]);
+    } catch (PDOException $e) {
+        error_log("Error updating completion photo: " . $e->getMessage());
+        return false;
     }
+}
+
+public function getMaintenanceRequestById($request_id) {
+    $sql = "SELECT 
+                mr.*,
+                s.Name as SpaceName,
+                c.Client_fn,
+                c.Client_ln,
+                c.Client_Email,
+                c.Client_Phone,
+                h.Handyman_fn,
+                h.Handyman_ln
+            FROM maintenancerequest mr
+            INNER JOIN space s ON mr.Space_ID = s.Space_ID
+            INNER JOIN client c ON mr.Client_ID = c.Client_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Request_ID = ?";
+    return $this->runQuery($sql, [$request_id]);
+}
+
+
+public function getClientMaintenanceHistory($client_id) {
+    $sql = "SELECT mr.Request_ID, mr.Space_ID, s.Name AS SpaceName, mr.RequestDate, mr.Status,
+                   mr.IssuePhoto, mr.CompletionPhoto,
+                   (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory WHERE Request_ID = mr.Request_ID) AS LastStatusDate,
+                   h.Handyman_fn, h.Handyman_ln, mr.Handyman_ID
+            FROM maintenancerequest mr
+            JOIN space s ON mr.Space_ID = s.Space_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Client_ID = ?
+            ORDER BY mr.RequestDate DESC";
+    return $this->runQuery($sql, [$client_id], true);
+}
+
 
     public function getMaintenanceHistoryForUnits(array $unit_ids, $client_id) {
         if (empty($unit_ids)) return [];

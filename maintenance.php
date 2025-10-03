@@ -2,15 +2,10 @@
 require 'database/database.php';
 session_start();
 
-// Ensure the Database class is properly instantiated.
-// It's good practice to wrap database operations in try-catch blocks in a real application,
-// especially during development, to catch connection errors or query issues.
 try {
     $db = new Database();
 } catch (Exception $e) {
-    // Log the error and display a user-friendly message, or redirect to an error page.
     error_log("Database connection failed: " . $e->getMessage());
-    // In a production environment, you might display a generic error.
     die("A system error occurred. Please try again later.");
 }
 
@@ -21,9 +16,7 @@ $is_logged_in = isset($_SESSION['C_username']) && isset($_SESSION['client_id']);
 $spaces = [];
 $requests = [];
 $message = '';
-$pending_space_ids = []; // ✅ This is correctly defined and initialized
-
-// Initialize $show_success_modal even if not logged in to avoid potential undefined variable warnings later.
+$pending_space_ids = [];
 $show_success_modal = false;
 
 if ($is_logged_in) {
@@ -33,62 +26,76 @@ if ($is_logged_in) {
     if (isset($_SESSION['maintenance_success'])) {
         $message = "<div class='alert alert-success'>Request submitted successfully!</div>";
         unset($_SESSION['maintenance_success']);
-        $show_success_modal = true; // ✅ Flag for SweetAlert in JS
+        $show_success_modal = true;
     }
 
     // --- Handle Form Submission
     if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit_request'])) {
-        // Add CSRF protection here for security
-        // Example:
-        // if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        //     $message = "<div class='alert alert-danger'>Invalid request. Please try again.</div>";
-        //     // Potentially log this as a security incident
-        // } else {
-            $space_id = filter_input(INPUT_POST, 'space_id', FILTER_VALIDATE_INT); // Safer way to get and validate integer input
+        $space_id = filter_input(INPUT_POST, 'space_id', FILTER_VALIDATE_INT);
 
-            if ($space_id === false || $space_id === null) { // filter_input returns false on failure, null if not set
-                $message = "<div class='alert alert-danger'>Invalid unit selected. Please try again.</div>";
+        if ($space_id === false || $space_id === null) {
+            $message = "<div class='alert alert-danger'>Invalid unit selected. Please try again.</div>";
+        } else {
+            // Check for pending requests
+            if ($db->hasPendingMaintenanceRequest($client_id, $space_id)) {
+                $message = "<div class='alert alert-danger'>You already have a pending maintenance request for this unit. Please wait until it is completed.</div>";
             } else {
-                // IMPORTANT: Ensure your Database class uses prepared statements for ALL queries
-                // to prevent SQL injection. This is assumed for methods like hasPendingMaintenanceRequest
-                // and createMaintenanceRequest.
-
-                if ($db->hasPendingMaintenanceRequest($client_id, $space_id)) {
-                    $message = "<div class='alert alert-danger'>You already have a pending maintenance request for this unit. Please wait until it is completed.</div>";
+                // Handle photo upload
+                $issue_photo = null;
+                if (isset($_FILES['issue_photo']) && $_FILES['issue_photo']['error'] === UPLOAD_ERR_OK) {
+                    $file = $_FILES['issue_photo'];
+                    $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+                    
+                    if (!in_array($file['type'], $allowed_types)) {
+                        $message = "<div class='alert alert-danger'>Invalid file type for photo. Please upload JPG, PNG, or GIF images only.</div>";
+                    } elseif ($file['size'] > 5 * 1024 * 1024) { // 5MB limit
+                        $message = "<div class='alert alert-danger'>Photo is too large (max 5MB). Please choose a smaller file.</div>";
+                    } else {
+                        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                        $filename = "issue_" . time() . "_" . rand(1000, 9999) . "." . $ext;
+                        $upload_dir = __DIR__ . "/uploads/maintenance_issues/";
+                        
+                        // Create directory if it doesn't exist
+                        if (!is_dir($upload_dir)) {
+                            mkdir($upload_dir, 0777, true);
+                        }
+                        
+                        $filepath = $upload_dir . $filename;
+                        if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                            $issue_photo = $filename;
+                        } else {
+                            $message = "<div class='alert alert-danger'>Failed to upload photo. Please try again.</div>";
+                        }
+                    }
                 } else {
-                    if ($db->createMaintenanceRequest($client_id, $space_id)) {
+                    $message = "<div class='alert alert-danger'>Please upload a photo of the issue.</div>";
+                }
+
+                // If photo upload was successful, create the maintenance request
+                if ($issue_photo && empty($message)) {
+                    if ($db->createMaintenanceRequestWithPhoto($client_id, $space_id, $issue_photo)) {
                         $_SESSION['maintenance_success'] = true;
-                        // Always include exit() after header() redirects
                         header("Location: " . $_SERVER['PHP_SELF']);
                         exit();
                     } else {
-                        // More detailed error logging for debugging might be helpful here.
                         error_log("Failed to create maintenance request for client_id: {$client_id}, space_id: {$space_id}");
                         $message = "<div class='alert alert-danger'>Failed to submit request. Please try again.</div>";
                     }
                 }
             }
-        // } // End of CSRF check
+        }
     }
 
     // --- Fetch Data
-    // Ensure these methods also use prepared statements and handle potential database errors.
     $spaces = $db->getClientSpacesForMaintenance($client_id);
     $requests = $db->getClientMaintenanceHistory($client_id);
 
     foreach ($requests as $req) {
-        // Consider using a consistent column name for status or a specific flag in the DB
-        // to simplify checking for 'pending' states.
         if (in_array($req['Status'], ['Submitted', 'In Progress'])) {
             $pending_space_ids[] = $req['Space_ID'];
         }
     }
-
-    // CSRF token generation (for the form) - place it inside the logged-in block
-    // $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-
 }
-// No need for an else block here for $show_success_modal as it's initialized to false.
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -113,7 +120,7 @@ if ($is_logged_in) {
     <?php require('links.php'); ?>
 
     <style>
-        /* Modern Alert Styles (example - you'd integrate this with your existing CSS) */
+        /* Modern Alert Styles */
         .modern-alert {
             padding: 1rem 1.25rem;
             margin-bottom: 1rem;
@@ -138,7 +145,7 @@ if ($is_logged_in) {
             border-color: #ffecb5;
         }
 
-        /* Status Badge Styles (example) */
+        /* Status Badge Styles */
         .status-badge {
             display: inline-block;
             padding: .35em .65em;
@@ -151,15 +158,106 @@ if ($is_logged_in) {
             vertical-align: baseline;
             border-radius: .375rem;
         }
-        .status-submitted { background-color: #0d6efd; /* Blue */ }
-        .status-in-progress { background-color: #ffc107; /* Yellow */ color: #343a40;}
-        .status-completed { background-color: #198754; /* Green */ }
-        .status-cancelled { background-color: #dc3545; /* Red */ }
-        .status-pending { background-color: #6c757d; /* Gray */ }
+        .status-submitted { background-color: #0d6efd; }
+        .status-in-progress { background-color: #ffc107; color: #343a40;}
+        .status-completed { background-color: #198754; }
+        .status-cancelled { background-color: #dc3545; }
+        .status-pending { background-color: #6c757d; }
 
-        /* Other styles as in your original code */
+        /* Photo Upload Styles */
+        .photo-upload-container {
+            border: 2px dashed #dee2e6;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .photo-upload-container:hover {
+            border-color: var(--primary);
+            background: rgba(0, 123, 255, 0.05);
+        }
+
+        .photo-upload-container.dragover {
+            border-color: var(--primary);
+            background: rgba(0, 123, 255, 0.1);
+        }
+
+        .photo-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .photo-upload-label {
+            cursor: pointer;
+            display: block;
+            position: relative;
+            z-index: 5;
+        }
+
+        .photo-upload-icon {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .photo-info {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+
+        .photo-preview-container {
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        .photo-preview {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 0.5rem;
+            border: 2px solid var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Request Photos */
+        .request-photos {
+            margin-top: 1rem;
+        }
+
+        .photo-thumbnail {
+            width: 80px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 0.375rem;
+            border: 1px solid #dee2e6;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .photo-thumbnail:hover {
+            transform: scale(1.1);
+        }
+
+        /* Modal for photo viewing */
+        .photo-modal-img {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+
+        /* Other existing styles */
         .maintenance-header {
-            background-color: var(--primary); /* Or a specific color */
+            background-color: var(--primary);
             color: white;
             padding: 4rem 0;
             margin-bottom: 2rem;
@@ -183,10 +281,10 @@ if ($is_logged_in) {
             background-color: #fff;
             border-radius: 0.75rem;
             box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.08);
-            overflow: hidden; /* For table border-radius */
+            overflow: hidden;
         }
         .request-card-header, .history-card-header {
-            background-color: var(--light); /* A light background */
+            background-color: var(--light);
             padding: 1.25rem 1.5rem;
             border-bottom: 1px solid #e9ecef;
             display: flex;
@@ -232,14 +330,18 @@ if ($is_logged_in) {
             justify-content: center;
         }
         .submit-btn:hover {
-            background-color: var(--dark-primary); /* Darker shade of primary */
+            background-color: var(--dark-primary);
             color: white;
         }
         .submit-btn i {
             margin-right: 0.5rem;
         }
+        .submit-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
         .pending-warning {
-            color: #dc3545; /* Red for warning */
+            color: #dc3545;
             font-size: 0.9em;
             margin-top: 0.5rem;
             display: flex;
@@ -249,12 +351,12 @@ if ($is_logged_in) {
             margin-right: 0.5rem;
         }
         .history-table-container {
-            overflow-x: auto; /* For responsive tables */
-            padding: 0 1.5rem 1.5rem; /* Padding for the container, not table itself */
+            overflow-x: auto;
+            padding: 0 1.5rem 1.5rem;
         }
         .history-table {
             margin-bottom: 0;
-            border-collapse: separate; /* To allow border-radius on cells */
+            border-collapse: separate;
             border-spacing: 0;
             width: 100%;
         }
@@ -262,7 +364,7 @@ if ($is_logged_in) {
             padding: 1rem 1.25rem;
             vertical-align: middle;
             border-top: 1px solid #e9ecef;
-            white-space: nowrap; /* Prevent wrapping in cells */
+            white-space: nowrap;
         }
         .history-table th {
             background-color: #f8f9fa;
@@ -271,11 +373,6 @@ if ($is_logged_in) {
             text-align: left;
             border-bottom: 1px solid #e9ecef;
         }
-        /* Rounded corners for the table, if desired */
-        .history-table thead tr:first-child th:first-child { border-top-left-radius: 0.75rem; }
-        .history-table thead tr:first-child th:last-child { border-top-right-radius: 0.75rem; }
-        .history-table tbody tr:last-child td:first-child { border-bottom-left-radius: 0.75rem; }
-        .history-table tbody tr:last-child td:last-child { border-bottom-right-radius: 0.75rem; }
 
         .empty-state {
             text-align: center;
@@ -312,7 +409,7 @@ if ($is_logged_in) {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 40vh; /* Adjust as needed */
+            min-height: 40vh;
         }
         .login-card {
             text-align: center;
@@ -323,27 +420,21 @@ if ($is_logged_in) {
         }
         .lock-icon {
             font-size: 4rem;
-            color: var(--info); /* Or a brand color */
+            color: var(--info);
             margin-bottom: 1.5rem;
         }
-        .login-card .btn {
-            font-weight: 600;
-        }
 
-        /* Basic scroll animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .animate-on-scroll {
             animation: fadeIn 0.6s ease-out forwards;
-            opacity: 0; /* Hidden by default */
+            opacity: 0;
         }
-        /* You might use an Intersection Observer API for more advanced scroll animations */
 
-        /* Define CSS Custom Properties (Variables) */
         :root {
-            --primary: #007bff; /* Example: Bootstrap primary blue */
+            --primary: #007bff;
             --secondary: #6c757d;
             --success: #28a745;
             --info: #17a2b8;
@@ -351,10 +442,8 @@ if ($is_logged_in) {
             --danger: #dc3545;
             --light: #f8f9fa;
             --dark: #343a40;
-            --dark-primary: #0056b3; /* A darker shade of primary for hover */
-            /* Add any other specific colors from your design system */
+            --dark-primary: #0056b3;
         }
-
     </style>
 </head>
 <body>
@@ -385,9 +474,6 @@ if ($is_logged_in) {
             <!-- Display Messages -->
             <?php if (!empty($message)): ?>
                 <div class="animate-on-scroll">
-                    <!-- The str_replace is a creative way to apply custom alert classes.
-                         Ensure 'modern-alert' and specific color classes (alert-success, alert-danger)
-                         are defined in your CSS. -->
                     <?= str_replace(
                         ['alert-success', 'alert-danger', 'alert-warning'],
                         ['modern-alert alert-success', 'modern-alert alert-danger', 'modern-alert alert-warning'],
@@ -398,18 +484,14 @@ if ($is_logged_in) {
 
             <?php if ($is_logged_in): ?>
                 <?php if (!empty($spaces)): ?>
-                    <!-- ✅ Request Form Section -->
+                    <!-- Request Form Section -->
                     <div class="request-form-section animate-on-scroll">
                         <div class="request-card">
                             <div class="request-card-header">
                                 <h5><i class="bi bi-plus-circle"></i> Submit New Maintenance Request</h5>
                             </div>
                             <div class="request-card-body">
-                                <form method="post" id="maintenanceForm">
-                                    <?php // if ($is_logged_in): ?>
-                                    <!-- CSRF Token (uncomment if you implement CSRF protection) -->
-                                    <!-- <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>"> -->
-                                    <?php // endif; ?>
+                                <form method="post" id="maintenanceForm" enctype="multipart/form-data">
                                     <div class="mb-4">
                                         <label class="form-label">
                                             <i class="bi bi-building"></i> Select Your Unit
@@ -430,6 +512,33 @@ if ($is_logged_in) {
                                             You already have an active request for this unit. Please wait for completion.
                                         </div>
                                     </div>
+
+                                    <!-- Photo Upload Section -->
+                                    <div class="mb-4">
+                                        <label class="form-label">
+                                            <i class="bi bi-camera"></i> Photo of the Issue (Required)
+                                        </label>
+                                        <div class="photo-upload-container" id="photoUploadContainer">
+                                            <input type="file" name="issue_photo" id="issue_photo" class="photo-input" 
+                                                   accept="image/*" required onchange="handlePhotoSelect(this)">
+                                            <label for="issue_photo" class="photo-upload-label">
+                                                <div class="photo-upload-icon">
+                                                    <i class="bi bi-cloud-upload"></i>
+                                                </div>
+                                                <h5>Click to upload photo</h5>
+                                                <p class="text-muted mb-2">or drag and drop</p>
+                                                <p class="photo-info">JPG, PNG, GIF up to 5MB</p>
+                                                
+                                                <!-- Image Preview -->
+                                                <div id="photoPreview" class="photo-preview-container" style="display: none;">
+                                                    <img id="previewImage" class="photo-preview" src="" alt="Preview">
+                                                    <p class="text-success mb-0" id="photoFileName"></p>
+                                                </div>
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Please provide a clear photo of the issue that needs to be fixed.</small>
+                                    </div>
+
                                     <button type="submit" name="submit_request" class="submit-btn" id="submitBtn">
                                         <i class="bi bi-send"></i> Submit Maintenance Request
                                     </button>
@@ -438,7 +547,7 @@ if ($is_logged_in) {
                         </div>
                     </div>
                 <?php else: ?>
-                    <!-- ✅ No Units Alert -->
+                    <!-- No Units Alert -->
                     <div class="no-units-alert animate-on-scroll">
                         <i class="bi bi-house-x no-units-icon"></i>
                         <h4 class="fw-bold mb-3">No Units Available</h4>
@@ -446,7 +555,7 @@ if ($is_logged_in) {
                     </div>
                 <?php endif; ?>
 
-                <!-- ✅ History Section -->
+                <!-- History Section -->
                 <div class="history-section animate-on-scroll">
                     <div class="history-card">
                         <div class="history-card-header">
@@ -461,6 +570,8 @@ if ($is_logged_in) {
                                                 <th>Request Date</th>
                                                 <th>Unit</th>
                                                 <th>Status</th>
+                                                <th>Issue Photo</th>
+                                                <th>Completion Photo</th>
                                                 <th>Last Updated</th>
                                                 <th>Handyman</th>
                                             </tr>
@@ -478,9 +589,33 @@ if ($is_logged_in) {
                                                             <?= htmlspecialchars($req['Status']) ?>
                                                         </span>
                                                     </td>
+                                                    <td>
+                                                        <?php if (!empty($req['IssuePhoto'])): ?>
+                                                            <img src="uploads/maintenance_issues/<?= htmlspecialchars($req['IssuePhoto']) ?>" 
+                                                                 class="photo-thumbnail" 
+                                                                 data-bs-toggle="modal" 
+                                                                 data-bs-target="#photoModal"
+                                                                 data-photo="uploads/maintenance_issues/<?= htmlspecialchars($req['IssuePhoto']) ?>"
+                                                                 alt="Issue Photo">
+                                                        <?php else: ?>
+                                                            <span class="text-muted">No photo</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if (!empty($req['CompletionPhoto'])): ?>
+                                                            <img src="uploads/maintenance_completions/<?= htmlspecialchars($req['CompletionPhoto']) ?>" 
+                                                                 class="photo-thumbnail" 
+                                                                 data-bs-toggle="modal" 
+                                                                 data-bs-target="#photoModal"
+                                                                 data-photo="uploads/maintenance_completions/<?= htmlspecialchars($req['CompletionPhoto']) ?>"
+                                                                 alt="Completion Photo">
+                                                        <?php else: ?>
+                                                            <span class="text-muted">-</span>
+                                                        <?php endif; ?>
+                                                    </td>
                                                     <td><?= htmlspecialchars($req['LastStatusDate']) ?></td>
                                                     <td>
-                                                        <?php if (!empty($req['Handyman_fn'])): // Use !empty for better check ?>
+                                                        <?php if (!empty($req['Handyman_fn'])): ?>
                                                             <?= htmlspecialchars($req['Handyman_fn'] . ' ' . $req['Handyman_ln']) ?>
                                                         <?php else: ?>
                                                             <span class="text-muted">Not assigned</span>
@@ -501,7 +636,7 @@ if ($is_logged_in) {
                     </div>
                 </div>
             <?php else: ?>
-                <!-- ✅ Login Required Section -->
+                <!-- Login Required Section -->
                 <div class="login-required-section animate-on-scroll">
                     <div class="login-card">
                         <div class="lock-icon"><i class="bi bi-shield-lock"></i></div>
@@ -516,19 +651,32 @@ if ($is_logged_in) {
         </div>
     </div>
 
+    <!-- Photo Modal -->
+    <div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Photo View</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalPhoto" class="photo-modal-img" src="" alt="Photo">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <?php require('footer.php'); ?>
 
-    <!-- ✅ Scripts -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Success modal
-            // The condition in PHP `!empty($show_success_modal)` correctly renders this block.
             <?php if ($show_success_modal): ?>
                 Swal.fire({
                     icon: 'success',
                     title: 'Request Submitted!',
-                    text: 'Your request has been submitted successfully.',
-                    confirmButtonColor: 'var(--success)' // Uses CSS variable for consistency
+                    text: 'Your maintenance request has been submitted successfully. Our team will review it shortly.',
+                    confirmButtonColor: 'var(--success)'
                 });
             <?php endif; ?>
 
@@ -537,8 +685,7 @@ if ($is_logged_in) {
             const pendingInfo = document.getElementById('pendingInfo');
             const submitBtn = document.getElementById('submitBtn');
 
-            if (spaceSelect && pendingInfo && submitBtn) { // Add null checks for robustness
-                // Initial check in case a pending unit is pre-selected (though not likely with current logic)
+            if (spaceSelect && pendingInfo && submitBtn) {
                 const selectedOption = spaceSelect.options[spaceSelect.selectedIndex];
                 if (selectedOption && selectedOption.dataset.pending === "1") {
                     pendingInfo.style.display = "block";
@@ -559,7 +706,83 @@ if ($is_logged_in) {
                     }
                 });
             }
+
+            // Photo modal functionality
+            const photoModal = document.getElementById('photoModal');
+            if (photoModal) {
+                photoModal.addEventListener('show.bs.modal', function(event) {
+                    const button = event.relatedTarget;
+                    const photoSrc = button.getAttribute('data-photo');
+                    const modalImage = document.getElementById('modalPhoto');
+                    modalImage.src = photoSrc;
+                });
+            }
+
+            // Drag and drop functionality for photo upload
+            const photoUploadContainer = document.getElementById('photoUploadContainer');
+            if (photoUploadContainer) {
+                const photoInput = document.getElementById('issue_photo');
+                
+                photoUploadContainer.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    photoUploadContainer.classList.add('dragover');
+                });
+
+                photoUploadContainer.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    photoUploadContainer.classList.remove('dragover');
+                });
+
+                photoUploadContainer.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    photoUploadContainer.classList.remove('dragover');
+                    
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        photoInput.files = files;
+                        handlePhotoSelect(photoInput);
+                    }
+                });
+            }
         });
+
+        function handlePhotoSelect(input) {
+            const preview = document.getElementById('photoPreview');
+            const fileName = document.getElementById('photoFileName');
+            const previewImage = document.getElementById('previewImage');
+            const photoUploadContainer = document.getElementById('photoUploadContainer');
+
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                
+                // Validate file type
+                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                if (!validTypes.includes(file.type)) {
+                    alert('Please select a valid image file (JPEG, PNG, GIF).');
+                    input.value = '';
+                    return;
+                }
+                
+                // Validate file size (5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('File size must be less than 5MB.');
+                    input.value = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    fileName.textContent = file.name;
+                    preview.style.display = 'block';
+                    photoUploadContainer.style.borderColor = '#28a745';
+                    photoUploadContainer.style.background = 'rgba(40, 167, 69, 0.05)';
+                }
+                
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
     </script>
 </body>
 </html>
