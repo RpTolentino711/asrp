@@ -1132,13 +1132,15 @@ if ($r['Icon'] && file_exists($icon_path)): ?>
                                     <tr>
                                         <td><span class="fw-medium">#<?= $jt['JobType_ID'] ?></span></td>
                                         <td>
-                                            <?php if ($jt['Icon'] && file_exists('uploads/jobtype_icons/' . $jt['Icon'])): ?>
-                                                <img src="uploads/jobtype_icons/<?= htmlspecialchars($jt['Icon']) ?>" 
-                                                     alt="<?= htmlspecialchars($jt['JobType_Name']) ?>" 
-                                                     class="jobtype-icon-lg">
-                                            <?php else: ?>
-                                                <i class="fas fa-wrench fa-2x" style="color: var(--primary);"></i>
-                                            <?php endif; ?>
+                                       <?php 
+$icon_path = '../uploads/jobtype_icons/' . $r['Icon'];
+if ($r['Icon'] && file_exists($icon_path)): ?>
+    <img src="../uploads/jobtype_icons/<?= htmlspecialchars($r['Icon']) ?>" 
+         alt="<?= htmlspecialchars($r['JobType_Name'] ?? 'Job Type') ?>" 
+         class="jobtype-icon me-2">
+<?php else: ?>
+    <i class="fas fa-wrench me-2"></i>
+<?php endif; ?>
                                         </td>
                                         <td><strong><?= htmlspecialchars($jt['JobType_Name']) ?></strong></td>
                                         <td>
