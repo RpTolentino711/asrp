@@ -9,6 +9,9 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// Get filter from URL or default to 'active'
+$filter = isset($_GET['filter']) ? $_GET['filter'] : 'active';
+
 $message = '';
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['update_request'])) {
     $request_id = intval($_POST['request_id']);
@@ -30,7 +33,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['update_request'])) {
     }
 }
 
-$active_requests = $db->getActiveMaintenanceRequests();
+// Get requests based on filter
+switch($filter) {
+    case 'in-progress':
+        $requests = $db->getInProgressMaintenanceRequests();
+        $filter_title = "In Progress";
+        $filter_count = count($requests);
+        break;
+    case 'completed':
+        $requests = $db->getCompletedMaintenanceRequests();
+        $filter_title = "Completed";
+        $filter_count = count($requests);
+        break;
+    default: // active (all non-completed)
+        $requests = $db->getActiveMaintenanceRequests();
+        $filter_title = "Active";
+        $filter_count = count($requests);
+        break;
+}
+
 $handyman_list = $db->getAllHandymenWithJobTypes();
 ?>
 <!DOCTYPE html>
@@ -289,6 +310,105 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         .card-body {
             padding: 1.5rem;
         }
+        
+        /* Filter Tabs */
+        .filter-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+        
+        .filter-tab {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: var(--border-radius);
+            background: #f8fafc;
+            color: #6b7280;
+            font-weight: 500;
+            text-decoration: none;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        
+        .filter-tab:hover {
+            background: #e5e7eb;
+            color: #374151;
+            transform: translateY(-1px);
+        }
+        
+        .filter-tab.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+        }
+        
+        .filter-tab .badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: inherit;
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .filter-tab:not(.active) .badge {
+            background: #e5e7eb;
+            color: #6b7280;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border-left: 4px solid;
+            transition: var(--transition);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+        }
+        
+        .stat-card.active {
+            border-left-color: var(--primary);
+        }
+        
+        .stat-card.in-progress {
+            border-left-color: var(--warning);
+        }
+        
+        .stat-card.completed {
+            border-left-color: var(--secondary);
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .stat-card.active .stat-number { color: var(--primary); }
+        .stat-card.in-progress .stat-number { color: var(--warning); }
+        .stat-card.completed .stat-number { color: var(--secondary); }
         
         /* Desktop Table */
         .table-desktop {
@@ -661,6 +781,31 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             .card-body {
                 padding: 1.25rem;
             }
+
+            .filter-tabs {
+                gap: 0.25rem;
+            }
+            
+            .filter-tab {
+                padding: 0.6rem 1rem;
+                font-size: 0.85rem;
+                flex: 1;
+                min-width: 0;
+                justify-content: center;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+            
+            .stat-card {
+                padding: 1.25rem;
+            }
+            
+            .stat-number {
+                font-size: 1.75rem;
+            }
         }
         
         @media (max-width: 768px) {
@@ -837,14 +982,54 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
         
         <?= $message ?>
         
+        <!-- Statistics Cards -->
+        <div class="stats-grid animate-fade-in">
+            <?php
+            $active_count = count($db->getActiveMaintenanceRequests());
+            $in_progress_count = count($db->getInProgressMaintenanceRequests());
+            $completed_count = count($db->getCompletedMaintenanceRequests());
+            ?>
+            <a href="?filter=active" class="stat-card active text-decoration-none">
+                <div class="stat-number"><?= $active_count ?></div>
+                <div class="stat-label">Active Requests</div>
+            </a>
+            <a href="?filter=in-progress" class="stat-card in-progress text-decoration-none">
+                <div class="stat-number"><?= $in_progress_count ?></div>
+                <div class="stat-label">In Progress</div>
+            </a>
+            <a href="?filter=completed" class="stat-card completed text-decoration-none">
+                <div class="stat-number"><?= $completed_count ?></div>
+                <div class="stat-label">Completed</div>
+            </a>
+        </div>
+        
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <a href="?filter=active" class="filter-tab <?= $filter === 'active' ? 'active' : '' ?>">
+                <i class="fas fa-list"></i>
+                Active
+                <span class="badge"><?= $active_count ?></span>
+            </a>
+            <a href="?filter=in-progress" class="filter-tab <?= $filter === 'in-progress' ? 'active' : '' ?>">
+                <i class="fas fa-spinner"></i>
+                In Progress
+                <span class="badge"><?= $in_progress_count ?></span>
+            </a>
+            <a href="?filter=completed" class="filter-tab <?= $filter === 'completed' ? 'active' : '' ?>">
+                <i class="fas fa-check-circle"></i>
+                Completed
+                <span class="badge"><?= $completed_count ?></span>
+            </a>
+        </div>
+        
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-list-alt"></i>
-                <span>Active Maintenance Requests</span>
-                <span class="badge bg-primary ms-2"><?= count($active_requests) ?></span>
+                <span><?= $filter_title ?> Maintenance Requests</span>
+                <span class="badge bg-primary ms-2"><?= $filter_count ?></span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($active_requests)): ?>
+                <?php if (!empty($requests)): ?>
                     <!-- Desktop Table -->
                     <div class="table-desktop">
                         <table class="custom-table">
@@ -855,13 +1040,19 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                     <th>Unit</th>
                                     <th>Date</th>
                                     <th>Status</th>
+                                    <?php if ($filter !== 'completed'): ?>
                                     <th>Assign Handyman</th>
                                     <th>Action</th>
+                                    <?php else: ?>
+                                    <th>Completed By</th>
+                                    <th>Completion Date</th>
+                                    <?php endif; ?>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach($active_requests as $row): ?>
+                                <?php foreach($requests as $row): ?>
                                 <tr>
+                                    <?php if ($filter !== 'completed'): ?>
                                     <form method="post">
                                         <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
                                         <td><span class="fw-medium">#<?= $row['Request_ID'] ?></span></td>
@@ -897,6 +1088,28 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                             </button>
                                         </td>
                                     </form>
+                                    <?php else: ?>
+                                    <td><span class="fw-medium">#<?= $row['Request_ID'] ?></span></td>
+                                    <td><div class="fw-medium"><?= htmlspecialchars($row['Client_fn'] . " " . $row['Client_ln']) ?></div></td>
+                                    <td><?= htmlspecialchars($row['SpaceName']) ?></td>
+                                    <td><div class="text-muted"><?= htmlspecialchars($row['RequestDate']) ?></div></td>
+                                    <td>
+                                        <span class="badge-status badge-completed">Completed</span>
+                                    </td>
+                                    <td>
+                                        <?php if ($row['Handyman_fn']): ?>
+                                            <?= htmlspecialchars($row['Handyman_fn'] . ' ' . $row['Handyman_ln']) ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">Not assigned</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $completion_date = $db->getRequestCompletionDate($row['Request_ID']);
+                                        echo $completion_date ? htmlspecialchars($completion_date) : '<span class="text-muted">N/A</span>';
+                                        ?>
+                                    </td>
+                                    <?php endif; ?>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -905,16 +1118,18 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach($active_requests as $index => $row): 
+                        <?php foreach($requests as $index => $row): 
                             $statusClass = 'status-' . strtolower(str_replace(' ', '', $row['Status']));
                         ?>
                         <div class="mobile-card <?= $statusClass ?> animate-slide-up" style="animation-delay: <?= $index * 0.05 ?>s;">
+                            <?php if ($filter !== 'completed'): ?>
                             <div class="loading-overlay">
                                 <div class="spinner"></div>
                             </div>
                             
                             <form method="POST" action="" data-request-id="<?= $row['Request_ID'] ?>">
                                 <input type="hidden" name="request_id" value="<?= (int)$row['Request_ID'] ?>">
+                            <?php endif; ?>
                                 
                                 <div class="mobile-card-header">
                                     <div>
@@ -941,6 +1156,28 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                     <span class="value"><?= htmlspecialchars(date('M j, Y', strtotime($row['RequestDate']))) ?></span>
                                 </div>
 
+                                <?php if ($filter === 'completed'): ?>
+                                <div class="mobile-card-detail">
+                                    <span class="label"><i class="fas fa-user-tie me-1"></i>Completed By:</span>
+                                    <span class="value">
+                                        <?php if ($row['Handyman_fn']): ?>
+                                            <?= htmlspecialchars($row['Handyman_fn'] . ' ' . $row['Handyman_ln']) ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">Not assigned</span>
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                                
+                                <?php 
+                                $completion_date = $db->getRequestCompletionDate($row['Request_ID']);
+                                if ($completion_date): ?>
+                                <div class="mobile-card-detail">
+                                    <span class="label"><i class="fas fa-check-circle me-1"></i>Completed On:</span>
+                                    <span class="value"><?= htmlspecialchars($completion_date) ?></span>
+                                </div>
+                                <?php endif; ?>
+                                <?php endif; ?>
+
                                 <?php if (!empty($row['Description'])): ?>
                                 <div class="mobile-card-detail">
                                     <span class="label"><i class="fas fa-info-circle me-1"></i>Issue:</span>
@@ -948,13 +1185,14 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                 </div>
                                 <?php endif; ?>
 
-                                <?php if ($row['Handyman_fn']): ?>
+                                <?php if ($row['Handyman_fn'] && $filter !== 'completed'): ?>
                                 <div class="current-handyman">
                                     <i class="fas fa-user-tie"></i>
                                     Currently assigned: <?= htmlspecialchars($row['Handyman_fn'] . ' ' . $row['Handyman_ln']) ?>
                                 </div>
                                 <?php endif; ?>
 
+                                <?php if ($filter !== 'completed'): ?>
                                 <div class="mobile-form">
                                     <div class="mobile-form-group">
                                         <label for="status_<?= $row['Request_ID'] ?>">
@@ -986,17 +1224,26 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                                         <i class="fas fa-save"></i> Save Changes
                                     </button>
                                 </div>
-                            </form>
+                                </form>
+                                <?php endif; ?>
                         </div>
                         <?php endforeach; ?>
                     </div>
                 <?php else: ?>
                     <div class="empty-state animate-fade-in">
                         <i class="fas fa-tools"></i>
-                        <h4>No Active Maintenance Requests</h4>
-                        <p>All maintenance requests have been processed or completed.</p>
-                        <a href="dashboard.php" class="btn btn-primary mt-3">
-                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        <h4>No <?= strtolower($filter_title) ?> Maintenance Requests</h4>
+                        <p>
+                            <?php if ($filter === 'completed'): ?>
+                                No maintenance requests have been completed yet.
+                            <?php elseif ($filter === 'in-progress'): ?>
+                                No maintenance requests are currently in progress.
+                            <?php else: ?>
+                                All maintenance requests have been processed or completed.
+                            <?php endif; ?>
+                        </p>
+                        <a href="?filter=active" class="btn btn-primary mt-3">
+                            <i class="fas fa-list me-2"></i>View Active Requests
                         </a>
                     </div>
                 <?php endif; ?>
@@ -1063,8 +1310,6 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                         submitBtn.disabled = true;
                     }
-                    
-                    // Let the form submit normally - don't prevent default
                 });
             });
 
