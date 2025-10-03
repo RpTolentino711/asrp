@@ -6,13 +6,7 @@ $db = new Database();
 $is_logged_in = isset($_SESSION['client_id']);
 $job_types = $db->getAllJobTypes();
 
-$icon_map = [
-    "CARPENTRY" => "IMG/show/CARPENTRY.png",
-    "ELECTRICAL" => "IMG/show/ELECTRICAL.png",
-    "PLUMBING" => "IMG/show/PLUMBING.png",
-    "PAINTING" => "IMG/show/PAINTING.png",
-    "APPLIANCE REPAIR" => "IMG/show/APPLIANCE.png",
-];
+// Remove the hardcoded icon_map since we'll use the actual icons from database
 ?>
 <!doctype html>
 <html lang="en">
@@ -436,8 +430,16 @@ $icon_map = [
                 if (!empty($job_types)) {
                     $delay = 0;
                     foreach ($job_types as $row) {
+                        // Use the actual icon from database
+                        $icon_filename = $row['Icon'] ?? 'default-icon.png';
+                        $img_src = "uploads/jobtype_icons/" . $icon_filename;
+                        
+                        // Fallback to default icon if file doesn't exist
+                        if (!file_exists($img_src)) {
+                            $img_src = "IMG/show/wifi.png"; // Your default fallback
+                        }
+                        
                         $name_upper = strtoupper($row['JobType_Name']);
-                        $img_src = isset($icon_map[$name_upper]) ? $icon_map[$name_upper] : "IMG/show/wifi.png";
                         
                         // Service descriptions
                         $descriptions = [
@@ -445,7 +447,8 @@ $icon_map = [
                             "ELECTRICAL" => "Wiring, installations, and electrical repairs",
                             "PLUMBING" => "Pipe repairs, installations, and water systems",
                             "PAINTING" => "Interior and exterior painting services",
-                            "APPLIANCE REPAIR" => "Equipment maintenance and repairs"
+                            "APPLIANCE REPAIR" => "Equipment maintenance and repairs",
+                            "PIPELINE" => "Pipe systems and plumbing installations"
                         ];
                         
                         $description = isset($descriptions[$name_upper]) ? $descriptions[$name_upper] : "Professional maintenance service";
@@ -463,7 +466,7 @@ $icon_map = [
                         }
                         
                         echo '<div class="service-icon">';
-                        echo '<img src="' . $img_src . '" alt="' . htmlspecialchars($row['JobType_Name']) . ' Icon">';
+                        echo '<img src="' . $img_src . '" alt="' . htmlspecialchars($row['JobType_Name']) . ' Icon" onerror="this.src=\'IMG/show/wifi.png\'">';
                         echo '</div>';
                         echo '<h5 class="service-title">' . htmlspecialchars($row['JobType_Name']) . '</h5>';
                         echo '<p class="service-description">' . $description . '</p>';
@@ -553,7 +556,7 @@ $icon_map = [
                 card.addEventListener('mouseenter', function() {
                     if (!this.classList.contains('disabled')) {
                         // Optional: Add subtle sound feedback
-                        // new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp56hVFApGn+DyvmYbBT2a4/DF').play().catch(e => {});
+                        // new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp56hVFApGn+DyvmY').play().catch(e => {});
                     }
                 });
             });
