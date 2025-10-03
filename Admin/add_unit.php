@@ -17,7 +17,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 $ua_id = $_SESSION['admin_id'] ?? null;
 
 // Photo upload configuration
-$max_photos_per_unit = 5; // Set your desired limit here
+$max_photos_per_unit = 12; // Set your desired limit here
 
 $success_unit = '';
 $error_unit = '';
