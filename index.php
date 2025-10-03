@@ -36,10 +36,10 @@ if ($is_logged_in) {
 
 // --- Fetch ALL Data for the Page Using Clean Methods ---
 $hide_client_rented_unit_ids = $is_logged_in ? $db->getClientRentedUnitIds($_SESSION['client_id']) : [];
-$available_units = $db->getHomepageAvailableUnits(10);
-$rented_units_display = $db->getHomepageRentedUnits(10);
+$available_units = $db->getHomepageAvailableUnits(20);
+$rented_units_display = $db->getHomepageRentedUnits(20);
 $job_types_display = $db->getAllJobTypes();
-$testimonials = $db->getHomepageTestimonials(6);
+$testimonials = $db->getHomepageTestimonials(20);
 ?>
 
 <!doctype html>

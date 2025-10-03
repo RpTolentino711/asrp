@@ -417,7 +417,7 @@ public function getRentedUnits($client_id) {
         }
     }
 
-  public function getHomepageAvailableUnits($limit = 6) {
+  public function getHomepageAvailableUnits($limit = 20) {
     // Only show units that are available to rent (Flow_Status = 'new')
     $sql = "SELECT s.*, st.SpaceTypeName
             FROM space s
@@ -440,7 +440,7 @@ public function getRentedUnits($client_id) {
 
 
 
-public function getHomepageRentedUnits($limit = 12) {
+public function getHomepageRentedUnits($limit = 20) {
     $sql = "SELECT 
             s.Space_ID, s.Name, s.Price, st.SpaceTypeName, s.Street, s.Brgy, s.City,
             sa.StartDate, sa.EndDate,
@@ -562,7 +562,7 @@ public function updateJobTypeWithImage($jobTypeId, $iconFile) {
 
 
     
-    public function getHomepageTestimonials($limit = 6) {
+    public function getHomepageTestimonials($limit = 20) {
     $sql = "SELECT cf.*, c.Client_fn, c.Client_ln
         FROM clientfeedback cf
         JOIN invoice i ON cf.CS_ID = i.Invoice_ID
