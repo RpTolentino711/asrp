@@ -720,18 +720,23 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
     }
 
     // --- Handyman and Job Types ---
-    public function getAllHandymenWithJob() {
-        $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, h.Phone, jt.JobType_Name
-                FROM handyman h
-                LEFT JOIN handymanjob hj ON hj.Handyman_ID = h.Handyman_ID
-                LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
-                ORDER BY h.Handyman_ln, h.Handyman_fn";
-        try {
-            return $this->pdo->query($sql)->fetchAll();
-        } catch (PDOException $e) {
-            return [];
-        }
+public function getAllHandymenWithJob() {
+    $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, h.Phone, jt.JobType_Name, jt.Icon
+            FROM handyman h
+            LEFT JOIN handymanjob hj ON hj.Handyman_ID = h.Handyman_ID
+            LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
+            ORDER BY h.Handyman_ln, h.Handyman_fn";
+    try {
+        return $this->pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) {
+        return [];
     }
+}
+
+
+
+
+
     public function getJobTypeNameById($jobtype_id) {
         $sql = "SELECT JobType_Name FROM jobtype WHERE JobType_ID = ?";
         return $this->runQuery($sql, [$jobtype_id]);
@@ -746,31 +751,35 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
         return $this->runQuery($sql, [$jobtype_id], true) ?: [];
     }
 
+  
     public function getHandymanById($handyman_id) {
-        $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, h.Phone, hj.JobType_ID
-                FROM handyman h
-                LEFT JOIN handymanjob hj ON hj.Handyman_ID = h.Handyman_ID
-                WHERE h.Handyman_ID = ? LIMIT 1";
-        return $this->runQuery($sql, [$handyman_id]);
+    $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, h.Phone, hj.JobType_ID
+            FROM handyman h
+            LEFT JOIN handymanjob hj ON hj.Handyman_ID = h.Handyman_ID
+            WHERE h.Handyman_ID = ? LIMIT 1";
+    return $this->runQuery($sql, [$handyman_id]);
+}
+
+
+
+
+   public function addHandyman($fn, $ln, $phone, $jobtype_id) {
+    $this->pdo->beginTransaction();
+    try {
+        $sql1 = "INSERT INTO handyman (Handyman_fn, Handyman_ln, Phone) VALUES (?,?,?)";
+        $handyman_id = $this->insertAndGetId($sql1, [$fn, $ln, $phone]);
+        if (!$handyman_id) throw new Exception("Failed to create handyman record.");
+
+        $sql2 = "INSERT INTO handymanjob (Handyman_ID, JobType_ID) VALUES (?, ?)";
+        $this->executeStatement($sql2, [$handyman_id, $jobtype_id]);
+
+        $this->pdo->commit();
+        return true;
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        return false;
     }
-
-    public function addHandyman($fn, $ln, $phone, $jobtype_id) {
-        $this->pdo->beginTransaction();
-        try {
-            $sql1 = "INSERT INTO handyman (Handyman_fn, Handyman_ln, Phone) VALUES (?,?,?)";
-            $handyman_id = $this->insertAndGetId($sql1, [$fn, $ln, $phone]);
-            if (!$handyman_id) throw new Exception("Failed to create handyman record.");
-
-            $sql2 = "INSERT INTO handymanjob (Handyman_ID, JobType_ID) VALUES (?, ?)";
-            $this->executeStatement($sql2, [$handyman_id, $jobtype_id]);
-
-            $this->pdo->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->pdo->rollBack();
-            return false;
-        }
-    }
+}
     
 
 public function removeSpacePhoto($space_id, $photo_filename) {
@@ -793,52 +802,54 @@ public function removeSpacePhoto($space_id, $photo_filename) {
 
 
 
-    public function updateHandyman($id, $fn, $ln, $phone, $jobtype_id) {
-        $this->pdo->beginTransaction();
-        try {
-            $sql1 = "UPDATE handyman SET Handyman_fn=?, Handyman_ln=?, Phone=? WHERE Handyman_ID=?";
-            $this->executeStatement($sql1, [$fn, $ln, $phone, $id]);
+   public function updateHandyman($id, $fn, $ln, $phone, $jobtype_id) {
+    $this->pdo->beginTransaction();
+    try {
+        $sql1 = "UPDATE handyman SET Handyman_fn=?, Handyman_ln=?, Phone=? WHERE Handyman_ID=?";
+        $this->executeStatement($sql1, [$fn, $ln, $phone, $id]);
 
-            $job_exists = $this->runQuery("SELECT 1 FROM handymanjob WHERE Handyman_ID = ?", [$id]);
+        $job_exists = $this->runQuery("SELECT 1 FROM handymanjob WHERE Handyman_ID = ?", [$id]);
 
-            if ($job_exists) {
-                $sql2 = "UPDATE handymanjob SET JobType_ID=? WHERE Handyman_ID=?";
-                $this->executeStatement($sql2, [$jobtype_id, $id]);
-            } else {
-                $sql2 = "INSERT INTO handymanjob (Handyman_ID, JobType_ID) VALUES (?, ?)";
-                $this->executeStatement($sql2, [$id, $jobtype_id]);
-            }
-
-            $this->pdo->commit();
-            return true;
-        } catch (PDOException $e) {
-            $this->pdo->rollBack();
-            return false;
+        if ($job_exists) {
+            $sql2 = "UPDATE handymanjob SET JobType_ID=? WHERE Handyman_ID=?";
+            $this->executeStatement($sql2, [$jobtype_id, $id]);
+        } else {
+            $sql2 = "INSERT INTO handymanjob (Handyman_ID, JobType_ID) VALUES (?, ?)";
+            $this->executeStatement($sql2, [$id, $jobtype_id]);
         }
-    }
 
-    public function deleteHandyman($handyman_id) {
-        $this->pdo->beginTransaction();
-        try {
-            $this->executeStatement("DELETE FROM handymanjob WHERE Handyman_ID = ?", [$handyman_id]);
-            $this->executeStatement("DELETE FROM handyman WHERE Handyman_ID = ?", [$handyman_id]);
-            $this->pdo->commit();
-            return true;
-        } catch (PDOException $e) {
-            $this->pdo->rollBack();
-            return false;
-        }
+        $this->pdo->commit();
+        return true;
+    } catch (PDOException $e) {
+        $this->pdo->rollBack();
+        return false;
     }
+}
 
 
-       public function getAllJobTypes() {
-        $sql = "SELECT JobType_ID, JobType_Name FROM jobtype ORDER BY JobType_Name";
-        try {
-            return $this->pdo->query($sql)->fetchAll();
-        } catch (PDOException $e) {
-            return [];
-        }
+ public function deleteHandyman($handyman_id) {
+    $this->pdo->beginTransaction();
+    try {
+        $this->executeStatement("DELETE FROM handymanjob WHERE Handyman_ID = ?", [$handyman_id]);
+        $this->executeStatement("DELETE FROM handyman WHERE Handyman_ID = ?", [$handyman_id]);
+        $this->pdo->commit();
+        return true;
+    } catch (PDOException $e) {
+        $this->pdo->rollBack();
+        return false;
     }
+}
+
+
+
+      public function getAllJobTypes() {
+    $sql = "SELECT JobType_ID, JobType_Name, Icon FROM jobtype ORDER BY JobType_Name";
+    try {
+        return $this->pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
 
 
 
@@ -1986,24 +1997,47 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
 
 
 
-
-
-
-    public function deleteJobType($jobtype_id) {
-        $this->pdo->beginTransaction();
-        try {
-            // Remove jobtype from handymanjob first to avoid foreign key issues
-            $this->executeStatement("DELETE FROM handymanjob WHERE JobType_ID = ?", [$jobtype_id]);
-            // Remove the jobtype itself
-            $this->executeStatement("DELETE FROM jobtype WHERE JobType_ID = ?", [$jobtype_id]);
-            $this->pdo->commit();
-            return true;
-        } catch (PDOException $e) {
-            $this->pdo->rollBack();
-            error_log("Error deleting job type: " . $e->getMessage());
+public function addJobTypeWithImage($jobTypeName, $iconFile) {
+    try {
+        // Handle file upload
+        $uploadDir = 'uploads/jobtype_icons/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+        
+        $fileName = 'jobtype_' . time() . '_' . uniqid() . '.' . pathinfo($iconFile['name'], PATHINFO_EXTENSION);
+        $uploadPath = $uploadDir . $fileName;
+        
+        if (move_uploaded_file($iconFile['tmp_name'], $uploadPath)) {
+            $sql = "INSERT INTO jobtype (JobType_Name, Icon) VALUES (?, ?)";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$jobTypeName, $fileName]);
+        } else {
             return false;
         }
+    } catch (PDOException $e) {
+        error_log("Error adding job type: " . $e->getMessage());
+        return false;
     }
+}
+
+
+
+ public function deleteJobType($jobtype_id) {
+    $this->pdo->beginTransaction();
+    try {
+        // Remove jobtype from handymanjob first to avoid foreign key issues
+        $this->executeStatement("DELETE FROM handymanjob WHERE JobType_ID = ?", [$jobtype_id]);
+        // Remove the jobtype itself
+        $this->executeStatement("DELETE FROM jobtype WHERE JobType_ID = ?", [$jobtype_id]);
+        $this->pdo->commit();
+        return true;
+    } catch (PDOException $e) {
+        $this->pdo->rollBack();
+        error_log("Error deleting job type: " . $e->getMessage());
+        return false;
+    }
+}
   
     
 
