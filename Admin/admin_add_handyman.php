@@ -39,27 +39,18 @@ if (isset($_GET['delete_jobtype'])) {
 
 // --- Handle POST Requests ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Add a new job type with image upload
+    // Add a new job type
     if (isset($_POST['add_jobtype'])) {
         $new_jobtype = trim($_POST['NewJobType'] ?? '');
-        
+        $new_icon = trim($_POST['JobIcon'] ?? 'fa-wrench');
         if (!empty($new_jobtype)) {
-            // Handle file upload
-            if (isset($_FILES['JobIcon']) && $_FILES['JobIcon']['error'] === UPLOAD_ERR_OK) {
-                if ($db->addJobTypeWithImage($new_jobtype, $_FILES['JobIcon'])) {
-                    header("Location: admin_add_handyman.php?msg=jobtype_added");
-                    exit;
-                } else {
-                    $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-exclamation-circle me-2"></i>
-                            Failed to add new job type. Please try again.
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
-                }
+            if ($db->addJobTypeWithIcon($new_jobtype, $new_icon)) {
+                header("Location: admin_add_handyman.php?msg=jobtype_added");
+                exit;
             } else {
-                $msg = '<div class="alert alert-warning alert-dismissible fade show animate-fade-in" role="alert">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Please select an icon image for the job type.
+                $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to add new job type.
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>';
             }
@@ -505,24 +496,6 @@ if (isset($_GET['msg'])) {
             align-items: center;
             gap: 0.5rem;
         }
-
-        /* Job Type Icon Styling */
-        .jobtype-icon {
-            width: 40px;
-            height: 40px;
-            object-fit: cover;
-            border-radius: 8px;
-            border: 2px solid #e5e7eb;
-        }
-
-        .jobtype-icon-preview {
-            width: 60px;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 10px;
-            border: 2px solid var(--primary);
-            margin-bottom: 10px;
-        }
         
         /* Action Group */
         .action-group {
@@ -587,45 +560,33 @@ if (isset($_GET['msg'])) {
             color: var(--secondary);
         }
 
-        /* File Upload Styling */
-        .file-upload-container {
-            border: 2px dashed #d1d5db;
+        /* Icon Picker */
+        .icon-picker {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            border: 1px solid #e5e7eb;
             border-radius: var(--border-radius);
-            padding: 2rem;
+            margin-top: 0.5rem;
+        }
+
+        .icon-option {
+            padding: 0.75rem;
             text-align: center;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
             transition: var(--transition);
-            background: #f9fafb;
+            font-size: 1.2rem;
         }
 
-        .file-upload-container:hover {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        .file-upload-container.dragover {
+        .icon-option:hover, .icon-option.selected {
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.1);
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .file-upload-label {
-            cursor: pointer;
-            display: block;
-        }
-
-        .file-upload-icon {
-            font-size: 3rem;
             color: var(--primary);
-            margin-bottom: 1rem;
-        }
-
-        .file-info {
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            color: #6b7280;
         }
         
         /* Mobile Responsive */
@@ -675,10 +636,6 @@ if (isset($_GET['msg'])) {
 
             .stats-row {
                 grid-template-columns: 1fr;
-            }
-
-            .file-upload-container {
-                padding: 1.5rem;
             }
         }
         
@@ -848,13 +805,7 @@ if (isset($_GET['msg'])) {
                                     <td><i class="fas fa-phone-alt text-muted me-2"></i><?= htmlspecialchars($r['Phone']) ?></td>
                                     <td>
                                         <span class="badge-job">
-                                            <?php if ($r['Icon'] && file_exists('uploads/jobtype_icons/' . $r['Icon'])): ?>
-                                                <img src="uploads/jobtype_icons/<?= htmlspecialchars($r['Icon']) ?>" 
-                                                     alt="<?= htmlspecialchars($r['JobType_Name'] ?? 'Job Type') ?>" 
-                                                     class="jobtype-icon me-2">
-                                            <?php else: ?>
-                                                <i class="fas fa-wrench me-2"></i>
-                                            <?php endif; ?>
+                                            <i class="fas <?= htmlspecialchars($r['Icon'] ?? 'fa-wrench') ?>"></i>
                                             <?= htmlspecialchars($r['JobType_Name'] ?? 'Unassigned') ?>
                                         </span>
                                     </td>
@@ -949,7 +900,7 @@ if (isset($_GET['msg'])) {
             </div>
             <div class="card-body">
                 <!-- Add Job Type Form -->
-                <form method="POST" id="jobTypeForm" enctype="multipart/form-data">
+                <form method="POST" id="jobTypeForm">
                     <div class="row align-items-end">
                         <div class="col-md-5 mb-3">
                             <label class="form-label"><i class="fas fa-tag me-2"></i>Job Type Name *</label>
@@ -957,31 +908,85 @@ if (isset($_GET['msg'])) {
                                 placeholder="e.g., Plumbing, Electrical, Carpentry">
                         </div>
                         <div class="col-md-5 mb-3">
-                            <label class="form-label"><i class="fas fa-image me-2"></i>Job Type Icon *</label>
+                            <label class="form-label"><i class="fas fa-icons me-2"></i>Select Icon *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-wrench" id="selectedIconPreview"></i>
+                                </span>
+                                <input type="text" name="JobIcon" id="jobIconInput" class="form-control" 
+                                    value="fa-wrench" readonly required>
+                                <button type="button" class="btn btn-outline-secondary" onclick="toggleIconPicker()">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
                             
-                            <!-- File Upload Area -->
-                            <div class="file-upload-container" id="fileUploadContainer">
-                                <label for="JobIcon" class="file-upload-label">
-                                    <div class="file-upload-icon">
-                                        <i class="fas fa-cloud-upload-alt"></i>
-                                    </div>
-                                    <h5>Click to upload icon</h5>
-                                    <p class="text-muted mb-2">or drag and drop</p>
-                                    <p class="file-info">PNG, JPG, GIF up to 2MB</p>
-                                    
-                                    <!-- Image Preview -->
-                                    <div id="imagePreview" class="mt-3" style="display: none;">
-                                        <img id="previewImage" class="jobtype-icon-preview" src="" alt="Preview">
-                                        <p class="text-success mb-0" id="fileName"></p>
-                                    </div>
-                                </label>
-                                <input type="file" name="JobIcon" id="JobIcon" class="file-input" 
-                                       accept="image/*" required onchange="previewImage(this)">
+                            <!-- Icon Picker -->
+                            <div id="iconPicker" class="icon-picker" style="display: none;">
+                                <div class="icon-option" data-icon="fa-wrench" onclick="selectIcon('fa-wrench')">
+                                    <i class="fas fa-wrench"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-hammer" onclick="selectIcon('fa-hammer')">
+                                    <i class="fas fa-hammer"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-screwdriver" onclick="selectIcon('fa-screwdriver')">
+                                    <i class="fas fa-screwdriver"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-toolbox" onclick="selectIcon('fa-toolbox')">
+                                    <i class="fas fa-toolbox"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-bolt" onclick="selectIcon('fa-bolt')">
+                                    <i class="fas fa-bolt"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-plug" onclick="selectIcon('fa-plug')">
+                                    <i class="fas fa-plug"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-paint-roller" onclick="selectIcon('fa-paint-roller')">
+                                    <i class="fas fa-paint-roller"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-brush" onclick="selectIcon('fa-brush')">
+                                    <i class="fas fa-brush"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-ruler" onclick="selectIcon('fa-ruler')">
+                                    <i class="fas fa-ruler"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-drafting-compass" onclick="selectIcon('fa-drafting-compass')">
+                                    <i class="fas fa-drafting-compass"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-tape" onclick="selectIcon('fa-tape')">
+                                    <i class="fas fa-tape"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-faucet" onclick="selectIcon('fa-faucet')">
+                                    <i class="fas fa-faucet"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-toilet" onclick="selectIcon('fa-toilet')">
+                                    <i class="fas fa-toilet"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-shower" onclick="selectIcon('fa-shower')">
+                                    <i class="fas fa-shower"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-broom" onclick="selectIcon('fa-broom')">
+                                    <i class="fas fa-broom"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-spray-can" onclick="selectIcon('fa-spray-can')">
+                                    <i class="fas fa-spray-can"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-house-damage" onclick="selectIcon('fa-house-damage')">
+                                    <i class="fas fa-house-damage"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-fire-extinguisher" onclick="selectIcon('fa-fire-extinguisher')">
+                                    <i class="fas fa-fire-extinguisher"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-hard-hat" onclick="selectIcon('fa-hard-hat')">
+                                    <i class="fas fa-hard-hat"></i>
+                                </div>
+                                <div class="icon-option" data-icon="fa-tools" onclick="selectIcon('fa-tools')">
+                                    <i class="fas fa-tools"></i>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-2 mb-3">
-                            <button type="submit" name="add_jobtype" class="btn btn-success w-100 h-100">
-                                <i class="fas fa-plus-circle me-2"></i>Add Job Type
+                            <button type="submit" name="add_jobtype" class="btn btn-success w-100">
+                                <i class="fas fa-plus-circle me-2"></i>Add
                             </button>
                         </div>
                     </div>
@@ -1012,13 +1017,8 @@ if (isset($_GET['msg'])) {
                                     <tr>
                                         <td><span class="fw-medium">#<?= $jt['JobType_ID'] ?></span></td>
                                         <td>
-                                            <?php if ($jt['Icon'] && file_exists('uploads/jobtype_icons/' . $jt['Icon'])): ?>
-                                                <img src="uploads/jobtype_icons/<?= htmlspecialchars($jt['Icon']) ?>" 
-                                                     alt="<?= htmlspecialchars($jt['JobType_Name']) ?>" 
-                                                     class="jobtype-icon">
-                                            <?php else: ?>
-                                                <i class="fas fa-wrench fa-2x" style="color: var(--primary);"></i>
-                                            <?php endif; ?>
+                                            <i class="fas <?= htmlspecialchars($jt['Icon'] ?? 'fa-wrench') ?> fa-2x" 
+                                               style="color: var(--primary);"></i>
                                         </td>
                                         <td><strong><?= htmlspecialchars($jt['JobType_Name']) ?></strong></td>
                                         <td>
@@ -1068,73 +1068,36 @@ if (isset($_GET['msg'])) {
             });
         });
 
-        // File upload and preview functionality
-        function previewImage(input) {
-            const preview = document.getElementById('previewImage');
-            const fileName = document.getElementById('fileName');
-            const imagePreview = document.getElementById('imagePreview');
-            const fileUploadContainer = document.getElementById('fileUploadContainer');
-
-            if (input.files && input.files[0]) {
-                const file = input.files[0];
-                
-                // Validate file type
-                const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
-                if (!validTypes.includes(file.type)) {
-                    alert('Please select a valid image file (JPEG, PNG, GIF).');
-                    input.value = '';
-                    return;
-                }
-                
-                // Validate file size (2MB)
-                if (file.size > 2 * 1024 * 1024) {
-                    alert('File size must be less than 2MB.');
-                    input.value = '';
-                    return;
-                }
-
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    preview.src = e.target.result;
-                    fileName.textContent = file.name;
-                    imagePreview.style.display = 'block';
-                    fileUploadContainer.style.borderColor = '#10b981';
-                    fileUploadContainer.style.background = 'rgba(16, 185, 129, 0.05)';
-                }
-                
-                reader.readAsDataURL(input.files[0]);
-            }
+        // Icon picker functionality
+        function toggleIconPicker() {
+            const picker = document.getElementById('iconPicker');
+            picker.style.display = picker.style.display === 'none' ? 'grid' : 'none';
         }
 
-        // Drag and drop functionality
-        const fileUploadContainer = document.getElementById('fileUploadContainer');
-        const fileInput = document.getElementById('JobIcon');
-
-        fileUploadContainer.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileUploadContainer.classList.add('dragover');
-        });
-
-        fileUploadContainer.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            fileUploadContainer.classList.remove('dragover');
-        });
-
-        fileUploadContainer.addEventListener('drop', (e) => {
-            e.preventDefault();
-            fileUploadContainer.classList.remove('dragover');
+        function selectIcon(iconClass) {
+            document.getElementById('jobIconInput').value = iconClass;
+            document.getElementById('selectedIconPreview').className = 'fas ' + iconClass;
             
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                previewImage(fileInput);
-            }
-        });
+            // Update selected state
+            document.querySelectorAll('.icon-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.querySelector(`[data-icon="${iconClass}"]`).classList.add('selected');
+            
+            // Close picker
+            document.getElementById('iconPicker').style.display = 'none';
+        }
 
-        // Click to upload
-        fileUploadContainer.addEventListener('click', () => {
-            fileInput.click();
+        // Close icon picker when clicking outside
+        document.addEventListener('click', function(event) {
+            const picker = document.getElementById('iconPicker');
+            const iconInput = document.getElementById('jobIconInput');
+            const searchBtn = event.target.closest('.btn-outline-secondary');
+            
+            if (picker && !picker.contains(event.target) && 
+                event.target !== iconInput && !searchBtn) {
+                picker.style.display = 'none';
+            }
         });
 
         // Confirmation dialogs

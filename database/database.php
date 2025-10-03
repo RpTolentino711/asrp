@@ -732,7 +732,6 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
             return [];
         }
     }
-
     public function getJobTypeNameById($jobtype_id) {
         $sql = "SELECT JobType_Name FROM jobtype WHERE JobType_ID = ?";
         return $this->runQuery($sql, [$jobtype_id]);
@@ -832,14 +831,14 @@ public function removeSpacePhoto($space_id, $photo_filename) {
     }
 
 
-     public function getAllJobTypes() {
-    $sql = "SELECT JobType_ID, JobType_Name, Icon FROM jobtype ORDER BY JobType_Name";
-    try {
-        return $this->pdo->query($sql)->fetchAll();
-    } catch (PDOException $e) {
-        return [];
+       public function getAllJobTypes() {
+        $sql = "SELECT JobType_ID, JobType_Name FROM jobtype ORDER BY JobType_Name";
+        try {
+            return $this->pdo->query($sql)->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
 
 
 
@@ -1214,112 +1213,14 @@ public function getPendingRentalRequests() {
         return $this->runQuery($sql, [$username]);
     }
 
-
-
-    
-
-public function getMonthlyEarningsStats($startDate, $endDate) {
-    // Include the time component to cover the entire end date
-    $endDateWithTime = $endDate . ' 23:59:59';
-    
-    $sql = "SELECT 
-        COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
-        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ?) as new_messages_count
-        FROM invoice 
-        WHERE Status = 'paid' 
-        AND Created_At BETWEEN ? AND ?";
-    
-    return $this->getRow($sql, [
-        $startDate, $endDateWithTime, 
-        $startDate, $endDateWithTime
-    ]);
-}
-
-
-public function getAdminDashboardCounts($startDate = null, $endDate = null) {
-    // If no dates provided, use current month
-    if (!$startDate || !$endDate) {
-        $startDate = date('Y-m-01');
-        $endDate = date('Y-m-t');
+    public function getAdminDashboardCounts() {
+        $sql = "SELECT
+                  (SELECT COUNT(*) FROM rentalrequest WHERE Status='Pending') AS pending_rentals,
+                  (SELECT COUNT(*) FROM maintenancerequest WHERE Status='Submitted') AS pending_maintenance,
+                  (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') AS unpaid_invoices,
+                  (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND InvoiceDate <= CURDATE()) AS unpaid_due_invoices";
+        return $this->runQuery($sql);
     }
-    
-    // Add time component to include the entire end date
-    $endDateWithTime = $endDate . ' 23:59:59';
-    
-    $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as overdue_invoices";
-    
-    return $this->getRow($sql, [
-        $startDate, $endDateWithTime, 
-        $startDate, $endDateWithTime,
-        $startDate, $endDateWithTime,
-        $startDate, $endDateWithTime
-    ]);
-}
-
-
-// New function specifically for maintenance statistics
-public function getMaintenanceStats($startDate, $endDate) {
-    $sql = "SELECT 
-        COUNT(*) as total_maintenance,
-        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed_maintenance,
-        COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress_maintenance,
-        COUNT(CASE WHEN Status IN ('Submitted', 'In Progress') THEN 1 END) as pending_maintenance
-        FROM maintenancerequest 
-        WHERE RequestDate BETWEEN ? AND ?";
-    
-    return $this->getRow($sql, [$startDate, $endDate]);
-}
-
-public function getTotalRentalRequests($startDate, $endDate) {
-    // Include the time component to cover the entire end date
-    $endDateWithTime = $endDate . ' 23:59:59';
-    
-    $sql = "SELECT 
-        COUNT(*) as total_rental_requests,
-        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
-        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
-        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
-        FROM rentalrequest 
-        WHERE Requested_At BETWEEN ? AND ?";
-    
-    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
-    return [
-        'total' => $result['total_rental_requests'] ?? 0,
-        'pending' => $result['pending_rentals'] ?? 0,
-        'accepted' => $result['accepted_rentals'] ?? 0,
-        'rejected' => $result['rejected_rentals'] ?? 0
-    ];
-}
-
-
-
-public function getTotalMaintenanceRequests($startDate, $endDate) {
-    // Add time component to include the entire end date
-    $endDateWithTime = $endDate . ' 23:59:59';
-    
-    $sql = "SELECT 
-        COUNT(*) as total_maintenance,
-        COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted_requests,
-        COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress_requests,
-        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed_requests
-        FROM maintenancerequest 
-        WHERE RequestDate BETWEEN ? AND ?";
-    
-    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
-    return [
-        'total' => $result['total_maintenance'] ?? 0,
-        'submitted' => $result['submitted_requests'] ?? 0,
-        'in_progress' => $result['in_progress_requests'] ?? 0,
-        'completed' => $result['completed_requests'] ?? 0
-    ];
-}
-
-    
 
     public function getLatestPendingRequests($limit = 5) {
         $sql = "SELECT rr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName, 
@@ -1502,20 +1403,20 @@ public function acceptRentalRequest($request_id) {
 
 
 
- public function getAllHandymenWithJob() {
-    $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, h.Phone, jt.JobType_Name, jt.Icon
-            FROM handyman h
-            LEFT JOIN handymanjob hj ON hj.Handyman_ID = h.Handyman_ID
-            LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
-            ORDER BY h.Handyman_ln, h.Handyman_fn";
-    try {
-        return $this->pdo->query($sql)->fetchAll();
-    } catch (PDOException $e) {
-        return [];
+    public function getAllHandymenWithJobTypes() {
+        $sql = "SELECT h.Handyman_ID, h.Handyman_fn, h.Handyman_ln, 
+                       GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ') AS JobTypes
+                FROM handyman h
+                LEFT JOIN handymanjob hj ON h.Handyman_ID = hj.Handyman_ID
+                LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
+                GROUP BY h.Handyman_ID
+                ORDER BY h.Handyman_fn";
+        try {
+            return $this->pdo->query($sql)->fetchAll();
+        } catch (PDOException $e) {
+            return [];
+        }
     }
-}
-
-
 
 
     public function updateMaintenanceRequest($request_id, $new_status, $handyman_id) {
@@ -2018,5 +1919,9 @@ public function createNextRecurringInvoiceWithChatCustomDate($invoice_id, $custo
 
 
 ?>
+
+
+
+
 
 
