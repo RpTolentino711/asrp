@@ -966,13 +966,15 @@ if (isset($_GET['msg'])) {
                                     <td><i class="fas fa-phone-alt text-muted me-2"></i><?= htmlspecialchars($r['Phone']) ?></td>
                                     <td>
                                         <span class="badge-job">
-                                            <?php if ($r['Icon'] && file_exists('uploads/jobtype_icons/' . $r['Icon'])): ?>
-                                                <img src="uploads/jobtype_icons/<?= htmlspecialchars($r['Icon']) ?>" 
-                                                     alt="<?= htmlspecialchars($r['JobType_Name'] ?? 'Job Type') ?>" 
-                                                     class="jobtype-icon me-2">
-                                            <?php else: ?>
-                                                <i class="fas fa-wrench me-2"></i>
-                                            <?php endif; ?>
+                                         <?php 
+$icon_path = '../uploads/jobtype_icons/' . $r['Icon'];
+if ($r['Icon'] && file_exists($icon_path)): ?>
+    <img src="../uploads/jobtype_icons/<?= htmlspecialchars($r['Icon']) ?>" 
+         alt="<?= htmlspecialchars($r['JobType_Name'] ?? 'Job Type') ?>" 
+         class="jobtype-icon me-2">
+<?php else: ?>
+    <i class="fas fa-wrench me-2"></i>
+<?php endif; ?>
                                             <?= htmlspecialchars($r['JobType_Name'] ?? 'Unassigned') ?>
                                         </span>
                                     </td>
