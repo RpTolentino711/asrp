@@ -1570,7 +1570,7 @@ public function acceptRentalRequest($request_id) {
     }
 }
 
-  public function getActiveMaintenanceRequests() {
+public function getActiveMaintenanceRequests() {
     $sql = "SELECT mr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS SpaceName, 
                    mr.RequestDate, mr.Status, mr.Handyman_ID, mr.IssuePhoto, mr.CompletionPhoto,
                    h.Handyman_fn, h.Handyman_ln,
@@ -1638,7 +1638,6 @@ public function updateMaintenanceRequest($request_id, $new_status, $handyman_id,
         return false;
     }
 }
-    
 
     public function updateClientStatus($client_id, $status) {
         $sql = "UPDATE client SET Status = ? WHERE Client_ID = ?";
