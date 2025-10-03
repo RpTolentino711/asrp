@@ -1132,15 +1132,15 @@ if ($r['Icon'] && file_exists($icon_path)): ?>
                                     <tr>
                                         <td><span class="fw-medium">#<?= $jt['JobType_ID'] ?></span></td>
                                         <td>
-                                       <?php 
-$icon_path = '../uploads/jobtype_icons/' . $r['Icon'];
-if ($r['Icon'] && file_exists($icon_path)): ?>
-    <img src="../uploads/jobtype_icons/<?= htmlspecialchars($r['Icon']) ?>" 
-         alt="<?= htmlspecialchars($r['JobType_Name'] ?? 'Job Type') ?>" 
-         class="jobtype-icon me-2">
-<?php else: ?>
-    <i class="fas fa-wrench me-2"></i>
-<?php endif; ?>
+                                            <?php 
+                                            $icon_path = '../uploads/jobtype_icons/' . $jt['Icon'];
+                                            if ($jt['Icon'] && file_exists($icon_path)): ?>
+                                                <img src="../uploads/jobtype_icons/<?= htmlspecialchars($jt['Icon']) ?>" 
+                                                     alt="<?= htmlspecialchars($jt['JobType_Name'] ?? 'Job Type') ?>" 
+                                                     class="jobtype-icon">
+                                            <?php else: ?>
+                                                <i class="fas fa-wrench fa-lg text-muted"></i>
+                                            <?php endif; ?>
                                         </td>
                                         <td><strong><?= htmlspecialchars($jt['JobType_Name']) ?></strong></td>
                                         <td>
@@ -1152,7 +1152,7 @@ if ($r['Icon'] && file_exists($icon_path)): ?>
                                                 </button>
                                                 
                                                 <!-- Delete Icon Button -->
-                                                <?php if ($jt['Icon'] && file_exists('uploads/jobtype_icons/' . $jt['Icon'])): ?>
+                                                <?php if ($jt['Icon'] && file_exists('../uploads/jobtype_icons/' . $jt['Icon'])): ?>
                                                 <button onclick="confirmDeleteIcon(<?= $jt['JobType_ID'] ?>, '<?= htmlspecialchars(addslashes($jt['JobType_Name'])) ?>')" 
                                                         class="btn-action-sm btn-delete" title="Delete Icon">
                                                     <i class="fas fa-trash-alt"></i>
