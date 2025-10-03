@@ -762,7 +762,8 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
     </style>
 
 
-     
+        /* ... rest of your existing CSS ... */
+    </style>
 </head>
 <body>
     <!-- Mobile overlay and header (unchanged) -->
