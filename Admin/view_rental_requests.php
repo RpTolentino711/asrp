@@ -258,35 +258,35 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             pointer-events: none;
         }
         
-        /* Default: Show tooltip below */
+        /* Default: Show tooltip above (for most rows) */
         .client-tooltip {
-            top: 100%;
-            margin-top: 8px;
+            bottom: 100%;
+            margin-bottom: 8px;
         }
         
         .client-tooltip::after {
             content: '';
             position: absolute;
-            bottom: 100%;
+            top: 100%;
             left: 50%;
             transform: translateX(-50%);
             border: 6px solid transparent;
-            border-bottom-color: var(--dark);
+            border-top-color: var(--dark);
         }
         
-        /* When near top of viewport, show tooltip below */
+        /* First 2 rows: Show tooltip below */
         .custom-table tr:nth-child(-n+2) .client-tooltip {
-            top: 100%;
             bottom: auto;
+            top: 100%;
             margin-top: 8px;
             margin-bottom: 0;
         }
         
         .custom-table tr:nth-child(-n+2) .client-tooltip::after {
-            bottom: 100%;
             top: auto;
-            border-bottom-color: var(--dark);
+            bottom: 100%;
             border-top-color: transparent;
+            border-bottom-color: var(--dark);
         }
         
         .client-info:hover .client-tooltip {
