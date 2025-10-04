@@ -2151,6 +2151,59 @@ public function getRequestCompletionDate($request_id) {
 }
     
 
+public function getPaidInvoicesForPeriod($startDate, $endDate) {
+    $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name as SpaceName 
+            FROM invoice i 
+            LEFT JOIN client c ON i.Client_ID = c.Client_ID 
+            LEFT JOIN space s ON i.Space_ID = s.Space_ID 
+            WHERE i.Status = 'paid' 
+            AND i.InvoiceDate BETWEEN ? AND ? 
+            ORDER BY i.InvoiceDate DESC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function getRentalRequestsForPeriod($startDate, $endDate) {
+    $sql = "SELECT rr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName 
+            FROM rentalrequest rr 
+            LEFT JOIN client c ON rr.Client_ID = c.Client_ID 
+            LEFT JOIN space s ON rr.Space_ID = s.Space_ID 
+            WHERE rr.Requested_At BETWEEN ? AND ? 
+            ORDER BY rr.Requested_At DESC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function getMaintenanceRequestsForPeriod($startDate, $endDate) {
+    $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName, 
+                   h.Handyman_fn, h.Handyman_ln 
+            FROM maintenancerequest mr 
+            LEFT JOIN client c ON mr.Client_ID = c.Client_ID 
+            LEFT JOIN space s ON mr.Space_ID = s.Space_ID 
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID 
+            WHERE mr.RequestDate BETWEEN ? AND ? 
+            ORDER BY mr.RequestDate DESC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+public function getMessagesForPeriod($startDate, $endDate) {
+    $sql = "SELECT * FROM free_message 
+            WHERE Sent_At BETWEEN ? AND ? 
+            AND is_deleted = 0 
+            ORDER BY Sent_At DESC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 
 }
 
