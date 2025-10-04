@@ -256,6 +256,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             z-index: 1000;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             margin-bottom: 8px;
+            min-width: 250px;
         }
         
         .client-tooltip::after {
@@ -287,6 +288,21 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         .contact-item i {
             width: 14px;
             color: var(--info);
+        }
+        
+        .request-date {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            color: #d1d5db;
+            font-size: 0.8rem;
+        }
+        
+        .request-date i {
+            color: var(--warning);
         }
         
         /* Button Styling */
