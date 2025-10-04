@@ -1385,7 +1385,7 @@ function formatDateToMonthLetters($date) {
                                         <?php if (count($maintenance_history[$space_id]) > 3): ?>
                                             <small class="text-muted">
                                                 <i class="bi bi-three-dots me-1"></i>
-                                                +<?= count($maintenance_history[$space_id]) - 3 ?> more records
+                                                +<?= count($maintenance_history[$space_id]) - 3 ?>
                                             </small>
                                         <?php endif; ?>
                                     <?php else: ?>
