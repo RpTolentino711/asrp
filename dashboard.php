@@ -393,6 +393,43 @@ function formatDateToMonthLetters($date) {
         70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
         100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
     }
+
+    /* Maintenance History Dropdown */
+    .maintenance-dropdown {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid var(--gray-light);
+        border-radius: var(--border-radius-sm);
+        background: white;
+        margin-top: 0.5rem;
+    }
+    .maintenance-dropdown::-webkit-scrollbar {
+        width: 6px;
+    }
+    .maintenance-dropdown::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 3px;
+    }
+    .maintenance-dropdown::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+    }
+    .maintenance-dropdown::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    .toggle-maintenance {
+        background: none;
+        border: none;
+        color: var(--primary);
+        font-size: 0.85rem;
+        cursor: pointer;
+        padding: 0.25rem 0.5rem;
+        border-radius: var(--border-radius-sm);
+        transition: var(--transition);
+    }
+    .toggle-maintenance:hover {
+        background: rgba(37, 99, 235, 0.1);
+    }
     </style>
     <meta charset="utf-8">
     <title>Client Dashboard - ASRT Commercial Spaces</title>
@@ -771,6 +808,7 @@ function formatDateToMonthLetters($date) {
         .maintenance-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 0.75rem;
             margin-bottom: 1rem;
         }
@@ -1300,12 +1338,20 @@ function formatDateToMonthLetters($date) {
                                 <!-- Maintenance History -->
                                 <div class="maintenance-section mt-auto">
                                     <div class="maintenance-header">
-                                        <i class="bi bi-tools"></i>
-                                        <h6>Maintenance History</h6>
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-tools"></i>
+                                            <h6 class="mb-0 ms-2">Maintenance History</h6>
+                                        </div>
+                                        <?php if (isset($maintenance_history[$space_id]) && count($maintenance_history[$space_id]) > 3): ?>
+                                            <button type="button" class="toggle-maintenance" onclick="toggleMaintenanceHistory(<?= $space_id ?>)">
+                                                <i class="bi bi-chevron-down" id="maintenance-icon-<?= $space_id ?>"></i>
+                                                View All
+                                            </button>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <?php if (isset($maintenance_history[$space_id]) && !empty($maintenance_history[$space_id])): ?>
-                                        <ul class="maintenance-list">
+                                        <ul class="maintenance-list" id="maintenance-preview-<?= $space_id ?>">
                                             <?php foreach (array_slice($maintenance_history[$space_id], 0, 3) as $mh): ?>
                                                 <li class="maintenance-item">
                                                     <div>
@@ -1318,6 +1364,24 @@ function formatDateToMonthLetters($date) {
                                                 </li>
                                             <?php endforeach; ?>
                                         </ul>
+                                        
+                                        <!-- Full Maintenance History (Hidden by default) -->
+                                        <div class="maintenance-dropdown d-none" id="maintenance-full-<?= $space_id ?>">
+                                            <ul class="maintenance-list">
+                                                <?php foreach ($maintenance_history[$space_id] as $mh): ?>
+                                                    <li class="maintenance-item">
+                                                        <div>
+                                                            <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
+                                                            <small class="text-muted">Maintenance Request</small>
+                                                        </div>
+                                                        <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
+                                                            <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
+                                                        </span>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        </div>
+                                        
                                         <?php if (count($maintenance_history[$space_id]) > 3): ?>
                                             <small class="text-muted">
                                                 <i class="bi bi-three-dots me-1"></i>
@@ -1439,6 +1503,27 @@ function formatDateToMonthLetters($date) {
                 }
             });
             return false;
+        }
+
+        // Toggle maintenance history dropdown
+        function toggleMaintenanceHistory(spaceId) {
+            const preview = document.getElementById(`maintenance-preview-${spaceId}`);
+            const full = document.getElementById(`maintenance-full-${spaceId}`);
+            const icon = document.getElementById(`maintenance-icon-${spaceId}`);
+            
+            if (full.classList.contains('d-none')) {
+                // Show full history
+                preview.classList.add('d-none');
+                full.classList.remove('d-none');
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-up');
+            } else {
+                // Show preview only
+                preview.classList.remove('d-none');
+                full.classList.add('d-none');
+                icon.classList.remove('bi-chevron-up');
+                icon.classList.add('bi-chevron-down');
+            }
         }
 
         // Close navbar on mobile when clicking nav links
