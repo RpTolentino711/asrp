@@ -1230,12 +1230,7 @@ function formatDateToMonthLetters($date) {
                                         <i class="bi bi-calendar-check me-1"></i>
                                         <strong>Due:</strong> <?= $due_date ?>
                                     </div>
-                                    <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'unpaid'): ?>
-                                        <div class="unit-details text-warning">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>
-                                            <strong>Status:</strong> Payment Pending
-                                        </div>
-                                    <?php elseif (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
+                                    <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
                                         <div class="unit-details text-success">
                                             <i class="bi bi-check-circle me-1"></i>
                                             <strong>Status:</strong> Paid
