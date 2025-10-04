@@ -237,6 +237,67 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     }
 }
 
+// --- Handle space type update ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_type') {
+    $type_id = intval($_POST['type_id'] ?? 0);
+    $new_name = trim($_POST['new_type_name'] ?? '');
+
+    if (empty($new_name)) {
+        $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                      <i class="fas fa-exclamation-circle me-2"></i>
+                      Please enter a space type name.
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>';
+    } else {
+        // Check if the new name already exists (excluding current type)
+        $existing_types = $db->getAllSpaceTypes();
+        $existing = array_filter($existing_types, function($type) use ($new_name, $type_id) {
+            return strtolower(trim($type['SpaceTypeName'])) === strtolower(trim($new_name)) && $type['SpaceType_ID'] != $type_id;
+        });
+        
+        if ($existing) {
+            $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          This space type name already exists.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        } else {
+            if ($db->updateSpaceType($type_id, $new_name)) {
+                $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Space type updated successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            } else {
+                $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Failed to update space type.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+    }
+}
+
+// --- Handle space type deletion ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_type') {
+    $type_id = intval($_POST['type_id'] ?? 0);
+    
+    if ($db->deleteSpaceType($type_id)) {
+        $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Space type deleted successfully!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>';
+    } else {
+        $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                      <i class="fas fa-exclamation-circle me-2"></i>
+                      Cannot delete space type. It may be in use by existing spaces.
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>';
+    }
+}
+
 // --- Fetch Data for Display ---
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithDetails();
@@ -762,6 +823,45 @@ $spaces = $db->getAllSpacesWithDetails();
             border-color: var(--primary);
             background: rgba(99, 102, 241, 0.02);
         }
+
+        /* Space Type Actions */
+        .space-type-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-edit {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .btn-edit:hover {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-remove {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .btn-remove:hover {
+            background: var(--danger);
+            color: white;
+        }
         
         /* Mobile Responsive */
         @media (max-width: 992px) {
@@ -829,6 +929,10 @@ $spaces = $db->getAllSpacesWithDetails();
 
             .photo-item {
                 min-width: auto;
+            }
+
+            .space-type-actions {
+                flex-direction: column;
             }
         }
         
@@ -1344,6 +1448,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                 <tr>
                                     <th>ID</th>
                                     <th>Name</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1354,6 +1459,24 @@ $spaces = $db->getAllSpacesWithDetails();
                                         </td>
                                         <td>
                                             <div class="fw-medium"><?= htmlspecialchars($type['SpaceTypeName']) ?></div>
+                                        </td>
+                                        <td>
+                                            <div class="space-type-actions">
+                                                <!-- Edit Button -->
+                                                <button type="button" class="btn-edit" data-bs-toggle="modal" data-bs-target="#editTypeModal" 
+                                                        data-type-id="<?= $type['SpaceType_ID'] ?>" data-type-name="<?= htmlspecialchars($type['SpaceTypeName']) ?>">
+                                                    <i class="fas fa-edit me-1"></i> Edit
+                                                </button>
+                                                
+                                                <!-- Delete Button -->
+                                                <form method="post" onsubmit="return confirm('Are you sure you want to delete this space type? This action cannot be undone.');">
+                                                    <input type="hidden" name="form_type" value="delete_type">
+                                                    <input type="hidden" name="type_id" value="<?= $type['SpaceType_ID'] ?>">
+                                                    <button type="submit" class="btn-remove">
+                                                        <i class="fas fa-trash me-1"></i> Delete
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -1369,6 +1492,20 @@ $spaces = $db->getAllSpacesWithDetails();
                                     <?= htmlspecialchars($type['SpaceTypeName']) ?>
                                     <span class="badge bg-primary ms-2">#<?= $type['SpaceType_ID'] ?></span>
                                 </div>
+                                <div class="space-type-actions mt-2">
+                                    <button type="button" class="btn-edit" data-bs-toggle="modal" data-bs-target="#editTypeModal" 
+                                            data-type-id="<?= $type['SpaceType_ID'] ?>" data-type-name="<?= htmlspecialchars($type['SpaceTypeName']) ?>">
+                                        <i class="fas fa-edit me-1"></i> Edit
+                                    </button>
+                                    
+                                    <form method="post" onsubmit="return confirm('Are you sure you want to delete this space type? This action cannot be undone.');" class="mt-1">
+                                        <input type="hidden" name="form_type" value="delete_type">
+                                        <input type="hidden" name="type_id" value="<?= $type['SpaceType_ID'] ?>">
+                                        <button type="submit" class="btn-remove">
+                                            <i class="fas fa-trash me-1"></i> Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -1379,6 +1516,32 @@ $spaces = $db->getAllSpacesWithDetails();
                         <p>There are no space types in the system</p>
                     </div>
                 <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Space Type Modal -->
+    <div class="modal fade" id="editTypeModal" tabindex="-1" aria-labelledby="editTypeModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editTypeModalLabel">Edit Space Type</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="form_type" value="update_type">
+                        <input type="hidden" name="type_id" id="edit_type_id">
+                        <div class="mb-3">
+                            <label for="edit_type_name" class="form-label">Space Type Name</label>
+                            <input type="text" class="form-control" id="edit_type_name" name="new_type_name" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Space Type</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1445,6 +1608,20 @@ $spaces = $db->getAllSpacesWithDetails();
             } else if (display) {
                 display.textContent = '';
             }
+        }
+
+        // Edit Space Type Modal
+        const editTypeModal = document.getElementById('editTypeModal');
+        if (editTypeModal) {
+            editTypeModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const typeId = button.getAttribute('data-type-id');
+                const typeName = button.getAttribute('data-type-name');
+                
+                const modal = this;
+                modal.querySelector('#edit_type_id').value = typeId;
+                modal.querySelector('#edit_type_name').value = typeName;
+            });
         }
 
         // Check photo limit before upload

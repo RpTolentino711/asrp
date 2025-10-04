@@ -2090,6 +2090,40 @@ public function addJobTypeWithImage($jobTypeName, $iconFile) {
         return false;
     }
 }
+
+// Add these methods to your Database class in database/database.php
+
+public function updateSpaceType($type_id, $new_name) {
+    try {
+        $sql = "UPDATE spacetype SET SpaceTypeName = ? WHERE SpaceType_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([$new_name, $type_id]);
+    } catch (PDOException $e) {
+        error_log("Update Space Type Error: " . $e->getMessage());
+        return false;
+    }
+}
+
+public function deleteSpaceType($type_id) {
+    try {
+        // Check if any spaces are using this type
+        $check_sql = "SELECT COUNT(*) FROM space WHERE SpaceType_ID = ?";
+        $check_stmt = $this->pdo->prepare($check_sql);
+        $check_stmt->execute([$type_id]);
+        $count = $check_stmt->fetchColumn();
+        
+        if ($count > 0) {
+            return false; // Cannot delete type that's in use
+        }
+        
+        $sql = "DELETE FROM spacetype WHERE SpaceType_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([$type_id]);
+    } catch (PDOException $e) {
+        error_log("Delete Space Type Error: " . $e->getMessage());
+        return false;
+    }
+}
   
     
 
