@@ -2090,6 +2090,10 @@ public function addJobTypeWithImage($jobTypeName, $iconFile) {
         return false;
     }
 }
+
+
+
+
   // Add to your Database class
 public function getInProgressMaintenanceRequests() {
     $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName, 
@@ -2152,20 +2156,24 @@ public function getRequestCompletionDate($request_id) {
     
 
 public function getPaidInvoicesForPeriod($startDate, $endDate) {
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name as SpaceName 
             FROM invoice i 
             LEFT JOIN client c ON i.Client_ID = c.Client_ID 
             LEFT JOIN space s ON i.Space_ID = s.Space_ID 
             WHERE i.Status = 'paid' 
-            AND i.InvoiceDate BETWEEN ? AND ? 
-            ORDER BY i.InvoiceDate DESC";
+            AND i.Created_At BETWEEN ? AND ? 
+            ORDER BY i.Created_At DESC";
     
     $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
+    $stmt->execute([$startDate, $endDateWithTime]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 public function getRentalRequestsForPeriod($startDate, $endDate) {
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT rr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName 
             FROM rentalrequest rr 
             LEFT JOIN client c ON rr.Client_ID = c.Client_ID 
@@ -2174,11 +2182,13 @@ public function getRentalRequestsForPeriod($startDate, $endDate) {
             ORDER BY rr.Requested_At DESC";
     
     $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
+    $stmt->execute([$startDate, $endDateWithTime]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 public function getMaintenanceRequestsForPeriod($startDate, $endDate) {
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as SpaceName, 
                    h.Handyman_fn, h.Handyman_ln 
             FROM maintenancerequest mr 
@@ -2189,20 +2199,23 @@ public function getMaintenanceRequestsForPeriod($startDate, $endDate) {
             ORDER BY mr.RequestDate DESC";
     
     $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
+    $stmt->execute([$startDate, $endDateWithTime]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 public function getMessagesForPeriod($startDate, $endDate) {
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT * FROM free_message 
             WHERE Sent_At BETWEEN ? AND ? 
             AND is_deleted = 0 
             ORDER BY Sent_At DESC";
     
     $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
+    $stmt->execute([$startDate, $endDateWithTime]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 
 }
