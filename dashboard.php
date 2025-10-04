@@ -123,7 +123,6 @@ if (isset($_SESSION['feedback_success'])) {
 }
 
 // --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
-// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
@@ -348,13 +347,25 @@ try {
     $maintenance_history = [];
     $unit_photos = [];
 }
+
+// Function to format date in month letters
+function formatDateToMonthLetters($date) {
+    if ($date === 'N/A' || empty($date)) {
+        return 'N/A';
+    }
+    
+    try {
+        $dateTime = new DateTime($date);
+        return $dateTime->format('F j, Y');
+    } catch (Exception $e) {
+        return $date; // Return original if parsing fails
+    }
+}
 ?>
 <!doctype html>
 <html lang="en">
 <head>
-    <style>
-
-        
+    <style>        
     .notification-badge {
         position: absolute;
         top: 0.2em;
@@ -399,7 +410,6 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
-      
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -1010,7 +1020,6 @@ try {
                 transform: translateY(0);
             }
         }
-        
     </style>
 </head>
 
@@ -1172,19 +1181,19 @@ try {
                     $space_id = intval($rent['Space_ID']);
                     $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
                     
-                    // Get dates safely
-                    $rental_start = isset($rent['StartDate']) ? htmlspecialchars($rent['StartDate']) : 'N/A';
-                    $rental_end = isset($rent['EndDate']) ? htmlspecialchars($rent['EndDate']) : 'N/A';
-                    $due_date = $rental_end;
+                    // Get dates safely and format them
+                    $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
+                    $rental_end = isset($rent['EndDate']) ? formatDateToMonthLetters($rent['EndDate']) : 'N/A';
+                    $due_date = formatDateToMonthLetters($rental_end);
 
                     // Use InvoiceDate from the latest invoice with Flow_Status 'new'
                     if (method_exists($db, 'getLatestNewInvoiceForUnit')) {
                         try {
                             $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $space_id);
                             if ($latest_invoice && is_array($latest_invoice) && isset($latest_invoice['Flow_Status']) && strtolower($latest_invoice['Flow_Status']) === 'new') {
-                                $rental_start = isset($latest_invoice['InvoiceDate']) ? htmlspecialchars($latest_invoice['InvoiceDate']) : $rental_start;
-                                $rental_end = isset($latest_invoice['EndDate']) ? htmlspecialchars($latest_invoice['EndDate']) : $rental_end;
-                                $due_date = $rental_end;
+                                $rental_start = isset($latest_invoice['InvoiceDate']) ? formatDateToMonthLetters($latest_invoice['InvoiceDate']) : $rental_start;
+                                $rental_end = isset($latest_invoice['EndDate']) ? formatDateToMonthLetters($latest_invoice['EndDate']) : $rental_end;
+                                $due_date = formatDateToMonthLetters($rental_end);
                             }
                         } catch (Exception $e) {
                             // Use default values if method fails
@@ -1207,7 +1216,7 @@ try {
                                     <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName'] ?? 'Space') ?></span>
                                 </div>
 
-                                <!-- Location & Dates -->
+                                <!-- Location & Billing Information -->
                                 <div class="mb-3">
                                     <div class="unit-details">
                                         <i class="bi bi-geo-alt me-1"></i>
@@ -1221,6 +1230,17 @@ try {
                                         <i class="bi bi-calendar-check me-1"></i>
                                         <strong>Due:</strong> <?= $due_date ?>
                                     </div>
+                                    <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'unpaid'): ?>
+                                        <div class="unit-details text-warning">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            <strong>Status:</strong> Payment Pending
+                                        </div>
+                                    <?php elseif (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
+                                        <div class="unit-details text-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <strong>Status:</strong> Paid
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <!-- Photo Gallery -->
