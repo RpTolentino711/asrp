@@ -18,6 +18,14 @@ if (!empty($pending_requests)) {
         if (!empty($row['Client_Phone'])) {
             echo '<div class="contact-item"><i class="fas fa-phone"></i><span>' . htmlspecialchars($row['Client_Phone']) . '</span></div>';
         }
+        // Add the request submission date
+        if (!empty($row['Requested_At'])) {
+            $submitted_date = date('M j, Y g:i A', strtotime($row['Requested_At']));
+            echo '<div class="request-date">';
+            echo '<i class="fas fa-calendar-check"></i>';
+            echo '<span>Submitted: ' . htmlspecialchars($submitted_date) . '</span>';
+            echo '</div>';
+        }
         echo '</div></div></td>';
         echo '<td>' . htmlspecialchars($row['Name']) . '</td>';
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['StartDate']) . '</div></td>';
