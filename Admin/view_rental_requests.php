@@ -274,15 +274,15 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             border-top-color: var(--dark);
         }
         
-        /* First 2 rows: Show tooltip below */
-        .custom-table tr:nth-child(-n+2) .client-tooltip {
+        /* First row only: Show tooltip below */
+        .custom-table tr:first-child .client-tooltip {
             bottom: auto;
             top: 100%;
             margin-top: 8px;
             margin-bottom: 0;
         }
         
-        .custom-table tr:nth-child(-n+2) .client-tooltip::after {
+        .custom-table tr:first-child .client-tooltip::after {
             top: auto;
             bottom: 100%;
             border-top-color: transparent;
