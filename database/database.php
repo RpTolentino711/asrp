@@ -1256,7 +1256,7 @@ public function getPendingRequestsByClient($client_id) {
 
 public function getPendingRentalRequests() {
     $sql = "SELECT r.Request_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone, 
-                   s.Name, r.StartDate, r.EndDate, r.Status
+                   s.Name, r.StartDate, r.EndDate, r.Status, r.Requested_At
             FROM rentalrequest r
             JOIN client c ON r.Client_ID = c.Client_ID
             JOIN space s ON r.Space_ID = s.Space_ID
