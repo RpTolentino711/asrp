@@ -2124,7 +2124,16 @@ public function deleteSpaceType($type_id) {
         return false;
     }
 }
-  
+  public function updateSpace($space_id, $name, $spacetype_id, $price) {
+    try {
+        $sql = "UPDATE space SET Name = ?, SpaceType_ID = ?, Price = ? WHERE Space_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([$name, $spacetype_id, $price, $space_id]);
+    } catch (PDOException $e) {
+        error_log("Update Space Error: " . $e->getMessage());
+        return false;
+    }
+}
     
 
 

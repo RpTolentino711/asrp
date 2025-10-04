@@ -298,6 +298,56 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     }
 }
 
+// --- Handle space update ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_space') {
+    $space_id = intval($_POST['space_id'] ?? 0);
+    $name = trim($_POST['name'] ?? '');
+    $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
+    $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
+
+    if (empty($name) || empty($spacetype_id) || $price === null) {
+        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                      <i class="fas fa-exclamation-circle me-2"></i>
+                      Please fill in all required fields.
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>';
+    } elseif ($price < 0) {
+        $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                      <i class="fas fa-exclamation-circle me-2"></i>
+                      Price must be a non-negative number.
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>';
+    } else {
+        // Check if name already exists (excluding current space)
+        $existing_spaces = $db->getAllSpacesWithDetails();
+        $existing = array_filter($existing_spaces, function($space) use ($name, $space_id) {
+            return strtolower(trim($space['Name'])) === strtolower(trim($name)) && $space['Space_ID'] != $space_id;
+        });
+        
+        if ($existing) {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          A space/unit with this name already exists.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        } else {
+            if ($db->updateSpace($space_id, $name, $spacetype_id, $price)) {
+                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Space/unit updated successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            } else {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Failed to update space/unit.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+    }
+}
+
 // --- Fetch Data for Display ---
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithDetails();
@@ -862,6 +912,29 @@ $spaces = $db->getAllSpacesWithDetails();
             background: var(--danger);
             color: white;
         }
+
+        /* Space Actions */
+        .space-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-edit-space {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--secondary);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .btn-edit-space:hover {
+            background: var(--secondary);
+            color: white;
+        }
         
         /* Mobile Responsive */
         @media (max-width: 992px) {
@@ -931,7 +1004,8 @@ $spaces = $db->getAllSpacesWithDetails();
                 min-width: auto;
             }
 
-            .space-type-actions {
+            .space-type-actions,
+            .space-actions {
                 flex-direction: column;
             }
         }
@@ -1219,6 +1293,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                     <th>Type</th>
                                     <th>Price (PHP)</th>
                                     <th>Photos (Max: <?= $max_photos_per_unit ?>)</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1322,6 +1397,17 @@ $spaces = $db->getAllSpacesWithDetails();
                                                 <?php endif; ?>
                                             </div>
                                         </td>
+                                        <td>
+                                            <div class="space-actions">
+                                                <button type="button" class="btn-edit-space" data-bs-toggle="modal" data-bs-target="#editSpaceModal" 
+                                                        data-space-id="<?= $space['Space_ID'] ?>" 
+                                                        data-space-name="<?= htmlspecialchars($space['Name']) ?>" 
+                                                        data-space-type="<?= $space['SpaceType_ID'] ?>" 
+                                                        data-space-price="<?= $space['Price'] ?>">
+                                                    <i class="fas fa-edit me-1"></i> Edit
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -1357,6 +1443,16 @@ $spaces = $db->getAllSpacesWithDetails();
                                 <div class="mobile-card-detail">
                                     <span class="label">Price:</span>
                                     <span class="value">₱<?= number_format($space['Price'], 2) ?></span>
+                                </div>
+
+                                <div class="space-actions mt-2">
+                                    <button type="button" class="btn-edit-space" data-bs-toggle="modal" data-bs-target="#editSpaceModal" 
+                                            data-space-id="<?= $space['Space_ID'] ?>" 
+                                            data-space-name="<?= htmlspecialchars($space['Name']) ?>" 
+                                            data-space-type="<?= $space['SpaceType_ID'] ?>" 
+                                            data-space-price="<?= $space['Price'] ?>">
+                                        <i class="fas fa-edit me-1"></i> Edit Space
+                                    </button>
                                 </div>
 
                                 <div class="mobile-photo-grid">
@@ -1546,6 +1642,45 @@ $spaces = $db->getAllSpacesWithDetails();
         </div>
     </div>
 
+    <!-- Edit Space Modal -->
+    <div class="modal fade" id="editSpaceModal" tabindex="-1" aria-labelledby="editSpaceModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editSpaceModalLabel">Edit Space/Unit</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="form_type" value="update_space">
+                        <input type="hidden" name="space_id" id="edit_space_id">
+                        <div class="mb-3">
+                            <label for="edit_space_name" class="form-label">Space/Unit Name</label>
+                            <input type="text" class="form-control" id="edit_space_name" name="name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_space_type" class="form-label">Space Type</label>
+                            <select class="form-select" id="edit_space_type" name="spacetype_id" required>
+                                <option value="" disabled>Select Type</option>
+                                <?php foreach ($spacetypes as $stype): ?>
+                                    <option value="<?= $stype['SpaceType_ID'] ?>"><?= htmlspecialchars($stype['SpaceTypeName']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_space_price" class="form-label">Price (PHP)</label>
+                            <input type="number" step="100" min="0" class="form-control" id="edit_space_price" name="price" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update Space/Unit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Mobile menu functionality
@@ -1621,6 +1756,24 @@ $spaces = $db->getAllSpacesWithDetails();
                 const modal = this;
                 modal.querySelector('#edit_type_id').value = typeId;
                 modal.querySelector('#edit_type_name').value = typeName;
+            });
+        }
+
+        // Edit Space Modal
+        const editSpaceModal = document.getElementById('editSpaceModal');
+        if (editSpaceModal) {
+            editSpaceModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const spaceId = button.getAttribute('data-space-id');
+                const spaceName = button.getAttribute('data-space-name');
+                const spaceType = button.getAttribute('data-space-type');
+                const spacePrice = button.getAttribute('data-space-price');
+                
+                const modal = this;
+                modal.querySelector('#edit_space_id').value = spaceId;
+                modal.querySelector('#edit_space_name').value = spaceName;
+                modal.querySelector('#edit_space_type').value = spaceType;
+                modal.querySelector('#edit_space_price').value = spacePrice;
             });
         }
 
