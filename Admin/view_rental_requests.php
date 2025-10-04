@@ -228,7 +228,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             background-color: #f9fafb;
         }
         
-        /* Client Info with Hover Tooltip */
+        /* Client Info with Dynamic Tooltip Positioning */
         .client-info {
             position: relative;
             cursor: help;
@@ -241,7 +241,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         
         .client-tooltip {
             position: absolute;
-            bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
             background: var(--dark);
@@ -255,18 +254,39 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             transition: all 0.3s ease;
             z-index: 1000;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            margin-bottom: 8px;
             min-width: 250px;
+            pointer-events: none;
+        }
+        
+        /* Default: Show tooltip below */
+        .client-tooltip {
+            top: 100%;
+            margin-top: 8px;
         }
         
         .client-tooltip::after {
             content: '';
             position: absolute;
-            top: 100%;
+            bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
             border: 6px solid transparent;
-            border-top-color: var(--dark);
+            border-bottom-color: var(--dark);
+        }
+        
+        /* When near top of viewport, show tooltip below */
+        .custom-table tr:nth-child(-n+2) .client-tooltip {
+            top: 100%;
+            bottom: auto;
+            margin-top: 8px;
+            margin-bottom: 0;
+        }
+        
+        .custom-table tr:nth-child(-n+2) .client-tooltip::after {
+            bottom: 100%;
+            top: auto;
+            border-bottom-color: var(--dark);
+            border-top-color: transparent;
         }
         
         .client-info:hover .client-tooltip {
@@ -406,10 +426,19 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 max-width: 280px;
                 white-space: normal;
                 text-align: center;
+                margin: 0;
             }
             
             .client-tooltip::after {
                 display: none;
+            }
+            
+            /* Override the nth-child rule for mobile */
+            .custom-table tr:nth-child(-n+2) .client-tooltip {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
             }
         }
         
