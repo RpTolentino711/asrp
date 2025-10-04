@@ -123,6 +123,7 @@ if (isset($_SESSION['feedback_success'])) {
 }
 
 // --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
+// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
@@ -351,7 +352,9 @@ try {
 <!doctype html>
 <html lang="en">
 <head>
-    <style>        
+    <style>
+
+        
     .notification-badge {
         position: absolute;
         top: 0.2em;
@@ -396,6 +399,7 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
+      
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -1006,6 +1010,7 @@ try {
                 transform: translateY(0);
             }
         }
+        
     </style>
 </head>
 
@@ -1202,7 +1207,7 @@ try {
                                     <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName'] ?? 'Space') ?></span>
                                 </div>
 
-                                <!-- Location & Billing Information -->
+                                <!-- Location & Dates -->
                                 <div class="mb-3">
                                     <div class="unit-details">
                                         <i class="bi bi-geo-alt me-1"></i>
@@ -1210,23 +1215,12 @@ try {
                                     </div>
                                     <div class="unit-details">
                                         <i class="bi bi-calendar-range me-1"></i>
-                                        <strong>Current Billing Period:</strong> <?= $rental_start ?> to <?= $rental_end ?>
+                                        <strong>Period:</strong> <?= $rental_start ?> to <?= $rental_end ?>
                                     </div>
                                     <div class="unit-details">
                                         <i class="bi bi-calendar-check me-1"></i>
-                                        <strong>Payment Due Date:</strong> <?= $due_date ?>
+                                        <strong>Due:</strong> <?= $due_date ?>
                                     </div>
-                                    <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'unpaid'): ?>
-                                        <div class="unit-details text-warning">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>
-                                            <strong>Payment Status:</strong> Payment Pending
-                                        </div>
-                                    <?php elseif (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
-                                        <div class="unit-details text-success">
-                                            <i class="bi bi-check-circle me-1"></i>
-                                            <strong>Payment Status:</strong> Paid
-                                        </div>
-                                    <?php endif; ?>
                                 </div>
 
                                 <!-- Photo Gallery -->
