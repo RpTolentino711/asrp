@@ -1,5 +1,11 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require '../database/database.php';
+require '../class.phpmailer.php';
+require '../class.smtp.php';
 session_start();
 
 $db = new Database();
@@ -9,7 +15,544 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
-// $pending_requests = $db->getPendingRentalRequests();
+// Set Philippine timezone
+date_default_timezone_set('Asia/Manila');
+
+// --- Email notification function for rental acceptance ---
+function sendRentalAcceptanceEmail($clientEmail, $clientFirstName, $spaceName, $startDate, $endDate, $monthlyRent) {
+    $mail = new PHPMailer;
+    $mail->CharSet = 'UTF-8';
+    $mail->isSMTP();
+    $mail->Host = 'smtp.hostinger.com';
+    $mail->Port = 587;
+    $mail->SMTPAuth = true;
+    $mail->SMTPSecure = 'tls';
+    
+    $mail->Username = 'management@asrt.space';
+    $mail->Password = '@Pogilameg10'; // Move to environment variable in production
+    
+    $mail->Timeout = 30;
+    $mail->SMTPOptions = [
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
+            'allow_self_signed' => true,
+            'crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT,
+        ],
+    ];
+    
+    $mail->setFrom($mail->Username, 'ASRT Spaces');
+    $mail->addReplyTo('management@asrt.space', 'ASRT Spaces Management');
+    $mail->addAddress($clientEmail);
+    
+    $mail->isHTML(true);
+    $mail->Subject = "Welcome to ASRT Community! Your Rental Request Has Been Approved";
+    
+    $safeName = htmlspecialchars($clientFirstName, ENT_QUOTES, 'UTF-8');
+    $safeSpaceName = htmlspecialchars($spaceName, ENT_QUOTES, 'UTF-8');
+    $safeStartDate = htmlspecialchars($startDate, ENT_QUOTES, 'UTF-8');
+    $safeEndDate = htmlspecialchars($endDate, ENT_QUOTES, 'UTF-8');
+    $safeMonthlyRent = number_format($monthlyRent, 2);
+    $approvalTime = date('F j, Y \a\t g:i A T');
+    
+    $mail->Body = "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            .container { 
+                max-width: 650px; 
+                margin: 0 auto; 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                line-height: 1.6; 
+                background: #f8fafc;
+                padding: 20px;
+            }
+            .email-wrapper {
+                background: white;
+                border-radius: 16px;
+                overflow: hidden;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            }
+            .header { 
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                color: white; 
+                padding: 40px 30px; 
+                text-align: center; 
+            }
+            .logo { 
+                font-size: 32px; 
+                font-weight: bold; 
+                margin-bottom: 12px;
+                letter-spacing: 1px;
+            }
+            .subtitle { 
+                font-size: 18px; 
+                opacity: 0.95;
+                font-weight: 500;
+            }
+            .welcome-badge {
+                display: inline-block;
+                background: rgba(255, 255, 255, 0.2);
+                padding: 8px 20px;
+                border-radius: 30px;
+                margin-top: 15px;
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: 1px;
+                text-transform: uppercase;
+            }
+            .content { 
+                padding: 40px 30px;
+            }
+            .greeting { 
+                font-size: 24px; 
+                margin-bottom: 20px; 
+                color: #1e293b; 
+                font-weight: 700;
+            }
+            .welcome-message {
+                background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+                border-left: 5px solid #10b981;
+                padding: 25px;
+                margin: 25px 0;
+                border-radius: 0 12px 12px 0;
+                box-shadow: 0 2px 10px rgba(16, 185, 129, 0.1);
+            }
+            .welcome-title { 
+                font-weight: bold; 
+                color: #065f46; 
+                margin-bottom: 12px; 
+                font-size: 18px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .check-icon {
+                display: inline-block;
+                width: 24px;
+                height: 24px;
+                background: #10b981;
+                border-radius: 50%;
+                color: white;
+                text-align: center;
+                line-height: 24px;
+                font-weight: bold;
+            }
+            .welcome-text {
+                color: #047857;
+                font-size: 15px;
+                line-height: 1.7;
+            }
+            .rental-details {
+                background: white;
+                border: 2px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 25px;
+                margin: 25px 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            }
+            .detail-header {
+                font-size: 18px;
+                font-weight: bold;
+                color: #10b981;
+                margin-bottom: 20px;
+                padding-bottom: 12px;
+                border-bottom: 2px solid #10b981;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .detail-row { 
+                display: flex; 
+                justify-content: space-between; 
+                padding: 12px 0;
+                border-bottom: 1px solid #f1f5f9;
+                align-items: center;
+            }
+            .detail-row:last-child { 
+                border-bottom: none; 
+                padding-bottom: 0;
+            }
+            .detail-label { 
+                color: #64748b; 
+                font-weight: 600;
+                font-size: 14px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .detail-value { 
+                color: #1e293b; 
+                font-weight: 700;
+                font-size: 16px;
+                text-align: right;
+            }
+            .price-highlight {
+                color: #10b981;
+                font-size: 20px;
+            }
+            .welcome-benefits {
+                background: #fefce8;
+                border-left: 5px solid #f59e0b;
+                padding: 25px;
+                margin: 25px 0;
+                border-radius: 0 12px 12px 0;
+            }
+            .benefits-title {
+                font-weight: bold;
+                color: #92400e;
+                margin-bottom: 15px;
+                font-size: 16px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .benefit-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+            }
+            .benefit-item {
+                padding: 10px 0;
+                color: #78350f;
+                font-size: 14px;
+                display: flex;
+                align-items: start;
+                gap: 12px;
+            }
+            .benefit-icon {
+                color: #f59e0b;
+                font-weight: bold;
+                font-size: 18px;
+                flex-shrink: 0;
+            }
+            .next-steps {
+                background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+                border-left: 5px solid #3b82f6;
+                padding: 25px;
+                margin: 25px 0;
+                border-radius: 0 12px 12px 0;
+            }
+            .next-steps-title {
+                font-weight: bold;
+                color: #1e40af;
+                margin-bottom: 15px;
+                font-size: 16px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+            .step-item {
+                padding: 10px 0;
+                color: #1e40af;
+                font-size: 14px;
+                display: flex;
+                align-items: start;
+                gap: 12px;
+            }
+            .step-number {
+                background: #3b82f6;
+                color: white;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+            .cta-section {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 12px;
+                text-align: center;
+                margin: 30px 0;
+            }
+            .cta-title { 
+                font-size: 22px; 
+                font-weight: bold; 
+                margin-bottom: 12px;
+            }
+            .cta-text {
+                font-size: 15px;
+                opacity: 0.95;
+                margin-bottom: 20px;
+            }
+            .cta-button {
+                display: inline-block;
+                background: white;
+                color: #10b981;
+                padding: 14px 32px;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: bold;
+                margin-top: 10px;
+                transition: transform 0.2s;
+                font-size: 16px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+            .footer { 
+                padding: 30px; 
+                text-align: center; 
+                background: #1e293b; 
+                color: #94a3b8;
+            }
+            .footer h3 { 
+                color: white; 
+                margin-bottom: 15px; 
+                font-size: 20px;
+            }
+            .footer p { 
+                margin: 8px 0; 
+                font-size: 13px;
+                line-height: 1.6;
+            }
+            .contact-info {
+                margin-top: 20px;
+                padding-top: 20px;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .support-info { 
+                color: #10b981; 
+                font-weight: 600;
+            }
+            .timestamp { 
+                font-size: 12px; 
+                color: #64748b; 
+                margin-top: 25px; 
+                font-style: italic;
+                text-align: center;
+                padding-top: 20px;
+                border-top: 1px solid #e2e8f0;
+            }
+            @media (max-width: 600px) {
+                .container { 
+                    padding: 10px;
+                }
+                .content, .header, .footer { 
+                    padding: 25px 20px;
+                }
+                .detail-row { 
+                    flex-direction: column;
+                    align-items: flex-start;
+                    gap: 5px;
+                }
+                .detail-value { 
+                    text-align: left;
+                }
+                .greeting {
+                    font-size: 20px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='email-wrapper'>
+                <div class='header'>
+                    <div class='logo'>🏠 ASRT Spaces</div>
+                    <div class='subtitle'>Property Management Excellence</div>
+                    <div class='welcome-badge'>✓ Rental Approved</div>
+                </div>
+                
+                <div class='content'>
+                    <div class='greeting'>Welcome, {$safeName}!</div>
+                    
+                    <div class='welcome-message'>
+                        <div class='welcome-title'>
+                            <span class='check-icon'>✓</span>
+                            <span>Congratulations! You're Now Part of the ASRT Community</span>
+                        </div>
+                        <div class='welcome-text'>
+                            We are thrilled to welcome you to our community! Your rental request has been approved, and we're excited to have you as our valued tenant. At ASRT Spaces, we're committed to providing you with excellent service and a comfortable living experience.
+                        </div>
+                    </div>
+                    
+                    <div class='rental-details'>
+                        <div class='detail-header'>📋 Your Rental Details</div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Property:</span>
+                            <span class='detail-value'>{$safeSpaceName}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Lease Start:</span>
+                            <span class='detail-value'>{$safeStartDate}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Lease End:</span>
+                            <span class='detail-value'>{$safeEndDate}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Monthly Rent:</span>
+                            <span class='detail-value price-highlight'>₱{$safeMonthlyRent}</span>
+                        </div>
+                        <div class='detail-row'>
+                            <span class='detail-label'>Approval Date:</span>
+                            <span class='detail-value'>{$approvalTime}</span>
+                        </div>
+                    </div>
+                    
+                    <div class='welcome-benefits'>
+                        <div class='benefits-title'>🌟 Your Benefits as an ASRT Tenant</div>
+                        <ul class='benefit-list'>
+                            <li class='benefit-item'>
+                                <span class='benefit-icon'>✓</span>
+                                <span><strong>24/7 Support:</strong> Our management team is always available to assist you</span>
+                            </li>
+                            <li class='benefit-item'>
+                                <span class='benefit-icon'>✓</span>
+                                <span><strong>Easy Maintenance Requests:</strong> Submit and track repair requests through your account</span>
+                            </li>
+                            <li class='benefit-item'>
+                                <span class='benefit-icon'>✓</span>
+                                <span><strong>Real-Time Chat:</strong> Communicate directly with management for any concerns</span>
+                            </li>
+                            <li class='benefit-item'>
+                                <span class='benefit-icon'>✓</span>
+                                <span><strong>Online Payments:</strong> Convenient invoice tracking and payment system</span>
+                            </li>
+                            <li class='benefit-item'>
+                                <span class='benefit-icon'>✓</span>
+                                <span><strong>Professional Service:</strong> Experienced handymen for quick repairs</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class='next-steps'>
+                        <div class='next-steps-title'>📝 Next Steps</div>
+                        <div class='step-item'>
+                            <span class='step-number'>1</span>
+                            <span>Log in to your account to view your rental details and first invoice</span>
+                        </div>
+                        <div class='step-item'>
+                            <span class='step-number'>2</span>
+                            <span>Review your lease agreement and payment schedule</span>
+                        </div>
+                        <div class='step-item'>
+                            <span class='step-number'>3</span>
+                            <span>Contact us if you have any questions or need assistance</span>
+                        </div>
+                        <div class='step-item'>
+                            <span class='step-number'>4</span>
+                            <span>Prepare for your move-in on the scheduled start date</span>
+                        </div>
+                    </div>
+                    
+                    <div class='cta-section'>
+                        <div class='cta-title'>Ready to Get Started?</div>
+                        <div class='cta-text'>Log in to your ASRT Spaces account to access all your rental information and start using our services.</div>
+                        <a href='https://asrt.space' class='cta-button'>Access Your Account</a>
+                    </div>
+                    
+                    <div class='timestamp'>Welcome email sent: {$approvalTime}</div>
+                </div>
+                
+                <div class='footer'>
+                    <h3>ASRT Spaces</h3>
+                    <p>Thank you for choosing ASRT Spaces as your property management partner.</p>
+                    <p>We're committed to making your rental experience exceptional.</p>
+                    
+                    <div class='contact-info'>
+                        <p><strong>Need Help?</strong></p>
+                        <p>Contact us at <span class='support-info'>management@asrt.space</span></p>
+                        <p>General Luna Street, Barangay 10, Lipa City</p>
+                    </div>
+                    
+                    <p style='margin-top: 20px; font-size: 11px; opacity: 0.8;'>
+                        © 2025 ASRT Spaces. All rights reserved.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>";
+    
+    $mail->AltBody = "Welcome to ASRT Community, {$safeName}!\n\n" .
+        "Congratulations! Your rental request has been APPROVED.\n\n" .
+        "RENTAL DETAILS:\n" .
+        "Property: {$safeSpaceName}\n" .
+        "Lease Start: {$safeStartDate}\n" .
+        "Lease End: {$safeEndDate}\n" .
+        "Monthly Rent: ₱{$safeMonthlyRent}\n" .
+        "Approval Date: {$approvalTime}\n\n" .
+        "YOUR BENEFITS:\n" .
+        "• 24/7 Support from our management team\n" .
+        "• Easy maintenance request system\n" .
+        "• Real-time chat with management\n" .
+        "• Online payment and invoice tracking\n" .
+        "• Professional handyman services\n\n" .
+        "NEXT STEPS:\n" .
+        "1. Log in to your account to view details\n" .
+        "2. Review your lease agreement\n" .
+        "3. Contact us with any questions\n" .
+        "4. Prepare for your move-in date\n\n" .
+        "Log in to your account at: https://asrt.space\n\n" .
+        "Thank you for choosing ASRT Spaces!\n\n" .
+        "Need help? Contact: management@asrt.space\n" .
+        "ASRT Spaces - Property Management Excellence";
+    
+    return $mail->send();
+}
+
+// Handle rental request acceptance
+if (isset($_POST['accept_request'])) {
+    $requestId = intval($_POST['request_id']);
+    
+    // Get request details before accepting
+    $requestDetails = $db->getRentalRequestById($requestId);
+    
+    if ($requestDetails) {
+        // Accept the request
+        $result = $db->acceptRentalRequest($requestId);
+        
+        if ($result) {
+            // Try to send welcome email
+            try {
+                $emailSent = sendRentalAcceptanceEmail(
+                    $requestDetails['Client_Email'],
+                    $requestDetails['Client_fn'] ?: 'User',
+                    $requestDetails['SpaceName'] ?: 'Your Unit',
+                    $requestDetails['StartDate'],
+                    $requestDetails['EndDate'],
+                    $requestDetails['Price'] ?: 0
+                );
+                
+                if ($emailSent) {
+                    $_SESSION['admin_message'] = 'Rental request accepted successfully! Welcome email sent to client.';
+                    error_log("Welcome email sent to: " . $requestDetails['Client_Email'] . " for request ID: " . $requestId);
+                } else {
+                    $_SESSION['admin_message'] = 'Rental request accepted successfully! (Email notification failed)';
+                    error_log("Failed to send welcome email to: " . $requestDetails['Client_Email'] . " for request ID: " . $requestId);
+                }
+            } catch (Exception $e) {
+                $_SESSION['admin_message'] = 'Rental request accepted successfully! (Email error: ' . $e->getMessage() . ')';
+                error_log("Error sending welcome email: " . $e->getMessage());
+            }
+        } else {
+            $_SESSION['admin_error'] = 'Failed to accept rental request. Please try again.';
+        }
+    } else {
+        $_SESSION['admin_error'] = 'Rental request not found.';
+    }
+    
+    header('Location: view_rental_requests.php');
+    exit();
+}
+
+// Handle rental request rejection
+if (isset($_POST['reject_request'])) {
+    $requestId = intval($_POST['request_id']);
+    $result = $db->rejectRentalRequest($requestId);
+    
+    if ($result) {
+        $_SESSION['admin_message'] = 'Rental request rejected successfully.';
+    } else {
+        $_SESSION['admin_error'] = 'Failed to reject rental request. Please try again.';
+    }
+    
+    header('Location: view_rental_requests.php');
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -50,7 +593,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             min-height: 100vh;
         }
         
-        /* Sidebar Styling */
         .sidebar {
             position: fixed;
             width: var(--sidebar-width);
@@ -87,7 +629,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         
         .nav-item {
             margin-bottom: 0.5rem;
-            position: relative;
         }
         
         .nav-link {
@@ -112,25 +653,12 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             font-size: 1.1rem;
         }
         
-        .badge-notification {
-            position: absolute;
-            right: 1rem;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 0.7rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 20px;
-            font-weight: 600;
-        }
-        
-        /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
             padding: 2rem;
             transition: var(--transition);
         }
         
-        /* Header */
         .dashboard-header {
             display: flex;
             justify-content: space-between;
@@ -165,7 +693,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             font-size: 1.25rem;
         }
         
-        /* Dashboard Card */
         .dashboard-card {
             background: white;
             border-radius: var(--border-radius);
@@ -193,7 +720,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             padding: 1.5rem;
         }
         
-        /* Table Styling */
         .table-container {
             overflow-x: auto;
             border-radius: var(--border-radius);
@@ -228,7 +754,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             background-color: #f9fafb;
         }
         
-        /* Client Info with Dynamic Tooltip Positioning */
         .client-info {
             position: relative;
             cursor: help;
@@ -256,10 +781,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             min-width: 250px;
             pointer-events: none;
-        }
-        
-        /* Default: Show tooltip above (for most rows) */
-        .client-tooltip {
             bottom: 100%;
             margin-bottom: 8px;
         }
@@ -274,7 +795,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             border-top-color: var(--dark);
         }
         
-        /* First row only: Show tooltip below */
         .custom-table tr:first-child .client-tooltip {
             bottom: auto;
             top: 100%;
@@ -325,7 +845,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             color: var(--warning);
         }
         
-        /* Button Styling */
         .btn-action {
             padding: 0.5rem 1rem;
             border-radius: var(--border-radius);
@@ -359,7 +878,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             color: white;
         }
         
-        /* Status Badges */
         .badge {
             padding: 0.35rem 0.65rem;
             font-weight: 600;
@@ -367,7 +885,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             font-size: 0.75rem;
         }
         
-        /* Empty State */
         .empty-state {
             text-align: center;
             padding: 3rem 1rem;
@@ -380,7 +897,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             opacity: 0.5;
         }
         
-        /* Responsive */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -417,7 +933,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 padding: 0.4rem 0.8rem;
             }
             
-            /* Mobile tooltip adjustments */
             .client-tooltip {
                 position: fixed;
                 top: 50%;
@@ -433,7 +948,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 display: none;
             }
             
-            /* Override the nth-child rule for mobile */
             .custom-table tr:nth-child(-n+2) .client-tooltip {
                 position: fixed;
                 top: 50%;
@@ -442,7 +956,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
             }
         }
         
-        /* Animations */
         .animate-fade-in {
             animation: fadeIn 0.5s ease-in-out;
         }
@@ -454,8 +967,9 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     </style>
 </head>
 <body>
-    <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="mobile-overlay" id="mobileOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;"></div>
+
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="#" class="sidebar-brand">
                 <i class="fas fa-crown"></i>
@@ -529,9 +1043,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         </div>
     </div>
 
-    <!-- Main Content -->
     <div class="main-content">
-        <!-- Header -->
         <div class="dashboard-header">
             <div class="page-title">
                 <div class="title-icon">
@@ -563,7 +1075,11 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
         }
         ?>
         
-        <!-- Requests Table -->
+        <div class="alert alert-info animate-fade-in">
+            <i class="fas fa-envelope me-2"></i>
+            When you accept a rental request, the client will automatically receive a beautifully styled welcome email with their rental details and benefits.
+        </div>
+        
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-list-alt"></i>
@@ -571,54 +1087,94 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
                 <span class="badge bg-primary ms-2" id="pendingCount">0</span>
             </div>
             <div class="card-body p-0" id="pendingRequestsContainer">
-                <!-- Pending requests table will be loaded here via AJAX -->
-                <noscript>
                 <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
-                    <h4>Enable JavaScript for live updates</h4>
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <h4>Loading requests...</h4>
                 </div>
-                </noscript>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-    // --- LIVE ADMIN: AJAX Polling for Pending Rental Requests ---
     function fetchPendingRequests() {
         fetch('../AJAX/ajax_admin_pending_requests.php')
             .then(res => res.text())
             .then(html => {
                 document.getElementById('pendingRequestsContainer').innerHTML = html;
-                // Update count badge
                 const match = html.match(/data-count="(\d+)"/);
                 if (match) document.getElementById('pendingCount').textContent = match[1];
+            })
+            .catch(err => {
+                console.error('Error fetching requests:', err);
+                document.getElementById('pendingRequestsContainer').innerHTML = 
+                    '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h4>Error loading requests</h4></div>';
             });
     }
-    setInterval(fetchPendingRequests, 10000); // every 10s
+    
+    setInterval(fetchPendingRequests, 10000);
     document.addEventListener('DOMContentLoaded', fetchPendingRequests);
-        // SweetAlert for success/error messages
-        <?php if (isset($_SESSION['admin_message'])): ?>
-            Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: '<?= addslashes($_SESSION['admin_message']) ?>',
-                timer: 3000,
-                showConfirmButton: false
-            });
-            <?php unset($_SESSION['admin_message']); ?>
-        <?php endif; ?>
-        
-        <?php if (isset($_SESSION['admin_error'])): ?>
-            Swal.fire({
-                icon: 'error',
-                title: 'Error',
-                text: '<?= addslashes($_SESSION['admin_error']) ?>',
-                timer: 3000,
-                showConfirmButton: false
-            });
-            <?php unset($_SESSION['admin_error']); ?>
-        <?php endif; ?>
+    
+    function confirmAccept(requestId, clientName, spaceName) {
+        Swal.fire({
+            title: 'Accept Rental Request?',
+            html: `
+                <p>You are about to accept the rental request from:</p>
+                <p class="fw-bold">${clientName}</p>
+                <p>For property: <span class="fw-bold">${spaceName}</span></p>
+                <p class="text-muted mt-3">
+                    <i class="fas fa-envelope me-2"></i>
+                    A welcome email will be automatically sent to the client.
+                </p>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#10b981',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: '<i class="fas fa-check me-2"></i>Accept & Send Welcome Email',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('acceptForm_' + requestId).submit();
+            }
+        });
+    }
+    
+    function confirmReject(requestId, clientName, spaceName) {
+        Swal.fire({
+            title: 'Reject Rental Request?',
+            html: `
+                <p>You are about to reject the rental request from:</p>
+                <p class="fw-bold">${clientName}</p>
+                <p>For property: <span class="fw-bold">${spaceName}</span></p>
+                <p class="text-danger mt-3">This action cannot be undone.</p>
+            `,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: '<i class="fas fa-times me-2"></i>Reject Request',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('rejectForm_' + requestId).submit();
+            }
+        });
+    }
+    
+    document.querySelectorAll('.alert').forEach(alert => {
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (alert.parentNode) {
+                        alert.remove();
+                    }
+                }, 300);
+            }
+        }, 5000);
+    });
     </script>
 </body>
 </html>

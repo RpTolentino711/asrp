@@ -1,24 +1,33 @@
 <?php
 require_once '../database/database.php';
 session_start();
+
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     http_response_code(403);
     exit('Forbidden');
 }
+
 $db = new Database();
 $pending_requests = $db->getPendingRentalRequests();
+
 if (!empty($pending_requests)) {
     echo '<div class="table-container"><table class="custom-table"><thead><tr><th>Client</th><th>Space</th><th>Start Date</th><th>End Date</th><th>Actions</th></tr></thead><tbody>';
+    
     foreach ($pending_requests as $row) {
+        $clientName = htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']);
+        $spaceName = htmlspecialchars($row['Name']);
+        $requestId = $row['Request_ID'];
+        
         echo '<tr>';
-        echo '<td><div class="client-info"><div class="fw-bold">' . htmlspecialchars($row['Client_fn'].' '.$row['Client_ln']) . '</div>';
-        echo '<div class="text-muted small">ID: #' . htmlspecialchars($row['Request_ID']) . '</div>';
+        echo '<td><div class="client-info"><div class="fw-bold">' . $clientName . '</div>';
+        echo '<div class="text-muted small">ID: #' . $requestId . '</div>';
         echo '<div class="client-tooltip">';
         echo '<div class="contact-item"><i class="fas fa-envelope"></i><span>' . htmlspecialchars($row['Client_Email']) . '</span></div>';
+        
         if (!empty($row['Client_Phone'])) {
             echo '<div class="contact-item"><i class="fas fa-phone"></i><span>' . htmlspecialchars($row['Client_Phone']) . '</span></div>';
         }
-        // Add the request submission date
+        
         if (!empty($row['Requested_At'])) {
             $submitted_date = date('M j, Y g:i A', strtotime($row['Requested_At']));
             echo '<div class="request-date">';
@@ -26,17 +35,33 @@ if (!empty($pending_requests)) {
             echo '<span>Submitted: ' . htmlspecialchars($submitted_date) . '</span>';
             echo '</div>';
         }
+        
         echo '</div></div></td>';
-        echo '<td>' . htmlspecialchars($row['Name']) . '</td>';
+        echo '<td>' . $spaceName . '</td>';
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['StartDate']) . '</div></td>';
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['EndDate']) . '</div></td>';
-        echo '<td><form method="post" action="process_request.php" class="d-inline">';
-        echo '<input type="hidden" name="request_id" value="' . $row['Request_ID'] . '">';
-        echo '<button name="action" value="accept" class="btn-action btn-accept" onclick="return confirm(\'Are you sure you want to ACCEPT this rental request?\')"><i class="fas fa-check-circle"></i>Accept</button>';
-        echo '<button name="action" value="reject" class="btn-action btn-reject" onclick="return confirm(\'Are you sure you want to REJECT this rental request?\')"><i class="fas fa-times-circle"></i>Reject</button>';
-        echo '</form></td>';
+        echo '<td>';
+        
+        // Accept Form
+        echo '<form method="post" id="acceptForm_' . $requestId . '" style="display:inline;">';
+        echo '<input type="hidden" name="request_id" value="' . $requestId . '">';
+        echo '<input type="hidden" name="accept_request" value="1">';
+        echo '<button type="button" onclick="confirmAccept(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" class="btn-action btn-accept">';
+        echo '<i class="fas fa-check-circle"></i>Accept</button>';
+        echo '</form>';
+        
+        // Reject Form
+        echo '<form method="post" id="rejectForm_' . $requestId . '" style="display:inline;">';
+        echo '<input type="hidden" name="request_id" value="' . $requestId . '">';
+        echo '<input type="hidden" name="reject_request" value="1">';
+        echo '<button type="button" onclick="confirmReject(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" class="btn-action btn-reject">';
+        echo '<i class="fas fa-times-circle"></i>Reject</button>';
+        echo '</form>';
+        
+        echo '</td>';
         echo '</tr>';
     }
+    
     echo '</tbody></table></div>';
     echo '<span style="display:none" data-count="' . count($pending_requests) . '"></span>';
 } else {

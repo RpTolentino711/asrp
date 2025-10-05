@@ -2136,7 +2136,31 @@ public function deleteSpaceType($type_id) {
 }
 
 
+    // Add this NEW function to your Database class
+public function getRentalRequestById($requestId) {
+    $sql = "SELECT 
+                rr.Request_ID,
+                rr.Client_ID,
+                rr.Space_ID,
+                rr.StartDate,
+                rr.EndDate,
+                rr.Status,
+                c.Client_fn,
+                c.Client_ln,
+                c.Client_Email,
+                c.Client_Phone,
+                s.Name AS SpaceName,
+                s.Price,
+                s.Street,
+                s.Brgy,
+                s.City
+            FROM rentalrequest rr
+            INNER JOIN client c ON rr.Client_ID = c.Client_ID
+            INNER JOIN space s ON rr.Space_ID = s.Space_ID
+            WHERE rr.Request_ID = ?";
     
+    return $this->fetchSingle($sql, [$requestId]);
+}
 
 
 }
