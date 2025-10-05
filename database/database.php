@@ -2119,6 +2119,12 @@ public function getRentalRequestById($requestId) {
     return $this->fetchSingle($sql, [$requestId]);
 }
 
+public function fetchSingle($sql, $params = []) {
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute($params);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
 // Add these methods to your Database class in database/database.php
 
 public function updateSpaceType($type_id, $new_name) {
