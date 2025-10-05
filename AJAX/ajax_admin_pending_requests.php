@@ -1,15 +1,12 @@
 <?php
 require_once '../database/database.php';
 session_start();
-
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     http_response_code(403);
     exit('Forbidden');
 }
-
 $db = new Database();
 $pending_requests = $db->getPendingRentalRequests();
-
 if (!empty($pending_requests)) {
     echo '<div class="table-container"><table class="custom-table"><thead><tr><th>Client</th><th>Space</th><th>Start Date</th><th>End Date</th><th>Actions</th></tr></thead><tbody>';
     foreach ($pending_requests as $row) {
@@ -35,7 +32,7 @@ if (!empty($pending_requests)) {
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['EndDate']) . '</div></td>';
         echo '<td><form method="post" action="process_request.php" class="d-inline">';
         echo '<input type="hidden" name="request_id" value="' . $row['Request_ID'] . '">';
-        echo '<button name="action" value="accept" class="btn-action btn-accept" onclick="return confirm(\'Accept this request? Client will receive a welcome email with their account details and can access their dashboard.\')"><i class="fas fa-check-circle"></i>Accept</button>';
+        echo '<button name="action" value="accept" class="btn-action btn-accept" onclick="return confirm(\'Are you sure you want to ACCEPT this rental request?\')"><i class="fas fa-check-circle"></i>Accept</button>';
         echo '<button name="action" value="reject" class="btn-action btn-reject" onclick="return confirm(\'Are you sure you want to REJECT this rental request?\')"><i class="fas fa-times-circle"></i>Reject</button>';
         echo '</form></td>';
         echo '</tr>';
@@ -46,4 +43,3 @@ if (!empty($pending_requests)) {
     echo '<div class="empty-state"><i class="fas fa-inbox"></i><h4>No pending requests</h4><p>All rental requests have been processed</p></div>';
     echo '<span style="display:none" data-count="0"></span>';
 }
-?>

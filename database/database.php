@@ -2135,28 +2135,7 @@ public function deleteSpaceType($type_id) {
     }
 }
 
-// Add this method to your Database class in database.php
 
-public function getRentalRequestDetails($request_id) {
-    $sql = "SELECT 
-                rr.Request_ID,
-                rr.Client_ID,
-                rr.Space_ID,
-                c.fn AS Client_fn,
-                c.ln AS Client_ln,
-                c.email AS Client_Email,
-                c.username AS Username,
-                s.Name AS UnitName
-            FROM rentalrequest rr
-            LEFT JOIN client c ON rr.Client_ID = c.Client_ID
-            LEFT JOIN space s ON rr.Space_ID = s.Space_ID
-            WHERE rr.Request_ID = ?";
-    
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$request_id]);
-    
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
     
 
 
