@@ -2153,11 +2153,9 @@ public function getRentalRequestDetails($request_id) {
             WHERE rr.Request_ID = ?";
     
     $stmt = $this->conn->prepare($sql);
-    $stmt->bind_param('i', $request_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    $stmt->execute([$request_id]);
     
-    return $result->fetch_assoc();
+    return $stmt->fetch(PDO::FETCH_ASSOC);
 }
     
 
