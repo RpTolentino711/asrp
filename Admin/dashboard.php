@@ -1064,10 +1064,6 @@ function timeAgo($datetime) {
                                 <button type="submit" class="btn btn-primary flex-fill">
                                     <i class="fas fa-filter me-1"></i> Apply Filter
                                 </button>
-                                <a href="generate_monthly_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>" 
-                                   class="btn btn-danger" target="_blank" title="Export PDF Report">
-                                    <i class="fas fa-file-pdf"></i>
-                                </a>
                                 <a href="dashboard.php" class="btn btn-outline-secondary" title="Current Month">
                                     <i class="fas fa-sync"></i>
                                 </a>
