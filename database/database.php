@@ -612,6 +612,28 @@ public function updateJobTypeWithImage($jobTypeId, $iconFile) {
         return $this->executeStatement($sql, [$client_id, $space_id, $start_date, $end_date]);
     }
 
+
+      public function getUnreadAdminChatCounts($client_id) {
+        $sql = "SELECT ic.Invoice_ID, COUNT(ic.Chat_ID) as unread_count
+                FROM invoice_chat ic
+                INNER JOIN invoice i ON ic.Invoice_ID = i.Invoice_ID
+                WHERE i.Client_ID = ? AND ic.Sender_Type = 'admin' AND ic.is_read_client = 0
+                GROUP BY ic.Invoice_ID";
+        
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            
+            $counts = [];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $counts[$row['Invoice_ID']] = $row['unread_count'];
+            }
+            return $counts;
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+
 public function getClientSpacesForMaintenance($client_id) {
     $sql = "SELECT s.Space_ID, s.Name
             FROM clientspace cs
