@@ -1671,7 +1671,7 @@ function pollChatNotifications() {
     const clientId = <?= $_SESSION['client_id'] ?>;
 
     fetch('AJAX/get_unread_admin_chat_counts.php', {
-        method: 'POST',
+         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
