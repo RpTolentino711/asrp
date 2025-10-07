@@ -614,6 +614,26 @@ $is_logged_in = isset($_SESSION['client_id']);
     transform: rotate(360deg);
   }
 }
+
+/* Register link in login modal */
+.register-link-container {
+  text-align: center;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--navbar-gray-light);
+}
+
+.register-link {
+  color: var(--navbar-primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: var(--navbar-transition);
+}
+
+.register-link:hover {
+  color: var(--navbar-primary-light);
+  text-decoration: underline;
+}
 </style>
 
 <nav class="navbar navbar-expand-lg fixed-top modern-navbar">
@@ -642,7 +662,9 @@ $is_logged_in = isset($_SESSION['client_id']);
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'invoice_history.php' ? 'active' : '' ?>" href="invoice_history.php" style="position: relative;">
             <i class="bi bi-credit-card me-2"></i>Payment
-            <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
+            <?php if ($is_logged_in): ?>
+              <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
+            <?php endif; ?>
           </a>
         </li>
 
@@ -744,6 +766,13 @@ $is_logged_in = isset($_SESSION['client_id']);
             <button type="submit" class="modern-btn modern-btn-primary">
               <i class="bi bi-box-arrow-in-right me-2"></i>Login
             </button>
+          </div>
+          <!-- Register link added here -->
+          <div class="register-link-container">
+            <span class="text-muted">Don't have an account?</span>
+            <a href="#" class="register-link ms-1" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#registerModal">
+              Register now
+            </a>
           </div>
         </div>
       </form>
@@ -1746,4 +1775,3 @@ function checkRegisterForm() {
     return true;
 }
 </script>
-
