@@ -9,10 +9,8 @@ $db = new Database();
 
 // --- Client Information ---
 $client_name = '';
-$has_rental_space = false;
-
 if (isset($_SESSION['client_id'])) {
-    $client_info = $db->getClientInfo($_SESSION['client_id']);
+    $client_info = $db->getClientInfo($_SESSION['client_id']); // You'll need to create this method
     if ($client_info) {
         $client_name = trim($client_info['Client_fn'] . ' ' . $client_info['Client_ln']);
         // If full name is empty, fall back to username
@@ -20,22 +18,18 @@ if (isset($_SESSION['client_id'])) {
             $client_name = $client_info['C_username'] ?? 'User';
         }
     }
-    
-    // Check if client has an active rental space
-    $has_rental_space = $db->hasActiveRentalSpace($_SESSION['client_id']);
 }
 
-// --- Combined Notification Badge Logic ---
-$total_notification_count = 0;
-if (isset($_SESSION['client_id']) && $has_rental_space) {
-    // Count unpaid/overdue invoices
+// --- Invoice Notification Badge Logic ---
+$invoice_alert_count = 0;
+if (isset($_SESSION['client_id'])) {
     $invoice_list = $db->getClientInvoiceHistory($_SESSION['client_id']);
     foreach ($invoice_list as $inv) {
         $due = isset($inv['InvoiceDate']) ? $inv['InvoiceDate'] : '';
         $is_unpaid = ($inv['Status'] === 'unpaid');
         $is_overdue = ($due && $inv['Status'] === 'unpaid' && strtotime($due) < strtotime(date('Y-m-d')));
         if ($is_unpaid || $is_overdue) {
-            $total_notification_count++;
+            $invoice_alert_count++;
         }
     }
 }
@@ -620,26 +614,6 @@ $is_logged_in = isset($_SESSION['client_id']);
     transform: rotate(360deg);
   }
 }
-
-/* Register link in login modal */
-.register-link-container {
-  text-align: center;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--navbar-gray-light);
-}
-
-.register-link {
-  color: var(--navbar-primary);
-  text-decoration: none;
-  font-weight: 500;
-  transition: var(--navbar-transition);
-}
-
-.register-link:hover {
-  color: var(--navbar-primary-light);
-  text-decoration: underline;
-}
 </style>
 
 <nav class="navbar navbar-expand-lg fixed-top modern-navbar">
@@ -668,12 +642,6 @@ $is_logged_in = isset($_SESSION['client_id']);
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'invoice_history.php' ? 'active' : '' ?>" href="invoice_history.php" style="position: relative;">
             <i class="bi bi-credit-card me-2"></i>Payment
-            <?php if ($is_logged_in && $has_rental_space && $total_notification_count > 0): ?>
-              <span class="notification-badge" id="invoice-alert-badge"><?= $total_notification_count ?></span>
-            <?php else: ?>
-              <span class="notification-badge d-none" id="invoice-alert-badge"></span>
-            <?php endif; ?>
-            <!-- This will be updated by JavaScript with combined counts -->
             <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
           </a>
         </li>
@@ -776,13 +744,6 @@ $is_logged_in = isset($_SESSION['client_id']);
             <button type="submit" class="modern-btn modern-btn-primary">
               <i class="bi bi-box-arrow-in-right me-2"></i>Login
             </button>
-          </div>
-          <!-- Register link added here -->
-          <div class="register-link-container">
-            <span class="text-muted">Don't have an account?</span>
-            <a href="#" class="register-link ms-1" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#registerModal">
-              Register here
-            </a>
           </div>
         </div>
       </form>
@@ -1283,47 +1244,6 @@ function showResetPasswordModal() {
     modal.show();
 }
 
-// ========== NOTIFICATION BADGE POLLING ==========
-function pollChatNotifications() {
-    <?php if (isset($_SESSION['client_id']) && $has_rental_space): ?>
-    fetch('AJAX/get_unread_admin_chat_counts.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'client_id=' + encodeURIComponent(<?= $_SESSION['client_id'] ?>)
-    })
-    .then(response => response.json())
-    .then(chatCounts => {
-        let chatTotal = 0;
-        
-        // Count unread chat messages
-        if (typeof chatCounts === 'object' && chatCounts !== null) {
-            Object.values(chatCounts).forEach(cnt => { 
-                chatTotal += parseInt(cnt) || 0; 
-            });
-        }
-        
-        // Get the invoice count from PHP (already displayed)
-        const invoiceBadge = document.getElementById('invoice-alert-badge');
-        const invoiceCount = parseInt(invoiceBadge?.textContent || 0);
-        
-        // Calculate total (invoice alerts + unread messages)
-        const totalCount = invoiceCount + chatTotal;
-        
-        // Update the main badge
-        if (invoiceBadge) {
-            if (totalCount > 0) {
-                invoiceBadge.textContent = totalCount > 99 ? '99+' : totalCount;
-                invoiceBadge.classList.remove('d-none');
-            } else {
-                invoiceBadge.textContent = '';
-                invoiceBadge.classList.add('d-none');
-            }
-        }
-    })
-    .catch(error => console.error('Badge polling error:', error));
-    <?php endif; ?>
-}
-
 // ========== MAIN EVENT LISTENERS ==========
 document.addEventListener('DOMContentLoaded', function() {
     // ========== LIVE VALIDATION SETUP ==========
@@ -1720,9 +1640,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // ========== NOTIFICATION BADGE POLLING ==========
+    function pollChatNotifications() {
+        <?php if (isset($_SESSION['client_id'])): ?>
+        fetch('AJAX/get_unread_admin_chat_counts.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+        })
+        .then(response => response.json())
+        .then(counts => {
+            let total = 0;
+            Object.values(counts).forEach(cnt => { total += cnt; });
+            const badge = document.getElementById('client-unread-admin-badge');
+            if (badge) {
+                if (total > 0) {
+                    badge.textContent = total;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('d-none');
+                }
+            }
+        })
+        .catch(error => console.error('Badge polling error:', error));
+        <?php endif; ?>
+    }
+
     // Start polling for notification badges
-    pollChatNotifications();
-    setInterval(pollChatNotifications, 5000);
+   // Start polling for notification badges
+pollChatNotifications();
+setInterval(pollChatNotifications, 5000);
 });
 
 // ========== UTILITY FUNCTIONS ==========
@@ -1798,3 +1746,4 @@ function checkRegisterForm() {
     return true;
 }
 </script>
+
