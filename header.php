@@ -642,9 +642,7 @@ $is_logged_in = isset($_SESSION['client_id']);
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'invoice_history.php' ? 'active' : '' ?>" href="invoice_history.php" style="position: relative;">
             <i class="bi bi-credit-card me-2"></i>Payment
-            <?php if ($is_logged_in): ?>
-              <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
-            <?php endif; ?>
+            <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
           </a>
         </li>
 
@@ -739,17 +737,13 @@ $is_logged_in = isset($_SESSION['client_id']);
               </button>
             </div>
           </div>
-          <div class="mb-3 text-end">
+          <div class="mb-2 text-end">
             <a href="#" id="forgotPasswordLink" class="small text-primary">Forgot Password?</a>
           </div>
-          <div class="d-grid mb-3">
+          <div class="d-grid">
             <button type="submit" class="modern-btn modern-btn-primary">
               <i class="bi bi-box-arrow-in-right me-2"></i>Login
             </button>
-          </div>
-          <div class="text-center">
-            <span class="text-muted small">Don't have an account? </span>
-            <a href="#" id="showRegisterLink" class="small text-primary fw-semibold">Register here</a>
           </div>
         </div>
       </form>
@@ -1252,24 +1246,6 @@ function showResetPasswordModal() {
 
 // ========== MAIN EVENT LISTENERS ==========
 document.addEventListener('DOMContentLoaded', function() {
-    // ========== MODAL SWITCHING LINK ==========
-    const showRegisterLink = document.getElementById('showRegisterLink');
-    if (showRegisterLink) {
-        showRegisterLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            // Hide login modal
-            const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-            if (loginModal) {
-                loginModal.hide();
-            }
-            // Show register modal after a brief delay
-            setTimeout(() => {
-                const registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
-                registerModal.show();
-            }, 300);
-        });
-    }
-
     // ========== LIVE VALIDATION SETUP ==========
     // Email field validation
     const emailField = document.getElementById('reg_email');
@@ -1575,42 +1551,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Forgot Password Resend OTP
     const forgotResendBtn = document.getElementById('forgotResendOtpBtn');
     if (forgotResendBtn) {
-        forgotResendBtn.addEventListener('click', function() {
-            forgotResendBtn.disabled = true;
-            fetch('resend_forgot_otp.php', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        forgotOtpExpiresAt = data.expires_at;
-                        // Always clear and restart the timer interval
-                        if (forgotOtpTimerInterval) clearInterval(forgotOtpTimerInterval);
-                        updateForgotOtpTimer();
-                        forgotOtpTimerInterval = setInterval(updateForgotOtpTimer, 1000);
-                        Swal.fire({ 
-                            icon: 'success', 
-                            title: 'OTP Resent', 
-                            text: 'A new code has been sent to your email.' 
-                        });
-                    } else {
-                        Swal.fire({ 
-                            icon: 'error', 
-                            title: 'Error', 
-                            text: data.message || 'Could not resend OTP.' 
-                        });
-                    }
-                })
-                .catch(error => {
-                    console.error('Resend forgot OTP error:', error);
-                    Swal.fire({ 
-                        icon: 'error', 
-                        title: 'Error', 
-                        text: 'Could not resend OTP.' 
-                    });
-                })
-                .finally(() => {
-                    forgotResendBtn.disabled = false;
-                });
+    forgotResendBtn.addEventListener('click', function() {
+      forgotResendBtn.disabled = true;
+      fetch('resend_forgot_otp.php', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            forgotOtpExpiresAt = data.expires_at;
+            // Always clear and restart the timer interval
+            if (forgotOtpTimerInterval) clearInterval(forgotOtpTimerInterval);
+            updateForgotOtpTimer();
+            forgotOtpTimerInterval = setInterval(updateForgotOtpTimer, 1000);
+            Swal.fire({ 
+              icon: 'success', 
+              title: 'OTP Resent', 
+              text: 'A new code has been sent to your email.' 
+            });
+          } else {
+            Swal.fire({ 
+              icon: 'error', 
+              title: 'Error', 
+              text: data.message || 'Could not resend OTP.' 
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Resend forgot OTP error:', error);
+          Swal.fire({ 
+            icon: 'error', 
+            title: 'Error', 
+            text: 'Could not resend OTP.' 
+          });
+        })
+        .finally(() => {
+          forgotResendBtn.disabled = false;
         });
+    });
     }
 
     // Reset Password Form
@@ -1663,55 +1639,39 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-});
 
-// ========== NOTIFICATION POLLING ==========
-function pollChatNotifications() {
-    <?php if ($is_logged_in): ?>
-    const clientId = <?= $_SESSION['client_id'] ?>;
-    
-    fetch('AJAX/get_unread_counts.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'client_id=' + clientId
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Unread messages data:', data); // Debug log
-        
-        // Calculate total unread messages across all invoices
-        let totalUnread = 0;
-        for (let invoiceId in data) {
-            if (data.hasOwnProperty(invoiceId)) {
-                totalUnread += parseInt(data[invoiceId]) || 0;
+    // ========== NOTIFICATION BADGE POLLING ==========
+    function pollChatNotifications() {
+        <?php if (isset($_SESSION['client_id'])): ?>
+        fetch('AJAX/get_unread_admin_chat_counts.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+        })
+        .then(response => response.json())
+        .then(counts => {
+            let total = 0;
+            Object.values(counts).forEach(cnt => { total += cnt; });
+            const badge = document.getElementById('client-unread-admin-badge');
+            if (badge) {
+                if (total > 0) {
+                    badge.textContent = total;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('d-none');
+                }
             }
-        }
-        
-        console.log('Total unread:', totalUnread); // Debug log
-        
-        // Update the badge
-        const badge = document.getElementById('client-unread-admin-badge');
-        if (badge) {
-            if (totalUnread > 0) {
-                badge.textContent = totalUnread;
-                badge.classList.remove('d-none');
-            } else {
-                badge.classList.add('d-none');
-            }
-        }
-    })
-    .catch(error => {
-        console.error('Error fetching notification count:', error);
-    });
-    <?php endif; ?>
-}
+        })
+        .catch(error => console.error('Badge polling error:', error));
+        <?php endif; ?>
+    }
+
+    // Start polling for notification badges
+   // Start polling for notification badges
+pollChatNotifications();
+setInterval(pollChatNotifications, 5000);
+});
 
 // ========== UTILITY FUNCTIONS ==========
 
@@ -1786,3 +1746,4 @@ function checkRegisterForm() {
     return true;
 }
 </script>
+
