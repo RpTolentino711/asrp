@@ -1669,34 +1669,32 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-// ========== NOTIFICATION BADGE POLLING ==========
-function pollChatNotifications() {
-    <?php if (isset($_SESSION['client_id'])): ?>
-    fetch('AJAX/get_unread_admin_chat_counts.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
-    })
-    .then(response => response.json())
-    .then(counts => {
-        let total = 0;
-        Object.values(counts).forEach(cnt => { 
-            total += parseInt(cnt); 
-        });
-        const badge = document.getElementById('client-unread-admin-badge');
-        if (badge) {
-            if (total > 0) {
-                badge.textContent = total;
-                badge.classList.remove('d-none');
-            } else {
-                badge.textContent = '';
-                badge.classList.add('d-none');
+    // ========== NOTIFICATION BADGE POLLING ==========
+    function pollChatNotifications() {
+        <?php if (isset($_SESSION['client_id'])): ?>
+        fetch('AJAX/get_unread_admin_chat_counts.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+        })
+        .then(response => response.json())
+        .then(counts => {
+            let total = 0;
+            Object.values(counts).forEach(cnt => { total += cnt; });
+            const badge = document.getElementById('client-unread-admin-badge');
+            if (badge) {
+                if (total > 0) {
+                    badge.textContent = total;
+                    badge.classList.remove('d-none');
+                } else {
+                    badge.textContent = '';
+                    badge.classList.add('d-none');
+                }
             }
-        }
-    })
-    .catch(error => console.error('Badge polling error:', error));
-    <?php endif; ?>
-}
+        })
+        .catch(error => console.error('Badge polling error:', error));
+        <?php endif; ?>
+    }
 
     // Start polling for notification badges
    // Start polling for notification badges
