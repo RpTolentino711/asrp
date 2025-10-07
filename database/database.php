@@ -1555,6 +1555,48 @@ public function acceptRentalRequest($request_id) {
         }
     }
 
+    public function getInProgressMaintenanceRequests() {
+    $sql = "SELECT mr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS SpaceName, 
+                   mr.RequestDate, mr.Status, mr.Handyman_ID,
+                   h.Handyman_fn, h.Handyman_ln,
+                   (SELECT GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ')
+                    FROM handymanjob hj
+                    JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
+                    WHERE hj.Handyman_ID = h.Handyman_ID) AS JobTypes
+            FROM maintenancerequest mr
+            JOIN client c ON mr.Client_ID = c.Client_ID
+            JOIN space s ON mr.Space_ID = s.Space_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Status = 'In Progress'
+            ORDER BY mr.RequestDate DESC";
+    try {
+        return $this->pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
+public function getCompletedMaintenanceRequests() {
+    $sql = "SELECT mr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS SpaceName, 
+                   mr.RequestDate, mr.Status, mr.Handyman_ID,
+                   h.Handyman_fn, h.Handyman_ln,
+                   (SELECT GROUP_CONCAT(jt.JobType_Name SEPARATOR ', ')
+                    FROM handymanjob hj
+                    JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
+                    WHERE hj.Handyman_ID = h.Handyman_ID) AS JobTypes
+            FROM maintenancerequest mr
+            JOIN client c ON mr.Client_ID = c.Client_ID
+            JOIN space s ON mr.Space_ID = s.Space_ID
+            LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+            WHERE mr.Status = 'Completed'
+            ORDER BY mr.RequestDate DESC";
+    try {
+        return $this->pdo->query($sql)->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
+}
+
 
 
 
