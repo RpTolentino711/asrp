@@ -587,15 +587,14 @@ public function updateJobTypeWithImage($jobTypeId, $iconFile) {
         return $this->runQuery($sql, [$client_id], true);
     }
 
-    public function getClientInvoiceHistory($client_id) {
-        $sql = "SELECT i.Invoice_ID, i.InvoiceDate, i.InvoiceTotal, i.Status, s.Name AS SpaceName, s.Space_ID
-                FROM invoice i
-                LEFT JOIN space s ON i.Space_ID = s.Space_ID
-                WHERE i.Client_ID = ?
-                ORDER BY i.InvoiceDate DESC";
-        return $this->runQuery($sql, [$client_id], true);
-    }
-
+   public function getClientInvoiceHistory($client_id) {
+    $sql = "SELECT i.Invoice_ID, i.InvoiceDate, i.InvoiceTotal, i.Status, s.Name AS SpaceName, s.Space_ID
+            FROM invoice i
+            LEFT JOIN space s ON i.Space_ID = s.Space_ID
+            WHERE i.Client_ID = ?
+            ORDER BY i.InvoiceDate DESC";
+    return $this->runQuery($sql, [$client_id], true);
+}
 
     public function getOverdueInvoices() {
         $sql = "SELECT i.Invoice_ID, i.Client_ID, i.Space_ID, s.Name AS SpaceName
@@ -613,7 +612,18 @@ public function updateJobTypeWithImage($jobTypeId, $iconFile) {
     }
 
 
-    
+ public function hasActiveRentalSpace($client_id) {
+    try {
+        $sql = "SELECT COUNT(*) as count FROM clientspace WHERE Client_ID = ? AND active = 1";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$client_id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['count'] > 0;
+    } catch (PDOException $e) {
+        error_log("Database error in hasActiveRentalSpace: " . $e->getMessage());
+        return false;
+    }
+}
 
 public function getClientSpacesForMaintenance($client_id) {
     $sql = "SELECT s.Space_ID, s.Name
@@ -1230,15 +1240,16 @@ public function getAllSpacesWithDetails() {
         }
     }
 
-    public function getClientInfo($client_id) {
-    $sql = "SELECT Client_fn, Client_ln, Client_Email, Client_Phone 
+ public function getClientInfo($client_id) {
+    $sql = "SELECT Client_fn, Client_ln, Client_Email, Client_Phone, C_username 
             FROM client 
             WHERE Client_ID = ?";
     try {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$client_id]);
-        return $stmt->fetch();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
+        error_log("Error in getClientInfo: " . $e->getMessage());
         return null;
     }
 }
