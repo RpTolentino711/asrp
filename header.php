@@ -1669,8 +1669,8 @@ document.addEventListener('DOMContentLoaded', function() {
 function pollChatNotifications() {
     <?php if ($is_logged_in): ?>
     const clientId = <?= $_SESSION['client_id'] ?>;
-    
-    fetch('AJAX/get_unread_count.php', {
+
+    fetch('AJAX/get_unread_admin_chat_counts.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
