@@ -642,8 +642,8 @@ $is_logged_in = isset($_SESSION['client_id']);
         <li class="nav-item">
           <a class="modern-nav-link <?= $current_page == 'invoice_history.php' ? 'active' : '' ?>" href="invoice_history.php" style="position: relative;">
             <i class="bi bi-credit-card me-2"></i>Payment
-            <?php if ($is_logged_in && $invoice_alert_count > 0): ?>
-              <span class="notification-badge" id="client-unread-admin-badge"><?= $invoice_alert_count ?></span>
+            <?php if ($is_logged_in): ?>
+              <span class="notification-badge d-none" id="client-unread-admin-badge">0</span>
             <?php endif; ?>
           </a>
         </li>
@@ -1664,6 +1664,43 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ========== NOTIFICATION POLLING ==========
+function pollChatNotifications() {
+    <?php if ($is_logged_in): ?>
+    const clientId = <?= $_SESSION['client_id'] ?>;
+    
+    fetch('AJAX/get_unread_admin_count.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'client_id=' + clientId
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Calculate total unread messages across all invoices
+        let totalUnread = 0;
+        for (let invoiceId in data) {
+            totalUnread += data[invoiceId];
+        }
+        
+        // Update the badge
+        const badge = document.getElementById('client-unread-admin-badge');
+        if (badge) {
+            if (totalUnread > 0) {
+                badge.textContent = totalUnread;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error fetching notification count:', error);
+    });
+    <?php endif; ?>
+}
 
 // ========== UTILITY FUNCTIONS ==========
 
