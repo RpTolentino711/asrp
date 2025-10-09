@@ -1,137 +1,102 @@
-<?php
-require_once '../database/database.php';
-session_start();
+let isTabActive = true;
+let isLoading = false;
 
-if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
-    http_response_code(403);
-    exit('Forbidden');
-}
+// Stop polling when tab is not visible
+document.addEventListener('visibilitychange', function() {
+    isTabActive = !document.hidden;
+});
 
-// Simple caching mechanism - 15 seconds
-$cache_time = 15;
-$cache_key = 'pending_requests_' . md5(session_id());
-$cache_file = __DIR__ . '/cache/' . $cache_key . '.html';
-
-// Create cache directory if it doesn't exist
-if (!is_dir(__DIR__ . '/cache')) {
-    mkdir(__DIR__ . '/cache', 0755, true);
-}
-
-// Return cached version if it exists and is fresh
-if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_time) {
-    readfile($cache_file);
-    exit;
-}
-
-$db = new Database();
-$pending_requests = $db->getPendingRentalRequests();
-
-// Start output buffering for caching
-ob_start();
-
-if (!empty($pending_requests)) {
-    $request_count = count($pending_requests);
+function fetchPendingRequests() {
+    if (isLoading || !isTabActive) return;
     
-    echo '<div class="table-container" data-count="' . $request_count . '">
-            <table class="custom-table">
-            <thead>
-                <tr>
-                    <th>Client</th>
-                    <th>Space</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>';
+    isLoading = true;
     
-    foreach ($pending_requests as $row) {
-        $clientName = htmlspecialchars($row['Client_fn'] . ' ' . $row['Client_ln']);
-        $spaceName = htmlspecialchars($row['Name']);
-        $requestId = (int)$row['Request_ID'];
-        
-        echo '<tr>';
-        
-        // Client Info Column
-        echo '<td>
-                <div class="client-info">
-                    <div class="fw-bold">' . $clientName . '</div>
-                    <div class="text-muted small">ID: #' . $requestId . '</div>
-                    <div class="client-tooltip">
-                        <div class="contact-item">
-                            <i class="fas fa-envelope"></i>
-                            <span>' . htmlspecialchars($row['Client_Email']) . '</span>
-                        </div>';
-        
-        if (!empty($row['Client_Phone'])) {
-            echo '<div class="contact-item">
-                    <i class="fas fa-phone"></i>
-                    <span>' . htmlspecialchars($row['Client_Phone']) . '</span>
-                  </div>';
+    // Add cache-busting parameter
+    const url = '../AJAX/ajax_admin_pending_requests.php?t=' + Date.now();
+    
+    fetch(url)
+        .then(res => {
+            if (!res.ok) throw new Error('Network response was not ok');
+            return res.text();
+        })
+        .then(html => {
+            document.getElementById('pendingRequestsContainer').innerHTML = html;
+            const container = document.getElementById('pendingRequestsContainer');
+            const countElement = container.querySelector('[data-count]');
+            if (countElement) {
+                document.getElementById('pendingCount').textContent = countElement.getAttribute('data-count');
+            }
+            isLoading = false;
+        })
+        .catch(err => {
+            console.error('Error fetching requests:', err);
+            isLoading = false;
+        });
+}
+
+function confirmAccept(requestId, clientName, spaceName) {
+    Swal.fire({
+        title: 'Accept Rental Request?',
+        html: `
+            <p>You are about to accept the rental request from:</p>
+            <p class="fw-bold">${clientName}</p>
+            <p>For property: <span class="fw-bold">${spaceName}</span></p>
+            <p class="text-muted mt-3">
+                <i class="fas fa-envelope me-2"></i>
+                A welcome email will be automatically sent to the client.
+            </p>
+        `,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#10b981',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: '<i class="fas fa-check me-2"></i>Accept & Send Welcome Email',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('acceptForm_' + requestId).submit();
         }
-        
-        if (!empty($row['Requested_At'])) {
-            $submitted_date = date('M j, Y g:i A', strtotime($row['Requested_At']));
-            echo '<div class="request-date">
-                    <i class="fas fa-calendar-check"></i>
-                    <span>Submitted: ' . htmlspecialchars($submitted_date) . '</span>
-                  </div>';
-        }
-        
-        echo '</div></div></td>';
-        
-        // Space Name
-        echo '<td>' . $spaceName . '</td>';
-        
-        // Dates
-        echo '<td><div class="fw-medium">' . htmlspecialchars($row['StartDate']) . '</div></td>';
-        echo '<td><div class="fw-medium">' . htmlspecialchars($row['EndDate']) . '</div></td>';
-        
-        // Actions - WITH FORMS!
-        echo '<td>
-                <div class="action-buttons d-flex gap-2">';
-        
-        // Accept Form
-        echo '<form method="post" id="acceptForm_' . $requestId . '" style="display:inline;">
-                <input type="hidden" name="request_id" value="' . $requestId . '">
-                <input type="hidden" name="accept_request" value="1">
-                <button type="button" 
-                        onclick="confirmAccept(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" 
-                        class="btn-action btn-accept">
-                    <i class="fas fa-check-circle"></i> Accept
-                </button>
-              </form>';
-        
-        // Reject Form
-        echo '<form method="post" id="rejectForm_' . $requestId . '" style="display:inline;">
-                <input type="hidden" name="request_id" value="' . $requestId . '">
-                <input type="hidden" name="reject_request" value="1">
-                <button type="button" 
-                        onclick="confirmReject(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" 
-                        class="btn-action btn-reject">
-                    <i class="fas fa-times-circle"></i> Reject
-                </button>
-              </form>';
-        
-        echo '</div></td></tr>';
-    }
-    
-    echo '</tbody></table></div>';
-    
-} else {
-    echo '<div class="empty-state" data-count="0">
-            <i class="fas fa-inbox"></i>
-            <h4>No pending requests</h4>
-            <p class="text-muted">All rental requests have been processed.</p>
-          </div>';
+    });
 }
 
-// Get the output and cache it
-$output = ob_get_clean();
+function confirmReject(requestId, clientName, spaceName) {
+    Swal.fire({
+        title: 'Reject Rental Request?',
+        html: `
+            <p>You are about to reject the rental request from:</p>
+            <p class="fw-bold">${clientName}</p>
+            <p>For property: <span class="fw-bold">${spaceName}</span></p>
+            <p class="text-danger mt-3">This action cannot be undone.</p>
+        `,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: '<i class="fas fa-times me-2"></i>Reject Request',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            document.getElementById('rejectForm_' + requestId).submit();
+        }
+    });
+}
 
-// Save to cache file
-file_put_contents($cache_file, $output);
+// Load immediately, then every 5 seconds for live updates
+document.addEventListener('DOMContentLoaded', function() {
+    fetchPendingRequests();
+    setInterval(fetchPendingRequests, 5000); // 5 seconds for live updates
+});
 
-// Output the result
-echo $output;
-?>
+document.querySelectorAll('.alert').forEach(alert => {
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.style.opacity = '0';
+            alert.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.remove();
+                }
+            }, 300);
+        }
+    }, 5000);
+});
