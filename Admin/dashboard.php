@@ -1464,7 +1464,7 @@ function timeAgo($datetime) {
             ]
         },
         options: {
-            responsive: true,
+            responsive: true;
             maintainAspectRatio: false,
             plugins: { 
                 legend: { 

@@ -1345,7 +1345,7 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as overdue_invoices";
@@ -1357,7 +1357,6 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         $startDate, $endDateWithTime
     ]);
 }
-
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
