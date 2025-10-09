@@ -173,6 +173,44 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
 
+    // Handle file upload (now goes directly to photo_history)
+    $upload_dir = __DIR__ . "/../uploads/unit_photos/";
+    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+
+    $uploaded_photo_filename = null;
+    if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK) {
+        $file = $_FILES['photo'];
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+        if (in_array($file['type'], $allowed_types) && $file['size'] <= 2*1024*1024) {
+            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $uploaded_photo_filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
+            $filepath = $upload_dir . $uploaded_photo_filename;
+            
+            if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Failed to upload photo.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+                $uploaded_photo_filename = null;
+            }
+        } else {
+            if (!in_array($file['type'], $allowed_types)) {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Invalid file type for photo.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            } else {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Photo is too large (max 2MB).
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+    }
+
     if (empty($name) || empty($spacetype_id) || $price === null || empty($ua_id)) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                       <i class="fas fa-exclamation-circle me-2"></i>
@@ -194,9 +232,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     } else {
         // Add space without photo column - photo will be handled separately via history
         if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price)) {
+            $space_id = $db->lastInsertId();
+            
+            // If photo was uploaded, add it to history
+            if ($uploaded_photo_filename) {
+                $db->addPhotoToHistory($space_id, $uploaded_photo_filename, 'uploaded', null, $ua_id);
+            }
+            
             $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                             <i class="fas fa-check-circle me-2"></i>
-                            Space/unit added successfully!
+                            Space/unit added successfully!' . ($uploaded_photo_filename ? ' (Photo added to history)' : '') . '
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>';
         } else {
@@ -370,6 +415,18 @@ foreach ($spaces as $space) {
 }
 
 $photo_history = $db->getPhotoHistory();
+
+// Get unique spaces for filter
+$unique_spaces = [];
+foreach ($photo_history as $history) {
+    $space_id = $history['Space_ID'];
+    if (!isset($unique_spaces[$space_id])) {
+        $unique_spaces[$space_id] = [
+            'id' => $space_id,
+            'name' => $history['Space_Name'] ?? 'Unit #' . $space_id
+        ];
+    }
+}
 
 // Group history by space for better organization
 $space_history = [];
@@ -1209,6 +1266,15 @@ foreach ($photo_history as $history) {
             color: #6b7280;
             font-size: 1.5rem;
         }
+
+        /* Filter Styles */
+        .filter-section {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e5e7eb;
+        }
     </style>
 </head>
 <body>
@@ -1350,6 +1416,20 @@ foreach ($photo_history as $history) {
                                 <input id="price" type="number" step="100" min="0" class="form-control" name="price" placeholder="0.00" required />
                                 <div id="priceDisplay" class="price-display"></div>
                             </div>
+                            
+                            <!-- ADDED BACK: Photo Upload Field -->
+                            <div class="col-12">
+                                <label class="form-label fw-semibold">Main Photo (max 2MB, JPG/PNG/GIF):</label>
+                                <div class="file-input-container">
+                                    <div class="file-input-label">
+                                        <i class="fas fa-upload me-1"></i> Choose File
+                                    </div>
+                                    <input type="file" name="photo" accept="image/*" />
+                                </div>
+                                <div class="filename-display" id="photoFileName"></div>
+                                <small class="text-muted">You can add more photos after creating the unit</small>
+                            </div>
+                            
                             <div class="col-12 text-center mt-4">
                                 <button type="submit" class="btn btn-primary px-5">
                                     <i class="fas fa-plus-circle me-1"></i> Add Space/Unit
@@ -1734,14 +1814,38 @@ foreach ($photo_history as $history) {
                 <span class="badge bg-info ms-2"><?= count($photo_history) ?></span>
             </div>
             <div class="card-body">
+                <!-- Filter Section -->
+                <div class="filter-section">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="unitFilter" class="form-label fw-semibold">Filter by Unit:</label>
+                            <select id="unitFilter" class="form-select">
+                                <option value="all">All Units</option>
+                                <?php foreach ($unique_spaces as $space): ?>
+                                    <option value="<?= $space['id'] ?>"><?= htmlspecialchars($space['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="actionFilter" class="form-label fw-semibold">Filter by Action:</label>
+                            <select id="actionFilter" class="form-select">
+                                <option value="all">All Actions</option>
+                                <option value="uploaded">Uploaded</option>
+                                <option value="updated">Updated</option>
+                                <option value="deleted">Deleted</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <?php if (!empty($photo_history)): ?>
-                    <div class="timeline">
+                    <div class="timeline" id="photoTimeline">
                         <?php foreach ($photo_history as $history): 
                             $space_id = $history['Space_ID'];
                             $space_name = htmlspecialchars($history['Space_Name'] ?? 'Unit #' . $space_id);
                             $date = date('M j, Y g:i A', strtotime($history['Action_Date']));
                         ?>
-                            <div class="timeline-item">
+                            <div class="timeline-item" data-unit="<?= $space_id ?>" data-action="<?= $history['Action'] ?>">
                                 <div class="timeline-date">
                                     <i class="fas fa-clock me-1"></i><?= $date ?>
                                 </div>
@@ -1951,7 +2055,17 @@ foreach ($photo_history as $history) {
             }
         });
 
-        // File name display function
+        // File name display for main photo
+        document.querySelector('input[name="photo"]').addEventListener('change', function() {
+            const display = document.getElementById('photoFileName');
+            if (this.files.length > 0) {
+                display.textContent = this.files[0].name;
+            } else {
+                display.textContent = '';
+            }
+        });
+
+        // File name display for photo updates
         function showFileName(input, elementId) {
             const display = document.getElementById(elementId);
             if (display && input.files.length > 0) {
@@ -2005,6 +2119,35 @@ foreach ($photo_history as $history) {
                 modal.querySelector('#modalImage').src = imageSrc;
                 modal.querySelector('#modalImageTitle').textContent = imageTitle;
             });
+        }
+
+        // Photo History Filtering
+        const unitFilter = document.getElementById('unitFilter');
+        const actionFilter = document.getElementById('actionFilter');
+        const timelineItems = document.querySelectorAll('.timeline-item');
+
+        function filterTimeline() {
+            const selectedUnit = unitFilter.value;
+            const selectedAction = actionFilter.value;
+
+            timelineItems.forEach(item => {
+                const unitId = item.getAttribute('data-unit');
+                const actionType = item.getAttribute('data-action');
+                
+                const unitMatch = selectedUnit === 'all' || selectedUnit === unitId;
+                const actionMatch = selectedAction === 'all' || selectedAction === actionType;
+                
+                if (unitMatch && actionMatch) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        if (unitFilter && actionFilter) {
+            unitFilter.addEventListener('change', filterTimeline);
+            actionFilter.addEventListener('change', filterTimeline);
         }
 
         // Check photo limit before upload
