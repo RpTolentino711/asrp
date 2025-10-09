@@ -960,7 +960,9 @@ public function removeSpacePhoto($space_id, $photo_filename) {
 
 
 
-public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
+
+
+public function addNewSpace($name, $spacetype_id, $ua_id, $price) {
     $street = 'General Luna Strt';
     $brgy = '10';
     $city = 'Lipa City';
@@ -971,7 +973,7 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = 
 
     $this->pdo->beginTransaction();
     try {
-        // Insert space with NULL Photo_ID and empty Photo field (not using legacy JSON)
+        // Insert space with NULL Photo_ID - NO LONGER USING Photo COLUMN
         $sql1 = "INSERT INTO space (
                     Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Photo_ID, Price, 
                     Main_Photo_ID, Photo_Count, Photo_System, Flow_Status
@@ -1000,7 +1002,7 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = 
 
         $this->pdo->commit();
         error_log("=== addNewSpace SUCCESS ===");
-        return $space_id; // Return the space_id for photo handling
+        return $space_id;
         
     } catch (Exception $e) {
         $this->pdo->rollBack();
@@ -2294,6 +2296,9 @@ public function setPhotoAsMain($pic_id, $space_id) {
 
 
 public function addSpacePhoto($space_id, $filename, $is_main = 0) {
+    error_log("=== addSpacePhoto START ===");
+    error_log("Space ID: $space_id, Filename: $filename, Is_Main: $is_main");
+    
     $this->pdo->beginTransaction();
     
     try {
@@ -2303,29 +2308,47 @@ public function addSpacePhoto($space_id, $filename, $is_main = 0) {
         $count_stmt->execute([$space_id]);
         $photo_count = $count_stmt->fetchColumn();
         
+        error_log("Current active photo count: $photo_count");
+        
         // If this is the first photo, automatically set it as main
         if ($photo_count == 0) {
             $is_main = 1;
+            error_log("First photo - setting as main");
         }
         
-        // Insert the photo
+        // Insert the photo into space_photos table
         $sql = "INSERT INTO space_photos (Space_ID, Photo, Is_Main, Status) VALUES (?, ?, ?, 'active')";
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$space_id, $filename, $is_main]);
+        error_log("Executing: $sql with params: $space_id, $filename, $is_main");
+        
+        $result = $stmt->execute([$space_id, $filename, $is_main]);
+        error_log("Insert result: " . ($result ? 'success' : 'failed'));
         
         $new_photo_id = $this->pdo->lastInsertId();
+        error_log("New photo ID: $new_photo_id");
         
-        // If this is set as main, update the space's Photo_ID
+        // If this is set as main, update the space's Photo_ID and Main_Photo_ID
         if ($is_main) {
-            $this->setSpaceMainPhoto($space_id, $new_photo_id);
+            error_log("Setting as main photo for space");
+            $main_result = $this->setSpaceMainPhoto($space_id, $new_photo_id);
+            error_log("setSpaceMainPhoto result: " . ($main_result ? 'success' : 'failed'));
         }
         
+        // Update photo count in space table
+        $count_update_sql = "UPDATE space SET Photo_Count = (
+            SELECT COUNT(*) FROM space_photos WHERE Space_ID = ? AND Status = 'active'
+        ) WHERE Space_ID = ?";
+        $count_stmt = $this->pdo->prepare($count_update_sql);
+        $count_stmt->execute([$space_id, $space_id]);
+        
         $this->pdo->commit();
+        error_log("=== addSpacePhoto SUCCESS ===");
         return $new_photo_id;
         
     } catch (Exception $e) {
         $this->pdo->rollBack();
         error_log("addSpacePhoto Error: " . $e->getMessage());
+        error_log("=== addSpacePhoto FAILED ===");
         return false;
     }
 }
