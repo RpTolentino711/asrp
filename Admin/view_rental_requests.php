@@ -902,6 +902,21 @@ if (isset($_POST['reject_request'])) {
             opacity: 0.5;
         }
         
+        .action-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn-action {
+                min-width: 120px;
+            }
+        }
+        
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -926,11 +941,6 @@ if (isset($_POST['reject_request'])) {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 1rem;
-            }
-            
-            .action-buttons {
-                display: flex;
-                gap: 0.5rem;
             }
             
             .btn-action {
@@ -968,6 +978,11 @@ if (isset($_POST['reject_request'])) {
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+        
+        #pendingRequestsContainer {
+            min-height: 200px;
+            position: relative;
         }
     </style>
 </head>
@@ -1102,24 +1117,41 @@ if (isset($_POST['reject_request'])) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+    let isTabActive = true;
+    let isLoading = false;
+
+    // Stop polling when tab is not visible
+    document.addEventListener('visibilitychange', function() {
+        isTabActive = !document.hidden;
+        if (isTabActive && !isLoading) {
+            fetchPendingRequests();
+        }
+    });
+
     function fetchPendingRequests() {
+        if (isLoading) return;
+        
+        isLoading = true;
+        
         fetch('../AJAX/ajax_admin_pending_requests.php')
             .then(res => res.text())
             .then(html => {
                 document.getElementById('pendingRequestsContainer').innerHTML = html;
-                const match = html.match(/data-count="(\d+)"/);
-                if (match) document.getElementById('pendingCount').textContent = match[1];
+                const container = document.getElementById('pendingRequestsContainer');
+                const countElement = container.querySelector('[data-count]');
+                if (countElement) {
+                    document.getElementById('pendingCount').textContent = countElement.getAttribute('data-count');
+                }
+                isLoading = false;
             })
             .catch(err => {
                 console.error('Error fetching requests:', err);
                 document.getElementById('pendingRequestsContainer').innerHTML = 
                     '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h4>Error loading requests</h4></div>';
+                isLoading = false;
             });
     }
-    
-    setInterval(fetchPendingRequests, 10000);
-    document.addEventListener('DOMContentLoaded', fetchPendingRequests);
-    
+
     function confirmAccept(requestId, clientName, spaceName) {
         Swal.fire({
             title: 'Accept Rental Request?',
@@ -1155,7 +1187,7 @@ if (isset($_POST['reject_request'])) {
                 <p class="text-danger mt-3">This action cannot be undone.</p>
             `,
             icon: 'warning',
-            showCancelButton: true;
+            showCancelButton: true,
             confirmButtonColor: '#ef4444',
             cancelButtonColor: '#6b7280',
             confirmButtonText: '<i class="fas fa-times me-2"></i>Reject Request',
@@ -1166,6 +1198,16 @@ if (isset($_POST['reject_request'])) {
             }
         });
     }
+
+    // Load immediately, then every 30 seconds (instead of 10)
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchPendingRequests();
+        setInterval(function() {
+            if (isTabActive && !isLoading) {
+                fetchPendingRequests();
+            }
+        }, 30000); // 30 seconds instead of 10
+    });
     
     document.querySelectorAll('.alert').forEach(alert => {
         setTimeout(() => {

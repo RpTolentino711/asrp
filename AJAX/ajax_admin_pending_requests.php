@@ -87,11 +87,11 @@ if (!empty($pending_requests)) {
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['StartDate']) . '</div></td>';
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['EndDate']) . '</div></td>';
         
-        // Actions - KEEP THE FORMS!
+        // Actions - WITH FORMS!
         echo '<td>
                 <div class="action-buttons d-flex gap-2">';
         
-        // Accept Form - KEEP THIS!
+        // Accept Form
         echo '<form method="post" id="acceptForm_' . $requestId . '" style="display:inline;">
                 <input type="hidden" name="request_id" value="' . $requestId . '">
                 <input type="hidden" name="accept_request" value="1">
@@ -102,7 +102,7 @@ if (!empty($pending_requests)) {
                 </button>
               </form>';
         
-        // Reject Form - KEEP THIS!
+        // Reject Form
         echo '<form method="post" id="rejectForm_' . $requestId . '" style="display:inline;">
                 <input type="hidden" name="request_id" value="' . $requestId . '">
                 <input type="hidden" name="reject_request" value="1">

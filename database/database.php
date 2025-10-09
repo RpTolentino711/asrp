@@ -1293,7 +1293,7 @@ public function getPendingRequestsByClient($client_id) {
 
 public function getPendingRentalRequests() {
     $sql = "SELECT r.Request_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone, 
-                   s.Name, r.StartDate, r.EndDate, r.Status, r.Requested_At
+                   s.Name, r.StartDate, r.EndDate, r.Status, r.Requested_At, r.admin_seen
             FROM rentalrequest r
             JOIN client c ON r.Client_ID = c.Client_ID
             JOIN space s ON r.Space_ID = s.Space_ID
@@ -1527,9 +1527,9 @@ public function acceptRentalRequest($request_id) {
 
     $this->pdo->beginTransaction();
     try {
-        // 1. Mark request as accepted
+        // 1. Mark request as accepted AND seen
         $this->executeStatement(
-            "UPDATE rentalrequest SET Status = 'Accepted' WHERE Request_ID = ?",
+            "UPDATE rentalrequest SET Status = 'Accepted', admin_seen = 1 WHERE Request_ID = ?",
             [$request_id]
         );
         // 2. Mark space as occupied in availability
@@ -1923,10 +1923,12 @@ public function updateSpacePhotos($space_id, $new_photo_filename, $replace_index
 
 
 
-    public function rejectRentalRequest($request_id) {
-        $sql = "UPDATE rentalrequest SET Status = 'Rejected' WHERE Request_ID = ? AND Status = 'Pending'";
-        return $this->executeStatement($sql, [$request_id]);
-    }
+   public function rejectRentalRequest($request_id) {
+    // Also mark as seen when rejecting
+    $sql = "UPDATE rentalrequest SET Status = 'Rejected', admin_seen = 1 WHERE Request_ID = ? AND Status = 'Pending'";
+    return $this->executeStatement($sql, [$request_id]);
+}
+
 
 
 
