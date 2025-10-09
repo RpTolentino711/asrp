@@ -1598,72 +1598,91 @@ public function getCompletedMaintenanceRequests() {
 }
 
 
-public function getAllSpaceTypes() {
-    $sql = "SELECT * FROM spacetype ORDER BY SpaceTypeName";
-    $stmt = $this->pdo->query($sql);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
 
-public function getAllSpacesWithDetails() {
-    $sql = "SELECT s.*, st.SpaceTypeName 
-            FROM space s 
-            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID 
-            ORDER BY s.Space_ID DESC";
-    $stmt = $this->pdo->query($sql);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
 
-public function isSpaceNameExists($name) {
-    $sql = "SELECT COUNT(*) as count FROM space WHERE Name = ?";
+
+
+
+public function updateSpaceMainPhoto($space_id, $main_photo_id) {
+    $sql = "UPDATE space SET Main_Photo_ID = ? WHERE Space_ID = ?";
     $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$name]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $result['count'] > 0;
+    return $stmt->execute([$main_photo_id, $space_id]);
 }
 
-public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json) {
-    $sql = "INSERT INTO space (Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Price) 
-            VALUES (?, ?, ?, 'General Luna Strt', '10', 'Lipa City', ?, ?)";
+public function updateSpacePhotoCount($space_id) {
+    $count = $this->getActivePhotoCount($space_id);
+    $sql = "UPDATE space SET Photo_Count = ? WHERE Space_ID = ?";
     $stmt = $this->pdo->prepare($sql);
-    if ($stmt->execute([$name, $spacetype_id, $ua_id, $photo_json, $price])) {
-        return $this->pdo->lastInsertId();
-    }
-    return false;
+    return $stmt->execute([$count, $space_id]);
 }
 
-public function addSpaceType($spacetype_name) {
-    $sql = "INSERT INTO spacetype (SpaceTypeName) VALUES (?)";
+public function setPhotoAsMain($pic_id, $space_id) {
+    // First, set all photos in this space as not main
+    $sql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = ?";
     $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$spacetype_name]);
-}
-
-public function updateSpaceType($type_id, $new_name) {
-    $sql = "UPDATE spacetype SET SpaceTypeName = ? WHERE SpaceType_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$new_name, $type_id]);
-}
-
-public function deleteSpaceType($type_id) {
-    // Check if space type is in use
-    $check_sql = "SELECT COUNT(*) as count FROM space WHERE SpaceType_ID = ?";
-    $check_stmt = $this->pdo->prepare($check_sql);
-    $check_stmt->execute([$type_id]);
-    $result = $check_stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->execute([$space_id]);
     
-    if ($result['count'] > 0) {
-        return false; // Cannot delete, type is in use
+    // Then set the selected photo as main
+    $sql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = ?";
+    $stmt = $this->pdo->prepare($sql);
+    $result = $stmt->execute([$pic_id]);
+    
+    // Update space table
+    if ($result) {
+        $this->updateSpaceMainPhoto($space_id, $pic_id);
     }
     
-    $sql = "DELETE FROM spacetype WHERE SpaceType_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$type_id]);
+    return $result;
 }
 
-public function updateSpace($space_id, $name, $spacetype_id, $price) {
-    $sql = "UPDATE space SET Name = ?, SpaceType_ID = ?, Price = ? WHERE Space_ID = ?";
+public function getMainPhoto($space_id) {
+    $sql = "SELECT * FROM space_photos WHERE Space_ID = ? AND Is_Main = 1 AND Status = 'active' LIMIT 1";
     $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$name, $spacetype_id, $price, $space_id]);
+    $stmt->execute([$space_id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
 }
+
+public function migrateSpaceToNewPhotoSystem($space_id) {
+    // Get legacy photos
+    $space = $this->getSpaceById($space_id);
+    if (empty($space['Photo'])) {
+        return true;
+    }
+    
+    $legacy_photos = json_decode($space['Photo'], true) ?: [];
+    $migrated_count = 0;
+    
+    foreach ($legacy_photos as $index => $photo_filename) {
+        if ($this->addSpacePhoto($space_id, $photo_filename)) {
+            $migrated_count++;
+            
+            // Set first photo as main
+            if ($index === 0) {
+                $photos = $this->getSpacePhotos($space_id);
+                if (!empty($photos)) {
+                    $last_photo = end($photos);
+                    $this->setPhotoAsMain($last_photo['PICID'], $space_id);
+                }
+            }
+        }
+    }
+    
+    // Update space to mark as migrated
+    if ($migrated_count > 0) {
+        $sql = "UPDATE space SET Photo_System = 'new_table', Photo_Count = ? WHERE Space_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$migrated_count, $space_id]);
+        
+        // Optional: Clear legacy field
+        // $sql = "UPDATE space SET Photo = NULL WHERE Space_ID = ?";
+        // $stmt = $this->pdo->prepare($sql);
+        // $stmt->execute([$space_id]);
+    }
+    
+    return $migrated_count > 0;
+}
+
+
 
 
 
