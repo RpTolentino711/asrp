@@ -375,6 +375,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithDetails();
 $photo_history = $db->getPhotoHistory();
+
+// Group history by space for the modal
+$space_history = [];
+foreach ($photo_history as $history) {
+    $space_history[$history['Space_ID']][] = $history;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1120,6 +1126,12 @@ $photo_history = $db->getPhotoHistory();
             object-fit: cover;
             border-radius: 4px;
             border: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .history-photo:hover {
+            transform: scale(1.1);
         }
 
         .history-badge-uploaded {
@@ -1132,6 +1144,67 @@ $photo_history = $db->getPhotoHistory();
 
         .history-badge-deleted {
             background: #ef4444;
+        }
+
+        /* Modal Gallery Styles */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .gallery-item {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            transition: transform 0.3s;
+        }
+
+        .gallery-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .gallery-info {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .action-badge {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .btn-view-gallery {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .btn-view-gallery:hover {
+            background: var(--primary);
+            color: white;
         }
     </style>
 </head>
@@ -1660,11 +1733,11 @@ $photo_history = $db->getPhotoHistory();
             </div>
         </div>
 
-        <!-- Photo History Log -->
+        <!-- Enhanced Photo History Log -->
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-history"></i>
-                <span>Photo Change History</span>
+                <span>Photo History & Previous Versions</span>
                 <span class="badge bg-info ms-2"><?= count($photo_history) ?></span>
             </div>
             <div class="card-body p-0">
@@ -1676,19 +1749,23 @@ $photo_history = $db->getPhotoHistory();
                                     <th>Date & Time</th>
                                     <th>Space/Unit</th>
                                     <th>Action</th>
-                                    <th>Photo</th>
+                                    <th>Current/New Photo</th>
                                     <th>Previous Photo</th>
+                                    <th>View All Photos</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($photo_history as $history): ?>
+                                <?php foreach ($photo_history as $history): 
+                                    $space_id = $history['Space_ID'];
+                                    $space_name = htmlspecialchars($history['Space_Name'] ?? 'N/A');
+                                ?>
                                     <tr>
                                         <td>
                                             <small><?= date('M j, Y g:i A', strtotime($history['Action_Date'])) ?></small>
                                         </td>
                                         <td>
-                                            <strong><?= htmlspecialchars($history['Space_Name'] ?? 'N/A') ?></strong>
-                                            <br><small class="text-muted">ID: <?= $history['Space_ID'] ?></small>
+                                            <strong><?= $space_name ?></strong>
+                                            <br><small class="text-muted">ID: <?= $space_id ?></small>
                                         </td>
                                         <td>
                                             <?php 
@@ -1706,7 +1783,11 @@ $photo_history = $db->getPhotoHistory();
                                             <?php if ($history['Action'] !== 'deleted'): ?>
                                                 <img src="../uploads/unit_photos/<?= htmlspecialchars($history['Photo_Path']) ?>" 
                                                      class="history-photo" 
-                                                     alt="Current Photo">
+                                                     alt="Current Photo"
+                                                     data-bs-toggle="modal" 
+                                                     data-bs-target="#imageModal"
+                                                     data-image-src="../uploads/unit_photos/<?= htmlspecialchars($history['Photo_Path']) ?>"
+                                                     data-image-title="<?= $space_name ?> - <?= ucfirst($history['Action']) ?> (<?= date('M j, Y', strtotime($history['Action_Date'])) ?>)">
                                                 <br>
                                                 <small class="text-muted"><?= htmlspecialchars($history['Photo_Path']) ?></small>
                                             <?php else: ?>
@@ -1721,11 +1802,26 @@ $photo_history = $db->getPhotoHistory();
                                             <?php if ($history['Previous_Photo_Path']): ?>
                                                 <img src="../uploads/unit_photos/<?= htmlspecialchars($history['Previous_Photo_Path']) ?>" 
                                                      class="history-photo" 
-                                                     alt="Previous Photo">
+                                                     alt="Previous Photo"
+                                                     data-bs-toggle="modal" 
+                                                     data-bs-target="#imageModal"
+                                                     data-image-src="../uploads/unit_photos/<?= htmlspecialchars($history['Previous_Photo_Path']) ?>"
+                                                     data-image-title="<?= $space_name ?> - Previous Version (<?= date('M j, Y', strtotime($history['Action_Date'])) ?>)">
                                                 <br>
                                                 <small class="text-muted"><?= htmlspecialchars($history['Previous_Photo_Path']) ?></small>
                                             <?php else: ?>
                                                 <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if (isset($space_history[$space_id])): ?>
+                                                <button type="button" class="btn-view-gallery" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#galleryModal"
+                                                        data-space-id="<?= $space_id ?>"
+                                                        data-space-name="<?= $space_name ?>">
+                                                    <i class="fas fa-images me-1"></i> View Gallery
+                                                </button>
                                             <?php endif; ?>
                                         </td>
                                     </tr>
@@ -1805,6 +1901,39 @@ $photo_history = $db->getPhotoHistory();
                         <button type="submit" class="btn btn-primary">Update Space/Unit</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel">Photo Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="modalImage" src="" alt="Preview" class="img-fluid" style="max-height: 70vh;">
+                    <div id="modalImageTitle" class="mt-3 fw-bold"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gallery Modal -->
+    <div class="modal fade" id="galleryModal" tabindex="-1" aria-labelledby="galleryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="galleryModalLabel">Photo Gallery - <span id="gallerySpaceName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="galleryContent">
+                        <!-- Gallery content will be loaded here -->
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1903,6 +2032,142 @@ $photo_history = $db->getPhotoHistory();
                 modal.querySelector('#edit_space_type').value = spaceType;
                 modal.querySelector('#edit_space_price').value = spacePrice;
             });
+        }
+
+        // Image Preview Modal
+        const imageModal = document.getElementById('imageModal');
+        if (imageModal) {
+            imageModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const imageSrc = button.getAttribute('data-image-src');
+                const imageTitle = button.getAttribute('data-image-title');
+                
+                const modal = this;
+                modal.querySelector('#modalImage').src = imageSrc;
+                modal.querySelector('#modalImageTitle').textContent = imageTitle;
+            });
+        }
+
+        // Gallery Modal
+        const galleryModal = document.getElementById('galleryModal');
+        if (galleryModal) {
+            galleryModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const spaceId = button.getAttribute('data-space-id');
+                const spaceName = button.getAttribute('data-space-name');
+                
+                const modal = this;
+                modal.querySelector('#gallerySpaceName').textContent = spaceName;
+                
+                // Load gallery content for this space
+                loadSpaceGallery(spaceId, spaceName);
+            });
+        }
+
+        function loadSpaceGallery(spaceId, spaceName) {
+            const galleryContent = document.getElementById('galleryContent');
+            galleryContent.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Loading photos for ${spaceName}...</p>
+                </div>
+            `;
+            
+            // In a real implementation, you would fetch this data via AJAX
+            // For now, we'll use the PHP data that's already loaded
+            setTimeout(() => {
+                const spaceHistory = <?= json_encode($space_history) ?>;
+                const history = spaceHistory[spaceId] || [];
+                
+                if (history.length === 0) {
+                    galleryContent.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-images fa-3x mb-3"></i>
+                            <h4>No photo history found</h4>
+                            <p>This unit has no photo history</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let galleryHTML = `
+                    <div class="mb-3">
+                        <h6>All Photos for ${spaceName}</h6>
+                        <p class="text-muted">Showing ${history.length} photo entries in chronological order (newest first)</p>
+                    </div>
+                    <div class="gallery-grid">
+                `;
+                
+                // Show all photos from history
+                history.forEach(entry => {
+                    const actionClass = {
+                        'uploaded': 'bg-success',
+                        'updated': 'bg-warning', 
+                        'deleted': 'bg-danger'
+                    }[entry.Action] || 'bg-secondary';
+                    
+                    const actionText = {
+                        'uploaded': 'Uploaded',
+                        'updated': 'Updated',
+                        'deleted': 'Deleted'
+                    }[entry.Action] || entry.Action;
+                    
+                    const date = new Date(entry.Action_Date).toLocaleDateString();
+                    
+                    // Current/New Photo
+                    if (entry.Action !== 'deleted') {
+                        galleryHTML += `
+                            <div class="gallery-item">
+                                <img src="../uploads/unit_photos/${entry.Photo_Path}" 
+                                     alt="${actionText} on ${date}"
+                                     data-bs-toggle="modal" 
+                                     data-bs-target="#imageModal"
+                                     data-image-src="../uploads/unit_photos/${entry.Photo_Path}"
+                                     data-image-title="${spaceName} - ${actionText} (${date})">
+                                <div class="gallery-info">
+                                    <div>${actionText}</div>
+                                    <small>${date}</small>
+                                </div>
+                                <span class="badge ${actionClass} action-badge">${actionText}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    // Previous Photo (for updates)
+                    if (entry.Previous_Photo_Path) {
+                        galleryHTML += `
+                            <div class="gallery-item">
+                                <img src="../uploads/unit_photos/${entry.Previous_Photo_Path}" 
+                                     alt="Previous version from ${date}"
+                                     data-bs-toggle="modal" 
+                                     data-bs-target="#imageModal"
+                                     data-image-src="../uploads/unit_photos/${entry.Previous_Photo_Path}"
+                                     data-image-title="${spaceName} - Previous Version (${date})">
+                                <div class="gallery-info">
+                                    <div>Previous Version</div>
+                                    <small>${date}</small>
+                                </div>
+                                <span class="badge bg-secondary action-badge">Previous</span>
+                            </div>
+                        `;
+                    }
+                });
+                
+                galleryHTML += '</div>';
+                galleryContent.innerHTML = galleryHTML;
+                
+                // Re-attach click events for the new images
+                galleryContent.querySelectorAll('img').forEach(img => {
+                    img.addEventListener('click', function() {
+                        const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+                        document.getElementById('modalImage').src = this.src;
+                        document.getElementById('modalImageTitle').textContent = this.alt;
+                        imageModal.show();
+                    });
+                });
+            }, 500);
         }
 
         // Check photo limit before upload
