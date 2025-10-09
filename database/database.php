@@ -957,7 +957,7 @@ public function removeSpacePhoto($space_id, $photo_filename) {
     }
 
     
-public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
+public function addNewSpace($name, $spacetype_id, $ua_id, $price) {
     $street = 'General Luna Strt';
     $brgy = '10';
     $city = 'Lipa City';
@@ -965,10 +965,10 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = 
 
     $this->pdo->beginTransaction();
     try {
-        // Use the new JSON Photo column instead of individual Photo1, Photo2, etc.
+        // REMOVED: Photo column from the INSERT statement
         $sql1 = "INSERT INTO space (
-                    Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Price, Flow_Status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new')";
+                    Name, SpaceType_ID, UA_ID, Street, Brgy, City, Price, Flow_Status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')";
         $space_id = $this->insertAndGetId($sql1, [
             $name,                // Name
             $spacetype_id,        // SpaceType_ID
@@ -976,7 +976,6 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = 
             $street,              // Street
             $brgy,                // Brgy
             $city,                // City
-            $photo_json,          // Photo (JSON array)
             $price                // Price
         ]);
 
@@ -984,11 +983,23 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = 
             throw new Exception("Failed to create space record.");
         }
 
-        // Log the initial photo upload in history if there's a photo
-        if (!empty($photo_json)) {
-            $photos = json_decode($photo_json, true) ?: [];
-            foreach ($photos as $photo_filename) {
-                $this->logPhotoAction($space_id, $photo_filename, 'uploaded', null, $ua_id);
+        // Handle photo upload if provided (now goes to photo_history)
+        if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK) {
+            $file = $_FILES['photo'];
+            $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+            
+            if (in_array($file['type'], $allowed_types) && $file['size'] <= 2*1024*1024) {
+                $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
+                $upload_dir = __DIR__ . "/../../uploads/unit_photos/";
+                
+                if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+                $filepath = $upload_dir . $filename;
+                
+                if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                    // Log the initial photo upload in history
+                    $this->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id);
+                }
             }
         }
 
@@ -999,6 +1010,7 @@ public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = 
         return true;
     } catch (Exception $e) {
         $this->pdo->rollBack();
+        error_log("addNewSpace Error: " . $e->getMessage());
         return false;
     }
 }
@@ -1037,14 +1049,13 @@ public function getAllSpacesWithDetails() {
             LEFT JOIN spacetype t ON s.SpaceType_ID = t.SpaceType_ID
             ORDER BY s.Space_ID DESC";
     try {
-        // Only fetch spaces that still exist in the database
         $spaces = $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
-        // Optionally, filter out any completely empty/deleted rows (defensive, should not be needed)
         $spaces = array_filter($spaces, function($s) {
             return !empty($s['Space_ID']);
         });
         return $spaces;
     } catch (PDOException $e) {
+        error_log("getAllSpacesWithDetails Error: " . $e->getMessage());
         return [];
     }
 }
@@ -1890,17 +1901,6 @@ public function markRentalRequestDone($client_id, $space_id) {
 }
 
 
-public function getSpacePhoto($space_id) {
-    // Return only the Photo column, which contains a JSON array of photo filenames
-    $sql = "SELECT Photo FROM space WHERE Space_ID = ?";
-    return $this->runQuery($sql, [$space_id]);
-}
-
-
-public function updateSpacePhotoJson($space_id, $photo_json) {
-    $stmt = $this->pdo->prepare("UPDATE space SET Photo = ? WHERE Space_ID = ?");
-    return $stmt->execute([$photo_json, $space_id]);
-}
 
 
 public function updateSpacePhotos($space_id, $new_photo_filename, $replace_index = null) {
@@ -2276,6 +2276,47 @@ public function getPhotoHistory($space_id = null) {
     } catch (PDOException $e) {
         error_log("Get photo history error: " . $e->getMessage());
         return [];
+    }
+}
+public function getCurrentSpacePhotos($space_id) {
+    $sql = "SELECT * FROM photo_history 
+            WHERE Space_ID = ? AND Status = 'active' 
+            ORDER BY Action_Date DESC";
+    try {
+        return $this->query($sql, [$space_id])->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("getCurrentSpacePhotos Error: " . $e->getMessage());
+        return [];
+    }
+}
+
+public function addPhotoToHistory($space_id, $filename, $action, $previous_filename = null, $admin_id = null) {
+    $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
+            VALUES (?, ?, ?, ?, ?, ?)";
+    
+    $status = ($action === 'deleted') ? 'inactive' : 'active';
+    return $this->query($sql, [$space_id, $filename, $action, $previous_filename, $admin_id, $status]);
+}
+
+public function deactivatePhoto($space_id, $filename) {
+    $sql = "UPDATE photo_history SET Status = 'inactive' 
+            WHERE Space_ID = ? AND Photo_Path = ? AND Status = 'active'";
+    try {
+        return $this->query($sql, [$space_id, $filename]);
+    } catch (PDOException $e) {
+        error_log("deactivatePhoto Error: " . $e->getMessage());
+        return false;
+    }
+}
+
+public function getSpaceName($space_id) {
+    $sql = "SELECT Name FROM space WHERE Space_ID = ?";
+    try {
+        $result = $this->query($sql, [$space_id])->fetch(PDO::FETCH_ASSOC);
+        return $result ? $result['Name'] : 'Unknown Space';
+    } catch (PDOException $e) {
+        error_log("getSpaceName Error: " . $e->getMessage());
+        return 'Unknown Space';
     }
 }
 
