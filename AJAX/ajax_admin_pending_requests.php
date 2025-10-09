@@ -87,23 +87,31 @@ if (!empty($pending_requests)) {
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['StartDate']) . '</div></td>';
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['EndDate']) . '</div></td>';
         
-        // Actions
+        // Actions - KEEP THE FORMS!
         echo '<td>
                 <div class="action-buttons d-flex gap-2">';
         
-        // Accept Button
-        echo '<button type="button" 
-                onclick="confirmAccept(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" 
-                class="btn-action btn-accept">
-                <i class="fas fa-check-circle"></i> Accept
-              </button>';
+        // Accept Form - KEEP THIS!
+        echo '<form method="post" id="acceptForm_' . $requestId . '" style="display:inline;">
+                <input type="hidden" name="request_id" value="' . $requestId . '">
+                <input type="hidden" name="accept_request" value="1">
+                <button type="button" 
+                        onclick="confirmAccept(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" 
+                        class="btn-action btn-accept">
+                    <i class="fas fa-check-circle"></i> Accept
+                </button>
+              </form>';
         
-        // Reject Button
-        echo '<button type="button" 
-                onclick="confirmReject(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" 
-                class="btn-action btn-reject">
-                <i class="fas fa-times-circle"></i> Reject
-              </button>';
+        // Reject Form - KEEP THIS!
+        echo '<form method="post" id="rejectForm_' . $requestId . '" style="display:inline;">
+                <input type="hidden" name="request_id" value="' . $requestId . '">
+                <input type="hidden" name="reject_request" value="1">
+                <button type="button" 
+                        onclick="confirmReject(' . $requestId . ', \'' . addslashes($clientName) . '\', \'' . addslashes($spaceName) . '\')" 
+                        class="btn-action btn-reject">
+                    <i class="fas fa-times-circle"></i> Reject
+                </button>
+              </form>';
         
         echo '</div></td></tr>';
     }
