@@ -956,7 +956,8 @@ public function removeSpacePhoto($space_id, $photo_filename) {
         return (bool)$this->runQuery($sql, [$name]);
     }
 
-public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
+    
+    public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
     $street = 'General Luna Strt';
     $brgy = '10';
     $city = 'Lipa City';
