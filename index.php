@@ -685,22 +685,21 @@ if (isset($_SESSION['login_error'])) {
               $modal_id = "unitModal" . $modal_counter;
               $photo_modal_id = "photoModal" . $modal_counter;
 
-              // UPDATED: JSON photo display logic for available units
+              // UPDATED: Get photos from photo_history table instead of space.Photo column
               $photo_urls = [];
               
-              // Handle JSON photo array
-              if (!empty($space['Photo'])) {
-                  $json_photos = json_decode($space['Photo'], true);
-                  if (is_array($json_photos)) {
-                      foreach ($json_photos as $photo_filename) {
-                          if (!empty($photo_filename)) {
-                              $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo_filename);
-                          }
+              // Get active photos from photo_history table
+              $current_photos = $db->getCurrentSpacePhotos($space['Space_ID']);
+              if (!empty($current_photos)) {
+                  foreach ($current_photos as $photo) {
+                      if (!empty($photo['Photo_Path']) && $photo['Status'] === 'active') {
+                          $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo['Photo_Path']);
                       }
                   }
               }
               
-              // Fallback for old individual photo columns (backward compatibility)
+              // Fallback for backward compatibility - check if old photo columns exist
+              // This can be removed once migration is complete
               $photo_fields = ['Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
               foreach ($photo_fields as $photo_field) {
                   if (!empty($space[$photo_field])) {
