@@ -65,6 +65,10 @@ public function executeStatement($sql, $params = []) {
 
 
 
+    public function getLastInsertId() {
+    return $this->pdo->lastInsertId();
+}
+
 
 
 
