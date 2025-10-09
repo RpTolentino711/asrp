@@ -17,30 +17,72 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 $ua_id = $_SESSION['admin_id'] ?? null;
 
 // Photo upload configuration
-$max_photos_per_unit = 12; // Set your desired limit here
+$max_photos_per_unit = 12;
 
 $success_unit = '';
 $error_unit = '';
 $success_type = '';
 $error_type = '';
 
-// --- Handle photo delete for a specific index in JSON array ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
+// --- Handle set as main photo ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'set_main_photo') {
+    $pic_id = intval($_POST['pic_id'] ?? 0);
     $space_id = intval($_POST['space_id'] ?? 0);
-    $photo_index = intval($_POST['photo_index'] ?? -1);
-    if ($space_id >= 1 && $photo_index >= 0) {
-        $space = $db->getSpacePhoto($space_id);
-        $photos = [];
-        if ($space && !empty($space['Photo'])) {
-            $photos = json_decode($space['Photo'], true) ?: [];
+    
+    if ($pic_id && $space_id) {
+        if ($db->setPhotoAsMain($pic_id, $space_id)) {
+            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-star me-2"></i>
+                            Photo set as main successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Failed to set photo as main.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
         }
-        if (isset($photos[$photo_index])) {
-            $filepath = __DIR__ . "/../uploads/unit_photos/" . $photos[$photo_index];
-            if (file_exists($filepath)) unlink($filepath);
-            array_splice($photos, $photo_index, 1);
+    }
+}
+
+// --- Handle migration for a space ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'migrate_photos') {
+    $space_id = intval($_POST['space_id'] ?? 0);
+    
+    if ($space_id) {
+        $migrated_count = $db->migrateSpaceToNewPhotoSystem($space_id);
+        if ($migrated_count) {
+            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Successfully migrated ' . $migrated_count . ' photos to new system!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_unit = '<div class="alert alert-info alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-info-circle me-2"></i>
+                          No photos to migrate or already using new system.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        }
+    }
+}
+
+// --- Handle photo delete ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
+    $pic_id = intval($_POST['pic_id'] ?? 0);
+    if ($pic_id >= 1) {
+        $photo = $db->getPhotoById($pic_id);
+        if ($photo) {
+            $filepath = __DIR__ . "/../uploads/unit_photos/" . $photo['Photo'];
+            if (file_exists($filepath)) {
+                unlink($filepath);
+            }
             
-            // FIX: Use the new public method instead of direct pdo access
-            if ($db->updateSpacePhotoJson($space_id, json_encode($photos))) {
+            if ($db->softDeletePhoto($pic_id)) {
+                // Update photo count in space table
+                $db->updateSpacePhotoCount($photo['Space_ID']);
+                
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                 <i class="fas fa-check-circle me-2"></i>
                                 Photo deleted successfully!
@@ -51,33 +93,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     }
 }
 
-// --- Handle photo update/upload (append to JSON array) ---
+// --- Handle photo update/upload ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
-    $photo_index = isset($_POST['photo_index']) ? intval($_POST['photo_index']) : null;
+    $pic_id = isset($_POST['pic_id']) ? intval($_POST['pic_id']) : null;
     
     if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
-        // Get current photos to check limit
-        $space = $db->getSpacePhoto($space_id);
-        $current_photos = [];
-        if ($space && !empty($space['Photo'])) {
-            $current_photos = json_decode($space['Photo'], true) ?: [];
-        }
-        
         // Check limit for new uploads (not replacements)
-        if ($photo_index === null && count($current_photos) >= $max_photos_per_unit) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Maximum ' . $max_photos_per_unit . ' photos allowed per unit. Please delete some photos first.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } else {
-            $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
+        if ($pic_id === null) {
+            $current_count = $db->getActivePhotoCount($space_id);
+            if ($current_count >= $max_photos_per_unit) {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Maximum ' . $max_photos_per_unit . ' photos allowed per unit. Please delete some photos first.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+
+        if (empty($error_unit)) {
+            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             $file = $_FILES['new_photo'];
             if (!in_array($file['type'], $allowed_types)) {
                 $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                               <i class="fas fa-exclamation-circle me-2"></i>
-                              Invalid file type for photo.
+                              Invalid file type for photo. Allowed: JPG, PNG, GIF, WEBP.
                               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                               </div>';
             } elseif ($file['size'] > 2*1024*1024) {
@@ -92,12 +132,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 $upload_dir = __DIR__ . "/../uploads/unit_photos/";
                 if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
                 $filepath = $upload_dir . $filename;
+                
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                    // FIX: Use updateSpacePhotos correctly with photo_index for replacements
-                    if ($db->updateSpacePhotos($space_id, $filename, $photo_index)) {
+                    if ($db->updateSpacePhotos($space_id, $filename, $pic_id)) {
+                        // Update photo count in space table
+                        $db->updateSpacePhotoCount($space_id);
+                        
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
-                                        Photo ' . ($photo_index !== null ? 'updated' : 'uploaded') . ' successfully!
+                                        Photo ' . ($pic_id !== null ? 'updated' : 'uploaded') . ' successfully!
                                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                         </div>';
                     } else {
@@ -125,43 +168,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
 
-    // Handle file upload (main photo goes to Photo JSON array)
-    $photo_json = null;
-    $upload_dir = __DIR__ . "/../uploads/unit_photos/";
-    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
-
-    $photos = [];
-    if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK) {
-        $file = $_FILES['photo'];
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
-        if (!in_array($file['type'], $allowed_types)) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Invalid file type for photo.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } elseif ($file['size'] > 2*1024*1024) {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Photo is too large (max 2MB).
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        } else {
-            $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
-            $filepath = $upload_dir . $filename;
-            if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                $photos[] = $filename;
-            } else {
-                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                              <i class="fas fa-exclamation-circle me-2"></i>
-                              Failed to upload photo.
-                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                              </div>';
-            }
-        }
-    }
-    $photo_json = json_encode($photos);
+    // For new space, we'll handle photos separately after space creation
+    $photo_json = json_encode([]); // Empty array for new system
 
     if (empty($name) || empty($spacetype_id) || $price === null || empty($ua_id)) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
@@ -182,7 +190,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } else {
-        if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json)) {
+        if ($space_id = $db->addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json)) {
+            // Handle main photo upload for new space
+            if (isset($_FILES['photo']) && $_FILES['photo']['error'] == UPLOAD_ERR_OK) {
+                $file = $_FILES['photo'];
+                $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (in_array($file['type'], $allowed_types) && $file['size'] <= 2*1024*1024) {
+                    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+                    $filename = "adminunit_" . time() . "_" . rand(1000,9999) . "." . $ext;
+                    $upload_dir = __DIR__ . "/../uploads/unit_photos/";
+                    if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
+                    $filepath = $upload_dir . $filename;
+                    if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                        $new_photo_id = $db->addSpacePhoto($space_id, $filename);
+                        // Set as main photo
+                        if ($new_photo_id) {
+                            $db->setPhotoAsMain($new_photo_id, $space_id);
+                        }
+                    }
+                }
+            }
+            
             $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                             <i class="fas fa-check-circle me-2"></i>
                             Space/unit added successfully!
@@ -351,6 +379,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Fetch Data for Display ---
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithDetails();
+
+// Get photos for each space
+$space_photos = [];
+foreach ($spaces as $space) {
+    $space_photos[$space['Space_ID']] = $db->getSpacePhotos($space['Space_ID']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -728,6 +762,17 @@ $spaces = $db->getAllSpacesWithDetails();
             color: white;
         }
         
+        .btn-main {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .btn-main:hover {
+            background: #f59e0b;
+            color: white;
+        }
+        
         /* File Input Styling */
         .file-input-container {
             position: relative;
@@ -934,6 +979,23 @@ $spaces = $db->getAllSpacesWithDetails();
         .btn-edit-space:hover {
             background: var(--secondary);
             color: white;
+        }
+
+        /* Migration Alert */
+        .migration-alert {
+            background: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        /* Photo Info */
+        .photo-info {
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+            margin-top: 0.5rem;
         }
         
         /* Mobile Responsive */
@@ -1298,10 +1360,7 @@ $spaces = $db->getAllSpacesWithDetails();
                             </thead>
                             <tbody>
                                 <?php foreach ($spaces as $space): 
-                                    $photos = [];
-                                    if (!empty($space['Photo'])) {
-                                        $photos = json_decode($space['Photo'], true) ?: [];
-                                    }
+                                    $photos = $space_photos[$space['Space_ID']] ?? [];
                                     $current_count = count($photos);
                                     $can_add_more = $current_count < $max_photos_per_unit;
                                     $photos_remaining = $max_photos_per_unit - $current_count;
@@ -1330,31 +1389,51 @@ $spaces = $db->getAllSpacesWithDetails();
                                                 <!-- Existing Photos Grid -->
                                                 <?php if (!empty($photos)): ?>
                                                     <div class="photo-grid">
-                                                        <?php foreach ($photos as $index => $photo): ?>
+                                                        <?php foreach ($photos as $photo): ?>
                                                             <div class="photo-item">
-                                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($photo) ?>" class="photo-preview" alt="Photo <?= $index + 1 ?>">
+                                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo']) ?>" class="photo-preview" alt="Photo <?= $photo['PICID'] ?>">
                                                                 <div class="photo-actions">
                                                                     <form method="post" enctype="multipart/form-data">
                                                                         <div class="file-input-container">
                                                                             <div class="file-input-label btn-action btn-update">
                                                                                 <i class="fas fa-sync-alt"></i> Update
                                                                             </div>
-                                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $space['Space_ID'].$index ?>')">
+                                                                            <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $photo['PICID'] ?>')">
                                                                             <input type="hidden" name="form_type" value="update_photo">
                                                                             <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                            <input type="hidden" name="photo_index" value="<?= $index ?>">
+                                                                            <input type="hidden" name="pic_id" value="<?= $photo['PICID'] ?>">
                                                                         </div>
-                                                                        <span class="filename-display" id="update<?= $space['Space_ID'].$index ?>"></span>
+                                                                        <span class="filename-display" id="update<?= $photo['PICID'] ?>"></span>
                                                                         <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Update</button>
                                                                     </form>
                                                                     <form method="post" onsubmit="return confirm('Delete this photo?');">
                                                                         <input type="hidden" name="form_type" value="delete_photo">
-                                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                                        <input type="hidden" name="photo_index" value="<?= $index ?>">
+                                                                        <input type="hidden" name="pic_id" value="<?= $photo['PICID'] ?>">
                                                                         <button type="submit" class="btn-action btn-delete">
                                                                             <i class="fas fa-trash"></i> Delete
                                                                         </button>
                                                                     </form>
+                                                                    <?php if (!$photo['Is_Main']): ?>
+                                                                    <form method="post" onsubmit="return confirm('Set this photo as the main display photo?');">
+                                                                        <input type="hidden" name="form_type" value="set_main_photo">
+                                                                        <input type="hidden" name="pic_id" value="<?= $photo['PICID'] ?>">
+                                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                                        <button type="submit" class="btn-action btn-main">
+                                                                            <i class="fas fa-star"></i> Set as Main
+                                                                        </button>
+                                                                    </form>
+                                                                    <?php else: ?>
+                                                                    <div class="text-center">
+                                                                        <span class="badge bg-warning">
+                                                                            <i class="fas fa-star"></i> Main Photo
+                                                                        </span>
+                                                                    </div>
+                                                                    <?php endif; ?>
+                                                                    <div class="photo-info">
+                                                                        <small>ID: <?= $photo['PICID'] ?></small><br>
+                                                                        <small class="text-success">Status: <?= $photo['Status'] ?></small><br>
+                                                                        <small class="text-info">Uploaded: <?= date('M j, Y', strtotime($photo['Uploaded_At'])) ?></small>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         <?php endforeach; ?>
@@ -1395,6 +1474,25 @@ $spaces = $db->getAllSpacesWithDetails();
                                                         <small>Delete some photos to add new ones</small>
                                                     </div>
                                                 <?php endif; ?>
+
+                                                <!-- Migration Alert for Legacy System -->
+                                                <?php if (isset($space['Photo_System']) && $space['Photo_System'] === 'legacy_json' && !empty($space['Photo'])): ?>
+                                                <div class="migration-alert">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                                            <small>This space is using the legacy photo system</small>
+                                                        </div>
+                                                        <form method="post">
+                                                            <input type="hidden" name="form_type" value="migrate_photos">
+                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                                <i class="fas fa-sync-alt me-1"></i> Migrate to New System
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                         <td>
@@ -1417,10 +1515,7 @@ $spaces = $db->getAllSpacesWithDetails();
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
                         <?php foreach ($spaces as $space): 
-                            $photos = [];
-                            if (!empty($space['Photo'])) {
-                                $photos = json_decode($space['Photo'], true) ?: [];
-                            }
+                            $photos = $space_photos[$space['Space_ID']] ?? [];
                             $current_count = count($photos);
                             $can_add_more = $current_count < $max_photos_per_unit;
                             $photos_remaining = $max_photos_per_unit - $current_count;
@@ -1456,31 +1551,50 @@ $spaces = $db->getAllSpacesWithDetails();
                                 </div>
 
                                 <div class="mobile-photo-grid">
-                                    <?php foreach ($photos as $index => $photo): ?>
+                                    <?php foreach ($photos as $photo): ?>
                                         <div class="mobile-photo-item">
-                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($photo) ?>" alt="Photo <?= $index + 1 ?>">
+                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo']) ?>" alt="Photo <?= $photo['PICID'] ?>">
                                             <div class="mobile-photo-actions">
                                                 <form method="post" enctype="multipart/form-data">
                                                     <div class="file-input-container w-100">
                                                         <div class="file-input-label btn-action btn-update w-100">
                                                             <i class="fas fa-sync-alt"></i> Update
                                                         </div>
-                                                        <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-update<?= $space['Space_ID'].$index ?>')">
+                                                        <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'mobile-update<?= $photo['PICID'] ?>')">
                                                         <input type="hidden" name="form_type" value="update_photo">
                                                         <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                        <input type="hidden" name="photo_index" value="<?= $index ?>">
+                                                        <input type="hidden" name="pic_id" value="<?= $photo['PICID'] ?>">
                                                     </div>
-                                                    <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$index ?>"></div>
+                                                    <div class="filename-display" id="mobile-update<?= $photo['PICID'] ?>"></div>
                                                     <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Update</button>
                                                 </form>
                                                 <form method="post" onsubmit="return confirm('Delete this photo?');">
                                                     <input type="hidden" name="form_type" value="delete_photo">
-                                                    <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
-                                                    <input type="hidden" name="photo_index" value="<?= $index ?>">
+                                                    <input type="hidden" name="pic_id" value="<?= $photo['PICID'] ?>">
                                                     <button type="submit" class="btn-action btn-delete w-100">
                                                         <i class="fas fa-trash"></i> Delete
                                                     </button>
                                                 </form>
+                                                <?php if (!$photo['Is_Main']): ?>
+                                                <form method="post" onsubmit="return confirm('Set this photo as the main display photo?');">
+                                                    <input type="hidden" name="form_type" value="set_main_photo">
+                                                    <input type="hidden" name="pic_id" value="<?= $photo['PICID'] ?>">
+                                                    <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                    <button type="submit" class="btn-action btn-main w-100">
+                                                        <i class="fas fa-star"></i> Set as Main
+                                                    </button>
+                                                </form>
+                                                <?php else: ?>
+                                                <div class="text-center">
+                                                    <span class="badge bg-warning">
+                                                        <i class="fas fa-star"></i> Main Photo
+                                                    </span>
+                                                </div>
+                                                <?php endif; ?>
+                                                <div class="photo-info">
+                                                    <small>ID: <?= $photo['PICID'] ?></small><br>
+                                                    <small class="text-success">Status: <?= $photo['Status'] ?></small>
+                                                </div>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -1515,6 +1629,25 @@ $spaces = $db->getAllSpacesWithDetails();
                                         </div>
                                     <?php endif; ?>
                                 </div>
+
+                                <!-- Migration Alert for Legacy System (Mobile) -->
+                                <?php if (isset($space['Photo_System']) && $space['Photo_System'] === 'legacy_json' && !empty($space['Photo'])): ?>
+                                <div class="migration-alert mt-3">
+                                    <div class="d-flex flex-column gap-2">
+                                        <div class="text-center">
+                                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                            <small>Using legacy photo system</small>
+                                        </div>
+                                        <form method="post">
+                                            <input type="hidden" name="form_type" value="migrate_photos">
+                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                            <button type="submit" class="btn btn-warning btn-sm w-100">
+                                                <i class="fas fa-sync-alt me-1"></i> Migrate to New System
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -1797,18 +1930,12 @@ $spaces = $db->getAllSpacesWithDetails();
             input.addEventListener('change', function() {
                 const form = this.closest('form');
                 const spaceId = form.querySelector('input[name="space_id"]').value;
-                const isNewUpload = !form.querySelector('input[name="photo_index"]');
+                const isNewUpload = !form.querySelector('input[name="pic_id"]');
                 
                 if (isNewUpload && !checkPhotoLimit(spaceId, true)) {
                     this.value = ''; // Clear the file input
                 }
             });
-        });
-
-        // Add data-space-id attributes to photo items for counting
-        document.querySelectorAll('.photo-item').forEach(item => {
-            const spaceId = item.closest('tr').querySelector('td:first-child span').textContent.replace('#', '');
-            item.closest('td').setAttribute('data-space-id', spaceId);
         });
 
         // Confirmation for delete actions
