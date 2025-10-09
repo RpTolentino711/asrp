@@ -15,11 +15,6 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
-// MARK ALL PENDING REQUESTS AS SEEN WHEN ADMIN VIEWS THE PAGE
-$db->executeStatement(
-    "UPDATE rentalrequest SET admin_seen = 1 WHERE Status = 'Pending' AND admin_seen = 0"
-);
-
 // Set Philippine timezone
 date_default_timezone_set('Asia/Manila');
 
@@ -1155,7 +1150,7 @@ if (isset($_POST['reject_request'])) {
                 <p class="text-danger mt-3">This action cannot be undone.</p>
             `,
             icon: 'warning',
-            showCancelButton: true;
+            showCancelButton: true,
             confirmButtonColor: '#ef4444',
             cancelButtonColor: '#6b7280',
             confirmButtonText: '<i class="fas fa-times me-2"></i>Reject Request',
