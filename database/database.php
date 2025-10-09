@@ -1599,90 +1599,321 @@ public function getCompletedMaintenanceRequests() {
 
 
 
-
-
-
-
-public function updateSpaceMainPhoto($space_id, $main_photo_id) {
-    $sql = "UPDATE space SET Main_Photo_ID = ? WHERE Space_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$main_photo_id, $space_id]);
-}
-
-public function updateSpacePhotoCount($space_id) {
-    $count = $this->getActivePhotoCount($space_id);
-    $sql = "UPDATE space SET Photo_Count = ? WHERE Space_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$count, $space_id]);
-}
-
-public function setPhotoAsMain($pic_id, $space_id) {
-    // First, set all photos in this space as not main
-    $sql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$space_id]);
-    
-    // Then set the selected photo as main
-    $sql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $result = $stmt->execute([$pic_id]);
-    
-    // Update space table
-    if ($result) {
-        $this->updateSpaceMainPhoto($space_id, $pic_id);
-    }
-    
-    return $result;
-}
-
-public function getMainPhoto($space_id) {
-    $sql = "SELECT * FROM space_photos WHERE Space_ID = ? AND Is_Main = 1 AND Status = 'active' LIMIT 1";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$space_id]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-public function migrateSpaceToNewPhotoSystem($space_id) {
-    // Get legacy photos
-    $space = $this->getSpaceById($space_id);
-    if (empty($space['Photo'])) {
-        return true;
-    }
-    
-    $legacy_photos = json_decode($space['Photo'], true) ?: [];
-    $migrated_count = 0;
-    
-    foreach ($legacy_photos as $index => $photo_filename) {
-        if ($this->addSpacePhoto($space_id, $photo_filename)) {
-            $migrated_count++;
-            
-            // Set first photo as main
-            if ($index === 0) {
-                $photos = $this->getSpacePhotos($space_id);
-                if (!empty($photos)) {
-                    $last_photo = end($photos);
-                    $this->setPhotoAsMain($last_photo['PICID'], $space_id);
-                }
+    public function getSpacePhotos($space_id, $include_deleted = false) {
+        try {
+            if ($include_deleted) {
+                $sql = "SELECT * FROM space_photos WHERE Space_ID = ? ORDER BY Uploaded_At ASC";
+            } else {
+                $sql = "SELECT * FROM space_photos WHERE Space_ID = ? AND Status = 'active' ORDER BY Uploaded_At ASC";
             }
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("getSpacePhotos error: " . $e->getMessage());
+            return [];
         }
     }
-    
-    // Update space to mark as migrated
-    if ($migrated_count > 0) {
-        $sql = "UPDATE space SET Photo_System = 'new_table', Photo_Count = ? WHERE Space_ID = ?";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$migrated_count, $space_id]);
-        
-        // Optional: Clear legacy field
-        // $sql = "UPDATE space SET Photo = NULL WHERE Space_ID = ?";
-        // $stmt = $this->pdo->prepare($sql);
-        // $stmt->execute([$space_id]);
-    }
-    
-    return $migrated_count > 0;
-}
 
-   public function getSpacePhoto($space_id) {
+    public function getPhotoById($pic_id) {
+        try {
+            $sql = "SELECT * FROM space_photos WHERE PICID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$pic_id]);
+            return $stmt->fetch();
+        } catch (PDOException $e) {
+            error_log("getPhotoById error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function addSpacePhoto($space_id, $filename) {
+        try {
+            $sql = "INSERT INTO space_photos (Space_ID, Photo, Status) VALUES (?, ?, 'active')";
+            $stmt = $this->pdo->prepare($sql);
+            if ($stmt->execute([$space_id, $filename])) {
+                return $this->pdo->lastInsertId();
+            }
+            return false;
+        } catch (PDOException $e) {
+            error_log("addSpacePhoto error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateSpacePhoto($pic_id, $filename) {
+        try {
+            $sql = "UPDATE space_photos SET Photo = ? WHERE PICID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$filename, $pic_id]);
+        } catch (PDOException $e) {
+            error_log("updateSpacePhoto error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function softDeletePhoto($pic_id) {
+        try {
+            $sql = "UPDATE space_photos SET Status = 'deleted', Deleted_At = NOW() WHERE PICID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$pic_id]);
+        } catch (PDOException $e) {
+            error_log("softDeletePhoto error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getActivePhotoCount($space_id) {
+        try {
+            $sql = "SELECT COUNT(*) as count FROM space_photos WHERE Space_ID = ? AND Status = 'active'";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            $result = $stmt->fetch();
+            return $result['count'] ?? 0;
+        } catch (PDOException $e) {
+            error_log("getActivePhotoCount error: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function updateSpacePhotoCount($space_id) {
+        try {
+            $count = $this->getActivePhotoCount($space_id);
+            $sql = "UPDATE space SET Photo_Count = ? WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$count, $space_id]);
+        } catch (PDOException $e) {
+            error_log("updateSpacePhotoCount error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function setPhotoAsMain($pic_id, $space_id) {
+        try {
+            // Start transaction
+            $this->pdo->beginTransaction();
+            
+            // First, set all photos in this space as not main
+            $sql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            
+            // Then set the selected photo as main
+            $sql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $result = $stmt->execute([$pic_id]);
+            
+            // Update space table
+            if ($result) {
+                $this->updateSpaceMainPhoto($space_id, $pic_id);
+            }
+            
+            $this->pdo->commit();
+            return $result;
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("setPhotoAsMain error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateSpaceMainPhoto($space_id, $main_photo_id) {
+        try {
+            $sql = "UPDATE space SET Main_Photo_ID = ? WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$main_photo_id, $space_id]);
+        } catch (PDOException $e) {
+            error_log("updateSpaceMainPhoto error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getMainPhoto($space_id) {
+        try {
+            $sql = "SELECT * FROM space_photos WHERE Space_ID = ? AND Is_Main = 1 AND Status = 'active' LIMIT 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            return $stmt->fetch();
+        } catch (PDOException $e) {
+            error_log("getMainPhoto error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateSpacePhotos($space_id, $filename, $pic_id = null) {
+        if ($pic_id) {
+            // Update existing photo
+            return $this->updateSpacePhoto($pic_id, $filename);
+        } else {
+            // Add new photo
+            return $this->addSpacePhoto($space_id, $filename);
+        }
+    }
+
+    public function migrateSpaceToNewPhotoSystem($space_id) {
+        try {
+            // Get legacy photos
+            $space = $this->getSpaceById($space_id);
+            if (empty($space['Photo'])) {
+                return true;
+            }
+            
+            $legacy_photos = json_decode($space['Photo'], true) ?: [];
+            $migrated_count = 0;
+            
+            foreach ($legacy_photos as $index => $photo_filename) {
+                if ($this->addSpacePhoto($space_id, $photo_filename)) {
+                    $migrated_count++;
+                    
+                    // Set first photo as main
+                    if ($index === 0) {
+                        $photos = $this->getSpacePhotos($space_id);
+                        if (!empty($photos)) {
+                            $last_photo = end($photos);
+                            $this->setPhotoAsMain($last_photo['PICID'], $space_id);
+                        }
+                    }
+                }
+            }
+            
+            // Update space to mark as migrated
+            if ($migrated_count > 0) {
+                $sql = "UPDATE space SET Photo_System = 'new_table', Photo_Count = ? WHERE Space_ID = ?";
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute([$migrated_count, $space_id]);
+            }
+            
+            return $migrated_count > 0;
+        } catch (PDOException $e) {
+            error_log("migrateSpaceToNewPhotoSystem error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getSpaceById($space_id) {
+        try {
+            $sql = "SELECT * FROM space WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            return $stmt->fetch();
+        } catch (PDOException $e) {
+            error_log("getSpaceById error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // ===== EXISTING SPACE METHODS =====
+
+    public function getAllSpaceTypes() {
+        try {
+            $sql = "SELECT * FROM spacetype ORDER BY SpaceTypeName";
+            $stmt = $this->pdo->query($sql);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("getAllSpaceTypes error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAllSpacesWithDetails() {
+        try {
+            $sql = "SELECT s.*, st.SpaceTypeName 
+                    FROM space s 
+                    LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID 
+                    ORDER BY s.Space_ID DESC";
+            $stmt = $this->pdo->query($sql);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("getAllSpacesWithDetails error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function isSpaceNameExists($name) {
+        try {
+            $sql = "SELECT COUNT(*) as count FROM space WHERE Name = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$name]);
+            $result = $stmt->fetch();
+            return $result['count'] > 0;
+        } catch (PDOException $e) {
+            error_log("isSpaceNameExists error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json) {
+        try {
+            $sql = "INSERT INTO space (Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Price) 
+                    VALUES (?, ?, ?, 'General Luna Strt', '10', 'Lipa City', ?, ?)";
+            $stmt = $this->pdo->prepare($sql);
+            if ($stmt->execute([$name, $spacetype_id, $ua_id, $photo_json, $price])) {
+                return $this->pdo->lastInsertId();
+            }
+            return false;
+        } catch (PDOException $e) {
+            error_log("addNewSpace error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function addSpaceType($spacetype_name) {
+        try {
+            $sql = "INSERT INTO spacetype (SpaceTypeName) VALUES (?)";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$spacetype_name]);
+        } catch (PDOException $e) {
+            error_log("addSpaceType error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateSpaceType($type_id, $new_name) {
+        try {
+            $sql = "UPDATE spacetype SET SpaceTypeName = ? WHERE SpaceType_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$new_name, $type_id]);
+        } catch (PDOException $e) {
+            error_log("updateSpaceType error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function deleteSpaceType($type_id) {
+        try {
+            // Check if space type is in use
+            $check_sql = "SELECT COUNT(*) as count FROM space WHERE SpaceType_ID = ?";
+            $check_stmt = $this->pdo->prepare($check_sql);
+            $check_stmt->execute([$type_id]);
+            $result = $check_stmt->fetch();
+            
+            if ($result['count'] > 0) {
+                return false; // Cannot delete, type is in use
+            }
+            
+            $sql = "DELETE FROM spacetype WHERE SpaceType_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$type_id]);
+        } catch (PDOException $e) {
+            error_log("deleteSpaceType error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateSpace($space_id, $name, $spacetype_id, $price) {
+        try {
+            $sql = "UPDATE space SET Name = ?, SpaceType_ID = ?, Price = ? WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$name, $spacetype_id, $price, $space_id]);
+        } catch (PDOException $e) {
+            error_log("updateSpace error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // ===== LEGACY PHOTO METHODS (for backward compatibility) =====
+    
+    public function getSpacePhoto($space_id) {
         try {
             $sql = "SELECT Photo FROM space WHERE Space_ID = ?";
             $stmt = $this->pdo->prepare($sql);
@@ -1694,6 +1925,26 @@ public function migrateSpaceToNewPhotoSystem($space_id) {
         }
     }
 
+    public function updateSpacePhotoJson($space_id, $photo_json) {
+        try {
+            $sql = "UPDATE space SET Photo = ? WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$photo_json, $space_id]);
+        } catch (PDOException $e) {
+            error_log("updateSpacePhotoJson error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // ===== UTILITY METHODS =====
+
+    public function getLastError() {
+        return $this->pdo->errorInfo();
+    }
+
+    public function getPDO() {
+        return $this->pdo;
+    }
 
 
 
