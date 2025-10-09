@@ -957,7 +957,7 @@ public function removeSpacePhoto($space_id, $photo_filename) {
     }
 
     
-    public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
+public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
     $street = 'General Luna Strt';
     $brgy = '10';
     $city = 'Lipa City';
@@ -984,6 +984,14 @@ public function removeSpacePhoto($space_id, $photo_filename) {
             throw new Exception("Failed to create space record.");
         }
 
+        // Log the initial photo upload in history if there's a photo
+        if (!empty($photo_json)) {
+            $photos = json_decode($photo_json, true) ?: [];
+            foreach ($photos as $photo_filename) {
+                $this->logPhotoAction($space_id, $photo_filename, 'uploaded', null, $ua_id);
+            }
+        }
+
         $sql2 = "INSERT INTO spaceavailability (Space_ID, Status) VALUES (?, ?)";
         $this->executeStatement($sql2, [$space_id, $avail_status]);
 
@@ -998,7 +1006,29 @@ public function removeSpacePhoto($space_id, $photo_filename) {
 
 
 
-
+public function addFirstPhotoToSpace($space_id, $filename, $action_by = null) {
+    try {
+        // Create new photos array with the first photo
+        $photos = [$filename];
+        $photo_json = json_encode($photos);
+        
+        // Update the space with the first photo
+        $sql = "UPDATE space SET Photo = ? WHERE Space_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $result = $stmt->execute([$photo_json, $space_id]);
+        
+        if ($result) {
+            // Log the first photo upload in history
+            $this->logPhotoAction($space_id, $filename, 'uploaded', null, $action_by);
+            return true;
+        }
+        
+        return false;
+    } catch (PDOException $e) {
+        error_log("Add first photo to space error: " . $e->getMessage());
+        return false;
+    }
+}
 
 
 public function getAllSpacesWithDetails() {
