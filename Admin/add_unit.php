@@ -24,26 +24,32 @@ $error_unit = '';
 $success_type = '';
 $error_type = '';
 
-// --- Handle photo delete for a specific index in JSON array ---
+// --- Handle photo delete with history tracking ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $photo_index = intval($_POST['photo_index'] ?? -1);
+    
     if ($space_id >= 1 && $photo_index >= 0) {
         $space = $db->getSpacePhoto($space_id);
         $photos = [];
         if ($space && !empty($space['Photo'])) {
             $photos = json_decode($space['Photo'], true) ?: [];
         }
+        
         if (isset($photos[$photo_index])) {
-            $filepath = __DIR__ . "/../uploads/unit_photos/" . $photos[$photo_index];
-            if (file_exists($filepath)) unlink($filepath);
+            $deleted_photo_filename = $photos[$photo_index];
+            
+            // Log the deletion in history
+            $db->logPhotoAction($space_id, $deleted_photo_filename, 'deleted', null, $ua_id);
+            
+            // Remove from current photos array
             array_splice($photos, $photo_index, 1);
             
-            // FIX: Use the new public method instead of direct pdo access
+            // Update the space with remaining photos
             if ($db->updateSpacePhotoJson($space_id, json_encode($photos))) {
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                 <i class="fas fa-check-circle me-2"></i>
-                                Photo deleted successfully!
+                                Photo deleted successfully! (History stored)
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>';
             }
@@ -51,13 +57,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     }
 }
 
-// --- Handle photo update/upload (append to JSON array) ---
+// --- Handle photo update/upload with history tracking ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $photo_index = isset($_POST['photo_index']) ? intval($_POST['photo_index']) : null;
     
     if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
-        // Get current photos to check limit
+        // Get current photos to check limit and track changes
         $space = $db->getSpacePhoto($space_id);
         $current_photos = [];
         if ($space && !empty($space['Photo'])) {
@@ -92,12 +98,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 $upload_dir = __DIR__ . "/../uploads/unit_photos/";
                 if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
                 $filepath = $upload_dir . $filename;
+                
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                    // FIX: Use updateSpacePhotos correctly with photo_index for replacements
-                    if ($db->updateSpacePhotos($space_id, $filename, $photo_index)) {
+                    $old_photo_filename = null;
+                    
+                    // If updating existing photo (not adding new)
+                    if ($photo_index !== null && isset($current_photos[$photo_index])) {
+                        $old_photo_filename = $current_photos[$photo_index];
+                        // Log the update in history
+                        $db->logPhotoAction($space_id, $filename, 'updated', $old_photo_filename, $ua_id);
+                        // Replace the photo in array
+                        $current_photos[$photo_index] = $filename;
+                    } else {
+                        // If adding new photo
+                        $current_photos[] = $filename;
+                        // Log the upload in history
+                        $db->logPhotoAction($space_id, $filename, 'uploaded', null, $ua_id);
+                    }
+                    
+                    // Update the space photos
+                    if ($db->updateSpacePhotoJson($space_id, json_encode($current_photos))) {
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
-                                        Photo ' . ($photo_index !== null ? 'updated' : 'uploaded') . ' successfully!
+                                        Photo ' . ($photo_index !== null ? 'updated' : 'uploaded') . ' successfully! (History stored)
                                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                         </div>';
                     } else {
@@ -351,6 +374,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Fetch Data for Display ---
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithDetails();
+$photo_history = $db->getPhotoHistory();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1088,6 +1112,27 @@ $spaces = $db->getAllSpacesWithDetails();
                 min-width: 44px;
             }
         }
+
+        /* Photo History Styles */
+        .history-photo {
+            width: 80px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .history-badge-uploaded {
+            background: #10b981;
+        }
+
+        .history-badge-updated {
+            background: #f59e0b;
+        }
+
+        .history-badge-deleted {
+            background: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -1347,7 +1392,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                                                         <span class="filename-display" id="update<?= $space['Space_ID'].$index ?>"></span>
                                                                         <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Update</button>
                                                                     </form>
-                                                                    <form method="post" onsubmit="return confirm('Delete this photo?');">
+                                                                    <form method="post" onsubmit="return confirm('Delete this photo? This action will be recorded in history.');">
                                                                         <input type="hidden" name="form_type" value="delete_photo">
                                                                         <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
                                                                         <input type="hidden" name="photo_index" value="<?= $index ?>">
@@ -1473,7 +1518,7 @@ $spaces = $db->getAllSpacesWithDetails();
                                                     <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$index ?>"></div>
                                                     <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Update</button>
                                                 </form>
-                                                <form method="post" onsubmit="return confirm('Delete this photo?');">
+                                                <form method="post" onsubmit="return confirm('Delete this photo? This action will be recorded in history.');">
                                                     <input type="hidden" name="form_type" value="delete_photo">
                                                     <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
                                                     <input type="hidden" name="photo_index" value="<?= $index ?>">
@@ -1610,6 +1655,89 @@ $spaces = $db->getAllSpacesWithDetails();
                         <i class="fas fa-tag"></i>
                         <h4>No space types found</h4>
                         <p>There are no space types in the system</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Photo History Log -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-history"></i>
+                <span>Photo Change History</span>
+                <span class="badge bg-info ms-2"><?= count($photo_history) ?></span>
+            </div>
+            <div class="card-body p-0">
+                <?php if (!empty($photo_history)): ?>
+                    <div class="table-container">
+                        <table class="custom-table">
+                            <thead>
+                                <tr>
+                                    <th>Date & Time</th>
+                                    <th>Space/Unit</th>
+                                    <th>Action</th>
+                                    <th>Photo</th>
+                                    <th>Previous Photo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($photo_history as $history): ?>
+                                    <tr>
+                                        <td>
+                                            <small><?= date('M j, Y g:i A', strtotime($history['Action_Date'])) ?></small>
+                                        </td>
+                                        <td>
+                                            <strong><?= htmlspecialchars($history['Space_Name'] ?? 'N/A') ?></strong>
+                                            <br><small class="text-muted">ID: <?= $history['Space_ID'] ?></small>
+                                        </td>
+                                        <td>
+                                            <?php 
+                                            $badge_class = [
+                                                'uploaded' => 'bg-success',
+                                                'updated' => 'bg-warning',
+                                                'deleted' => 'bg-danger'
+                                            ][$history['Action']] ?? 'bg-secondary';
+                                            ?>
+                                            <span class="badge <?= $badge_class ?>">
+                                                <?= ucfirst($history['Action']) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($history['Action'] !== 'deleted'): ?>
+                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($history['Photo_Path']) ?>" 
+                                                     class="history-photo" 
+                                                     alt="Current Photo">
+                                                <br>
+                                                <small class="text-muted"><?= htmlspecialchars($history['Photo_Path']) ?></small>
+                                            <?php else: ?>
+                                                <span class="text-danger">
+                                                    <i class="fas fa-trash"></i> Deleted
+                                                </span>
+                                                <br>
+                                                <small class="text-muted"><?= htmlspecialchars($history['Photo_Path']) ?></small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($history['Previous_Photo_Path']): ?>
+                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($history['Previous_Photo_Path']) ?>" 
+                                                     class="history-photo" 
+                                                     alt="Previous Photo">
+                                                <br>
+                                                <small class="text-muted"><?= htmlspecialchars($history['Previous_Photo_Path']) ?></small>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="fas fa-history"></i>
+                        <h4>No photo history found</h4>
+                        <p>Photo changes will appear here</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -1815,7 +1943,7 @@ $spaces = $db->getAllSpacesWithDetails();
         document.querySelectorAll('form').forEach(form => {
             if (form.querySelector('input[name="form_type"][value="delete_photo"]')) {
                 form.addEventListener('submit', function(e) {
-                    if (!confirm('Are you sure you want to delete this photo? This action cannot be undone.')) {
+                    if (!confirm('Are you sure you want to delete this photo? This action will be recorded in history.')) {
                         e.preventDefault();
                     }
                 });

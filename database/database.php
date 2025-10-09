@@ -2210,6 +2210,43 @@ public function deleteSpaceType($type_id) {
         return false;
     }
 }
+// Add to your Database class
+public function logPhotoAction($space_id, $photo_path, $action, $previous_photo_path = null, $action_by = null) {
+    try {
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By) 
+                VALUES (?, ?, ?, ?, ?)";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$space_id, $photo_path, $action, $previous_photo_path, $action_by]);
+        return true;
+    } catch (PDOException $e) {
+        error_log("Photo history log error: " . $e->getMessage());
+        return false;
+    }
+}
+
+public function getPhotoHistory($space_id = null) {
+    try {
+        if ($space_id) {
+            $sql = "SELECT ph.*, s.Name as Space_Name 
+                    FROM photo_history ph 
+                    LEFT JOIN space s ON ph.Space_ID = s.Space_ID 
+                    WHERE ph.Space_ID = ? 
+                    ORDER BY ph.Action_Date DESC";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+        } else {
+            $sql = "SELECT ph.*, s.Name as Space_Name 
+                    FROM photo_history ph 
+                    LEFT JOIN space s ON ph.Space_ID = s.Space_ID 
+                    ORDER BY ph.Action_Date DESC";
+            $stmt = $this->pdo->query($sql);
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Get photo history error: " . $e->getMessage());
+        return [];
+    }
+}
 
 
 
