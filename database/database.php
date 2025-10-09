@@ -63,11 +63,20 @@ public function executeStatement($sql, $params = []) {
     }
 
 
-
-
-    public function getLastInsertId() {
-    return $this->pdo->lastInsertId();
+    public function getSpaceByName($name) {
+    $sql = "SELECT * FROM space WHERE Name = ? ORDER BY Space_ID DESC LIMIT 1";
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$name]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("getSpaceByName Error: " . $e->getMessage());
+        return null;
+    }
 }
+
+
+    
 
 
 
