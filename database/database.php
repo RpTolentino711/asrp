@@ -958,6 +958,8 @@ public function removeSpacePhoto($space_id, $photo_filename) {
 
 
 
+
+
     public function addNewSpace($name, $spacetype_id, $ua_id, $price, $photo_json = null) {
     $street = 'General Luna Strt';
     $brgy = '10';
@@ -966,7 +968,7 @@ public function removeSpacePhoto($space_id, $photo_filename) {
 
     $this->pdo->beginTransaction();
     try {
-        // Use NULL for Photo_ID initially, it will be set when main photo is uploaded
+        // Insert space with NULL Photo_ID initially
         $sql1 = "INSERT INTO space (
                     Name, SpaceType_ID, UA_ID, Street, Brgy, City, Photo, Photo_ID, Price, Flow_Status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, 'new')";
@@ -985,6 +987,7 @@ public function removeSpacePhoto($space_id, $photo_filename) {
             throw new Exception("Failed to create space record.");
         }
 
+        // Create availability record
         $sql2 = "INSERT INTO spaceavailability (Space_ID, Status) VALUES (?, ?)";
         $this->executeStatement($sql2, [$space_id, $avail_status]);
 
@@ -1910,13 +1913,6 @@ public function getAllUnitsWithRenterStatus() {
 }
 
 
-// Add this method to your Database class for chart data (daily breakdown for the month)
-// Add these methods to your Database class
-
-// Add or update this method in your Database class
-
-// Add or update this method in your Database class
-
 public function getAdminMonthChartData($startDate, $endDate) {
     $days = [];
     $new_rentals = [];
@@ -2187,109 +2183,196 @@ public function deleteSpaceType($type_id) {
 
 
 
-// In your Database class
-
-/**
- * Get photo by ID using PDO
- */
-public function getPhotoById($pic_id) {
-    $sql = "SELECT * FROM space_photos WHERE PICID = :pic_id AND Status = 'active'";
-    $stmt = $this->conn->prepare($sql);
-    $stmt->bindParam(':pic_id', $pic_id, PDO::PARAM_INT);
-    $stmt->execute();
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+public function getActivePhotoCount($space_id) {
+    $sql = "SELECT COUNT(*) as count FROM space_photos WHERE Space_ID = ? AND Status = 'active'";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$space_id]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    return $result['count'];
 }
 
 /**
  * Soft delete a photo using PDO
  */
 public function softDeletePhoto($pic_id) {
-    $sql = "UPDATE space_photos SET Status = 'deleted', Deleted_At = NOW() WHERE PICID = :pic_id";
-    $stmt = $this->conn->prepare($sql);
-    $stmt->bindParam(':pic_id', $pic_id, PDO::PARAM_INT);
-    return $stmt->execute();
+    $sql = "UPDATE space_photos SET Status = 'deleted', Deleted_At = NOW() WHERE PICID = ?";
+    $stmt = $this->pdo->prepare($sql);
+    return $stmt->execute([$pic_id]);
 }
 
-/**
- * Add new space photo using PDO
- */
-public function addSpacePhoto($space_id, $filename, $is_main = 0) {
-    $sql = "INSERT INTO space_photos (Space_ID, Photo, Is_Main, Status) VALUES (:space_id, :filename, :is_main, 'active')";
-    $stmt = $this->conn->prepare($sql);
-    $stmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-    $stmt->bindParam(':filename', $filename, PDO::PARAM_STR);
-    $stmt->bindParam(':is_main', $is_main, PDO::PARAM_INT);
+
+
+
+public function updatePhotoWithSoftDelete($space_id, $new_filename, $old_pic_id = null) {
+    $this->pdo->beginTransaction();
     
-    if ($stmt->execute()) {
-        $new_photo_id = $this->conn->lastInsertId();
+    try {
+        $was_main = false;
         
-        // If this is set as main, update the space's Photo_ID
-        if ($is_main) {
-            $this->setSpaceMainPhoto($space_id, $new_photo_id);
+        // If updating an existing photo, soft delete the old one and check if it was main
+        if ($old_pic_id) {
+            // Check if the old photo was the main photo
+            $check_sql = "SELECT Is_Main FROM space_photos WHERE PICID = ?";
+            $check_stmt = $this->pdo->prepare($check_sql);
+            $check_stmt->execute([$old_pic_id]);
+            $old_photo = $check_stmt->fetch(PDO::FETCH_ASSOC);
+            $was_main = $old_photo && $old_photo['Is_Main'];
+            
+            // Soft delete the old photo
+            $softDeleteSql = "UPDATE space_photos SET Status = 'deleted', Deleted_At = NOW() WHERE PICID = ?";
+            $softDeleteStmt = $this->pdo->prepare($softDeleteSql);
+            $softDeleteStmt->execute([$old_pic_id]);
         }
         
+        // Insert new photo record
+        $is_main = $was_main ? 1 : 0; // If old photo was main, new one should be main too
+        $insertSql = "INSERT INTO space_photos (Space_ID, Photo, Is_Main, Status) VALUES (?, ?, ?, 'active')";
+        $insertStmt = $this->pdo->prepare($insertSql);
+        $insertStmt->execute([$space_id, $new_filename, $is_main]);
+        
+        $new_photo_id = $this->pdo->lastInsertId();
+        
+        // If this is now the main photo, update space's Photo_ID
+        if ($is_main) {
+            $this->setPhotoAsMain($new_photo_id, $space_id);
+        }
+        
+        $this->pdo->commit();
         return $new_photo_id;
+        
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        error_log("updatePhotoWithSoftDelete Error: " . $e->getMessage());
+        return false;
     }
-    return false;
 }
+
 
 /**
  * Set space's main photo reference using PDO
  */
 public function setSpaceMainPhoto($space_id, $photo_id) {
-    // First, unset any existing main photos
-    $unsetSql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = :space_id AND Is_Main = 1";
-    $unsetStmt = $this->conn->prepare($unsetSql);
-    $unsetStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-    $unsetStmt->execute();
+    $this->pdo->beginTransaction();
     
-    // Set the new main photo
-    $setSql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = :photo_id AND Space_ID = :space_id";
-    $setStmt = $this->conn->prepare($setSql);
-    $setStmt->bindParam(':photo_id', $photo_id, PDO::PARAM_INT);
-    $setStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-    $setStmt->execute();
-    
-    // Update space's Photo_ID reference
-    $spaceSql = "UPDATE space SET Photo_ID = :photo_id WHERE Space_ID = :space_id";
-    $spaceStmt = $this->conn->prepare($spaceSql);
-    $spaceStmt->bindParam(':photo_id', $photo_id, PDO::PARAM_INT);
-    $spaceStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-    return $spaceStmt->execute();
+    try {
+        // Unset current main photos
+        $unsetSql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = ? AND Is_Main = 1 AND Status = 'active'";
+        $unsetStmt = $this->pdo->prepare($unsetSql);
+        $unsetStmt->execute([$space_id]);
+        
+        // Set new main photo
+        $setSql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = ? AND Space_ID = ? AND Status = 'active'";
+        $setStmt = $this->pdo->prepare($setSql);
+        $setStmt->execute([$photo_id, $space_id]);
+        
+        // Update space's Photo_ID reference
+        $spaceSql = "UPDATE space SET Photo_ID = ? WHERE Space_ID = ?";
+        $spaceStmt = $this->pdo->prepare($spaceSql);
+        $spaceStmt->execute([$photo_id, $space_id]);
+        
+        $this->pdo->commit();
+        return true;
+        
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        error_log("setSpaceMainPhoto Error: " . $e->getMessage());
+        return false;
+    }
 }
 
 /**
  * Update photo with soft delete using PDO (for replacing photos)
  */
 public function updatePhotoWithSoftDelete($space_id, $new_filename, $old_pic_id = null) {
-    $this->conn->beginTransaction();
+    $this->pdo->beginTransaction();
     
     try {
-        // If updating an existing photo, soft delete the old one
+        $was_main = false;
+        
+        // If updating an existing photo, soft delete the old one and check if it was main
         if ($old_pic_id) {
-            $softDeleteSql = "UPDATE space_photos SET Status = 'deleted', Deleted_At = NOW() WHERE PICID = :old_pic_id";
-            $softDeleteStmt = $this->conn->prepare($softDeleteSql);
-            $softDeleteStmt->bindParam(':old_pic_id', $old_pic_id, PDO::PARAM_INT);
-            $softDeleteStmt->execute();
+            // Check if the old photo was the main photo
+            $check_sql = "SELECT Is_Main FROM space_photos WHERE PICID = ?";
+            $check_stmt = $this->pdo->prepare($check_sql);
+            $check_stmt->execute([$old_pic_id]);
+            $old_photo = $check_stmt->fetch(PDO::FETCH_ASSOC);
+            $was_main = $old_photo && $old_photo['Is_Main'];
+            
+            // Soft delete the old photo
+            $softDeleteSql = "UPDATE space_photos SET Status = 'deleted', Deleted_At = NOW() WHERE PICID = ?";
+            $softDeleteStmt = $this->pdo->prepare($softDeleteSql);
+            $softDeleteStmt->execute([$old_pic_id]);
         }
         
         // Insert new photo record
-        $insertSql = "INSERT INTO space_photos (Space_ID, Photo, Is_Main, Status) VALUES (:space_id, :filename, 0, 'active')";
-        $insertStmt = $this->conn->prepare($insertSql);
-        $insertStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-        $insertStmt->bindParam(':filename', $new_filename, PDO::PARAM_STR);
-        $insertStmt->execute();
+        $is_main = $was_main ? 1 : 0; // If old photo was main, new one should be main too
+        $insertSql = "INSERT INTO space_photos (Space_ID, Photo, Is_Main, Status) VALUES (?, ?, ?, 'active')";
+        $insertStmt = $this->pdo->prepare($insertSql);
+        $insertStmt->execute([$space_id, $new_filename, $is_main]);
         
-        $new_photo_id = $this->conn->lastInsertId();
+        $new_photo_id = $this->pdo->lastInsertId();
         
-        $this->conn->commit();
+        // If this is now the main photo, update space's Photo_ID
+        if ($is_main) {
+            $this->setSpaceMainPhoto($space_id, $new_photo_id);
+        }
+        
+        $this->pdo->commit();
         return $new_photo_id;
         
     } catch (Exception $e) {
-        $this->conn->rollBack();
+        $this->pdo->rollBack();
+        error_log("updatePhotoWithSoftDelete Error: " . $e->getMessage());
         return false;
     }
 }
+
+
+
+public function handleMainPhotoDeletion($space_id, $deleted_pic_id) {
+    $this->pdo->beginTransaction();
+    
+    try {
+        // Check if the deleted photo was the main photo by checking space table
+        $check_sql = "SELECT Photo_ID FROM space WHERE Space_ID = ? AND Photo_ID = ?";
+        $check_stmt = $this->pdo->prepare($check_sql);
+        $check_stmt->execute([$space_id, $deleted_pic_id]);
+        
+        if ($check_stmt->fetch()) {
+            // The deleted photo was the main photo, find a new one
+            $new_main_sql = "SELECT PICID FROM space_photos WHERE Space_ID = ? AND Status = 'active' ORDER BY Uploaded_At ASC LIMIT 1";
+            $new_main_stmt = $this->pdo->prepare($new_main_sql);
+            $new_main_stmt->execute([$space_id]);
+            $new_main = $new_main_stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($new_main) {
+                // Set the new main photo
+                $this->setPhotoAsMain($new_main['PICID'], $space_id);
+            } else {
+                // No photos left, set Photo_ID to NULL
+                $null_sql = "UPDATE space SET Photo_ID = NULL WHERE Space_ID = ?";
+                $null_stmt = $this->pdo->prepare($null_sql);
+                $null_stmt->execute([$space_id]);
+            }
+        }
+        
+        $this->pdo->commit();
+        return true;
+        
+    } catch (Exception $e) {
+        $this->pdo->rollBack();
+        error_log("handleMainPhotoDeletion Error: " . $e->getMessage());
+        return false;
+    }
+}
+
+public function getPhotoById($pic_id) {
+    $sql = "SELECT * FROM space_photos WHERE PICID = ? AND Status = 'active'";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$pic_id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
 
 
 public function migrateSpaceToNewPhotoSystem($space_id) {
@@ -2346,38 +2429,36 @@ public function getSpacePhotos($space_id) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+
+
 /**
- * Set photo as main using PDO
+ * FIXED: Set photo as main using PDO consistently
  */
 public function setPhotoAsMain($pic_id, $space_id) {
-    $this->conn->beginTransaction();
+    $this->pdo->beginTransaction();
     
     try {
         // Unset current main photo
-        $unsetSql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = :space_id AND Is_Main = 1";
-        $unsetStmt = $this->conn->prepare($unsetSql);
-        $unsetStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-        $unsetStmt->execute();
+        $unsetSql = "UPDATE space_photos SET Is_Main = 0 WHERE Space_ID = ? AND Is_Main = 1 AND Status = 'active'";
+        $unsetStmt = $this->pdo->prepare($unsetSql);
+        $unsetStmt->execute([$space_id]);
         
         // Set new main photo
-        $setSql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = :pic_id AND Space_ID = :space_id";
-        $setStmt = $this->conn->prepare($setSql);
-        $setStmt->bindParam(':pic_id', $pic_id, PDO::PARAM_INT);
-        $setStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-        $setStmt->execute();
+        $setSql = "UPDATE space_photos SET Is_Main = 1 WHERE PICID = ? AND Space_ID = ? AND Status = 'active'";
+        $setStmt = $this->pdo->prepare($setSql);
+        $setStmt->execute([$pic_id, $space_id]);
         
         // Update space's Photo_ID reference
-        $spaceSql = "UPDATE space SET Photo_ID = :pic_id WHERE Space_ID = :space_id";
-        $spaceStmt = $this->conn->prepare($spaceSql);
-        $spaceStmt->bindParam(':pic_id', $pic_id, PDO::PARAM_INT);
-        $spaceStmt->bindParam(':space_id', $space_id, PDO::PARAM_INT);
-        $spaceStmt->execute();
+        $spaceSql = "UPDATE space SET Photo_ID = ? WHERE Space_ID = ?";
+        $spaceStmt = $this->pdo->prepare($spaceSql);
+        $spaceStmt->execute([$pic_id, $space_id]);
         
-        $this->conn->commit();
+        $this->pdo->commit();
         return true;
         
     } catch (Exception $e) {
-        $this->conn->rollBack();
+        $this->pdo->rollBack();
+        error_log("setPhotoAsMain Error: " . $e->getMessage());
         return false;
     }
 }
