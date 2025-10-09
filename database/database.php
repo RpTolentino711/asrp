@@ -1682,6 +1682,17 @@ public function migrateSpaceToNewPhotoSystem($space_id) {
     return $migrated_count > 0;
 }
 
+   public function getSpacePhoto($space_id) {
+        try {
+            $sql = "SELECT Photo FROM space WHERE Space_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$space_id]);
+            return $stmt->fetch();
+        } catch (PDOException $e) {
+            error_log("getSpacePhoto error: " . $e->getMessage());
+            return false;
+        }
+    }
 
 
 
