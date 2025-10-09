@@ -173,7 +173,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
 
-    // Handle file upload (now goes directly to photo_history)
+    // Handle file upload first to get filename
     $upload_dir = __DIR__ . "/../uploads/unit_photos/";
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
@@ -230,13 +230,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } else {
-        // Add space without photo column - photo will be handled separately via history
+        // Add space without photo column
         if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price)) {
-            $space_id = $db->lastInsertId();
+            // Get the newly created space by name to get its ID
+            // Get all spaces and find the newly created one
+            $all_spaces = $db->getAllSpacesWithDetails();
+            $new_space = null;
+            foreach ($all_spaces as $space) {
+                if ($space['Name'] === $name) {
+                    $new_space = $space;
+                    break;
+                }
+            }
             
-            // If photo was uploaded, add it to history
-            if ($uploaded_photo_filename) {
-                $db->addPhotoToHistory($space_id, $uploaded_photo_filename, 'uploaded', null, $ua_id);
+            if ($new_space && $uploaded_photo_filename) {
+                // Add the photo to photo_history
+                $db->addPhotoToHistory($new_space['Space_ID'], $uploaded_photo_filename, 'uploaded', null, $ua_id);
             }
             
             $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
@@ -611,7 +620,7 @@ foreach ($photo_history as $history) {
         /* Header */
         .dashboard-header {
             display: flex;
-            justify-content: space-between;
+            justify-content: between;
             align-items: center;
             margin-bottom: 2rem;
             padding-bottom: 1rem;
@@ -1417,7 +1426,7 @@ foreach ($photo_history as $history) {
                                 <div id="priceDisplay" class="price-display"></div>
                             </div>
                             
-                            <!-- ADDED BACK: Photo Upload Field -->
+                            <!-- Photo Upload Field -->
                             <div class="col-12">
                                 <label class="form-label fw-semibold">Main Photo (max 2MB, JPG/PNG/GIF):</label>
                                 <div class="file-input-container">

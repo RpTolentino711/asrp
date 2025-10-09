@@ -63,6 +63,7 @@ public function executeStatement($sql, $params = []) {
     }
 
 
+    
     public function getSpaceByName($name) {
     $sql = "SELECT * FROM space WHERE Name = ? ORDER BY Space_ID DESC LIMIT 1";
     try {
