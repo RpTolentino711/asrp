@@ -696,6 +696,53 @@ function timeAgo($datetime) {
         .summary-card.warning { border-top-color: var(--warning); }
         .summary-card.info { border-top-color: var(--info); }
         
+        /* Notification Styles */
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .new-request-indicator {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            animation: bounce 0.5s ease-in-out;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 60%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+            80% { transform: translateY(-2px); }
+        }
+
+        .bell-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            75% { transform: rotate(15deg); }
+        }
+
+        .new-request-flash {
+            animation: highlight 3s ease-in-out;
+        }
+
+        @keyframes highlight {
+            0% { background-color: rgba(34, 197, 94, 0.1); }
+            50% { background-color: rgba(34, 197, 94, 0.3); }
+            100% { background-color: transparent; }
+        }
+        
         /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
@@ -962,7 +1009,7 @@ function timeAgo($datetime) {
                     <i class="fas fa-clipboard-check"></i>
                     <span>Rental Requests</span>
                     <?php if ($pending > 0): ?>
-                        <span class="badge badge-notification bg-danger"><?= $pending ?></span>
+                        <span class="badge badge-notification bg-danger notification-badge" id="sidebarRentalBadge"><?= $pending ?></span>
                     <?php endif; ?>
                 </a>
             </div>
@@ -1213,6 +1260,7 @@ function timeAgo($datetime) {
                     <div class="card-header">
                         <i class="fas fa-list-alt"></i>
                         <span>Latest Rental Requests</span>
+                        <span class="badge bg-primary ms-2" id="latestRequestsBadge"><?= $pending ?></span>
                     </div>
                     <div class="card-body p-0" id="latestRequestsContainer">
                         <!-- Latest requests will be loaded here via AJAX -->
@@ -1286,28 +1334,165 @@ function timeAgo($datetime) {
         }
     });
 
-    // --- LIVE ADMIN: AJAX Polling for Dashboard Stats, Latest Requests, and Messages ---
+    // --- LIVE ADMIN: Real-time Notification System ---
+    let lastPendingCount = <?= $pending ?>;
+    let isFirstLoad = true;
+    let isTabActive = true;
+    let notificationCooldown = false;
+
+    // Stop polling when tab is not visible
+    document.addEventListener('visibilitychange', function() {
+        isTabActive = !document.hidden;
+        if (isTabActive) {
+            // Refresh immediately when tab becomes active
+            fetchDashboardCounts();
+            fetchLatestRequests();
+        }
+    });
+
+    function showNewRequestNotification(newRequestsCount) {
+        if (notificationCooldown) return;
+        
+        notificationCooldown = true;
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-success alert-dismissible fade show';
+        notification.style.cssText = `
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            z-index: 9999; 
+            min-width: 320px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-left: 4px solid #10b981;
+        `;
+        notification.innerHTML = `
+            <div class="d-flex align-items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-bell text-success fs-4 me-3 bell-shake"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading mb-1">🏠 New Rental Request!</h6>
+                    <p class="mb-2">You have <strong>${newRequestsCount}</strong> new pending request${newRequestsCount > 1 ? 's' : ''} to review.</p>
+                    <div class="d-flex gap-2 mt-2">
+                        <a href="view_rental_requests.php" class="btn btn-sm btn-success">
+                            <i class="fas fa-eye me-1"></i>View Requests
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 8 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, 8000);
+        
+        // Reset cooldown after 10 seconds
+        setTimeout(() => {
+            notificationCooldown = false;
+        }, 10000);
+    }
+
+    function updateBadgeAnimation(badgeElement, newCount, oldCount) {
+        if (newCount > oldCount && !isFirstLoad) {
+            badgeElement.classList.add('notification-badge');
+            setTimeout(() => {
+                badgeElement.classList.remove('notification-badge');
+            }, 3000);
+        }
+    }
+
     function fetchDashboardCounts() {
+        if (!isTabActive) return;
+        
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
             .then(res => res.json())
             .then(data => {
-                if (data) {
-                    document.getElementById('pendingRentalsCount').textContent = data.pending_rentals ?? 0;
-                    document.getElementById('pendingMaintenanceCount').textContent = data.pending_maintenance ?? 0;
-                    document.getElementById('unpaidInvoicesCount').textContent = data.unpaid_invoices ?? 0;
-                    document.getElementById('overdueInvoicesCount').textContent = data.overdue_invoices ?? 0;
+                if (data && !data.error) {
+                    const currentPending = data.pending_rentals ?? 0;
+                    const currentMaintenance = data.pending_maintenance ?? 0;
+                    const currentUnpaid = data.unpaid_invoices ?? 0;
+                    const currentOverdue = data.overdue_invoices ?? 0;
+
+                    // Update counts on dashboard
+                    document.getElementById('pendingRentalsCount').textContent = currentPending;
+                    document.getElementById('pendingMaintenanceCount').textContent = currentMaintenance;
+                    document.getElementById('unpaidInvoicesCount').textContent = currentUnpaid;
+                    document.getElementById('overdueInvoicesCount').textContent = currentOverdue;
+
+                    // Check for new rental requests
+                    if (!isFirstLoad && currentPending > lastPendingCount) {
+                        const newRequests = currentPending - lastPendingCount;
+                        showNewRequestNotification(newRequests);
+                        
+                        // Update sidebar badge with animation
+                        updateSidebarBadge(currentPending);
+                    }
+                    
+                    lastPendingCount = currentPending;
+                    isFirstLoad = false;
                 }
             })
             .catch(err => console.log('Error fetching dashboard counts:', err));
     }
 
+    function updateSidebarBadge(currentCount) {
+        const sidebarBadge = document.getElementById('sidebarRentalBadge');
+        if (sidebarBadge) {
+            const oldCount = parseInt(sidebarBadge.textContent);
+            sidebarBadge.textContent = currentCount;
+            updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+        } else {
+            // Create badge if it doesn't exist
+            const rentalLink = document.querySelector('a[href="view_rental_requests.php"]');
+            if (rentalLink) {
+                const newBadge = document.createElement('span');
+                newBadge.id = 'sidebarRentalBadge';
+                newBadge.className = 'badge badge-notification bg-danger notification-badge';
+                newBadge.textContent = currentCount;
+                rentalLink.appendChild(newBadge);
+            }
+        }
+    }
+
     function fetchLatestRequests() {
+        if (!isTabActive) return;
+        
         fetch('../AJAX/ajax_admin_dashboard_latest_requests.php')
             .then(res => res.text())
             .then(html => {
-                document.getElementById('latestRequestsContainer').innerHTML = html;
+                const container = document.getElementById('latestRequestsContainer');
+                container.innerHTML = html;
+                
+                // Update the badge count
+                const countElement = container.querySelector('[data-count]');
+                if (countElement) {
+                    const currentCount = parseInt(countElement.getAttribute('data-count'));
+                    const badge = document.getElementById('latestRequestsBadge');
+                    if (badge) {
+                        const oldCount = parseInt(badge.textContent);
+                        badge.textContent = currentCount;
+                        updateBadgeAnimation(badge, currentCount, oldCount);
+                    }
+                }
             })
             .catch(err => {
+                console.error('Error fetching latest requests:', err);
                 document.getElementById('latestRequestsContainer').innerHTML = 
                     '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
             });
@@ -1315,6 +1500,8 @@ function timeAgo($datetime) {
 
     let messageFilter = 'recent';
     function fetchMessages() {
+        if (!isTabActive) return;
+        
         fetch('../AJAX/ajax_admin_dashboard_messages.php?filter=' + messageFilter)
             .then(res => res.text())
             .then(html => {
@@ -1329,6 +1516,7 @@ function timeAgo($datetime) {
                 });
             })
             .catch(err => {
+                console.error('Error fetching messages:', err);
                 document.getElementById('messageBoardContainer').innerHTML = 
                     '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading messages</p></div>';
             });
@@ -1378,7 +1566,10 @@ function timeAgo($datetime) {
         const notification = document.createElement('div');
         notification.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
         notification.innerHTML = `
-            ${message}
+            <div class="d-flex align-items-center">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+                <span>${message}</span>
+            </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
         notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
@@ -1387,7 +1578,13 @@ function timeAgo($datetime) {
         
         setTimeout(() => {
             if (notification.parentNode) {
-                notification.remove();
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateY(-10px)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
             }
         }, 5000);
     }
@@ -1420,18 +1617,19 @@ function timeAgo($datetime) {
         recentBtn.classList.add('active');
     });
 
-    // Poll every 10 seconds
+    // Poll every 10 seconds for real-time updates
     setInterval(() => {
-        fetchDashboardCounts();
-        fetchLatestRequests();
-        fetchMessages();
-    }, 10000);
+        if (isTabActive) {
+            fetchDashboardCounts();
+            fetchLatestRequests();
+            fetchMessages();
+        }
+    }, 10000); // 10 seconds
 
     // Chart initialization
     const chartData = <?= json_encode($chartData) ?>;
     const ctx = document.getElementById('activityChart').getContext('2d');
 
-    let lastFocusedIndex = null;
     const activityChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -1464,7 +1662,7 @@ function timeAgo($datetime) {
             ]
         },
         options: {
-            responsive: true;
+            responsive: true,
             maintainAspectRatio: false,
             plugins: { 
                 legend: { 
@@ -1557,7 +1755,7 @@ function timeAgo($datetime) {
     // Tooltip functionality for status breakdowns
     document.addEventListener('DOMContentLoaded', function() {
         // Tooltips are handled by CSS hover effects with data-tooltip attributes
-        console.log('Tooltips enabled for status breakdowns');
+        console.log('Dashboard loaded with live notifications');
     });
     </script>
 </body>
