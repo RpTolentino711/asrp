@@ -7,27 +7,8 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit('Forbidden');
 }
 
-// Simple caching mechanism - 15 seconds
-$cache_time = 15;
-$cache_key = 'pending_requests_' . md5(session_id());
-$cache_file = __DIR__ . '/cache/' . $cache_key . '.html';
-
-// Create cache directory if it doesn't exist
-if (!is_dir(__DIR__ . '/cache')) {
-    mkdir(__DIR__ . '/cache', 0755, true);
-}
-
-// Return cached version if it exists and is fresh
-if (file_exists($cache_file) && (time() - filemtime($cache_file)) < $cache_time) {
-    readfile($cache_file);
-    exit;
-}
-
 $db = new Database();
 $pending_requests = $db->getPendingRentalRequests();
-
-// Start output buffering for caching
-ob_start();
 
 if (!empty($pending_requests)) {
     $request_count = count($pending_requests);
@@ -87,7 +68,7 @@ if (!empty($pending_requests)) {
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['StartDate']) . '</div></td>';
         echo '<td><div class="fw-medium">' . htmlspecialchars($row['EndDate']) . '</div></td>';
         
-        // Actions - WITH FORMS!
+        // Actions
         echo '<td>
                 <div class="action-buttons d-flex gap-2">';
         
@@ -125,13 +106,4 @@ if (!empty($pending_requests)) {
             <p class="text-muted">All rental requests have been processed.</p>
           </div>';
 }
-
-// Get the output and cache it
-$output = ob_get_clean();
-
-// Save to cache file
-file_put_contents($cache_file, $output);
-
-// Output the result
-echo $output;
 ?>
