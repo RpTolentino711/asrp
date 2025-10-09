@@ -2215,6 +2215,42 @@ public function deleteSpaceType($type_id) {
     }
 }
 
+
+
+
+public function migrateSpaceToNewPhotoSystem($space_id) {
+    // Get legacy photos from space table
+    $sql = "SELECT Photo FROM space WHERE Space_ID = ?";
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$space_id]);
+    $space = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$space || empty($space['Photo']) || $space['Photo'] == '[]') {
+        return 0;
+    }
+    
+    $photos = json_decode($space['Photo'], true);
+    $migrated_count = 0;
+    
+    foreach ($photos as $index => $photo_filename) {
+        if (!empty($photo_filename)) {
+            $is_main = ($index === 0) ? 1 : 0; // First photo is main
+            if ($this->addSpacePhoto($space_id, $photo_filename, $is_main)) {
+                $migrated_count++;
+            }
+        }
+    }
+    
+    // Clear legacy photos after migration
+    if ($migrated_count > 0) {
+        $clearSql = "UPDATE space SET Photo = '[]' WHERE Space_ID = ?";
+        $clearStmt = $this->pdo->prepare($clearSql);
+        $clearStmt->execute([$space_id]);
+    }
+    
+    return $migrated_count;
+}
+
 public function setPhotoAsMain($pic_id, $space_id) {
     $this->pdo->beginTransaction();
     
