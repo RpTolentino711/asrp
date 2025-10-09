@@ -80,9 +80,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             }
             
             if ($db->softDeletePhoto($pic_id)) {
-                // Update photo count in space table
-                $db->updateSpacePhotoCount($photo['Space_ID']);
-                
                 $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                 <i class="fas fa-check-circle me-2"></i>
                                 Photo deleted successfully!
@@ -135,9 +132,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
                     if ($db->updateSpacePhotos($space_id, $filename, $pic_id)) {
-                        // Update photo count in space table
-                        $db->updateSpacePhotoCount($space_id);
-                        
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
                                         Photo ' . ($pic_id !== null ? 'updated' : 'uploaded') . ' successfully!
@@ -1476,7 +1470,12 @@ foreach ($spaces as $space) {
                                                 <?php endif; ?>
 
                                                 <!-- Migration Alert for Legacy System -->
-                                                <?php if (isset($space['Photo_System']) && $space['Photo_System'] === 'legacy_json' && !empty($space['Photo'])): ?>
+                                                <?php 
+                                                // Check if space has legacy photos but no photos in new system
+                                                $has_legacy_photos = !empty($space['Photo']);
+                                                $has_new_photos = !empty($space_photos[$space['Space_ID']]);
+                                                if ($has_legacy_photos && !$has_new_photos): 
+                                                ?>
                                                 <div class="migration-alert">
                                                     <div class="d-flex justify-content-between align-items-center">
                                                         <div>
@@ -1631,7 +1630,12 @@ foreach ($spaces as $space) {
                                 </div>
 
                                 <!-- Migration Alert for Legacy System (Mobile) -->
-                                <?php if (isset($space['Photo_System']) && $space['Photo_System'] === 'legacy_json' && !empty($space['Photo'])): ?>
+                                <?php 
+                                // Check if space has legacy photos but no photos in new system
+                                $has_legacy_photos = !empty($space['Photo']);
+                                $has_new_photos = !empty($space_photos[$space['Space_ID']]);
+                                if ($has_legacy_photos && !$has_new_photos): 
+                                ?>
                                 <div class="migration-alert mt-3">
                                     <div class="d-flex flex-column gap-2">
                                         <div class="text-center">
