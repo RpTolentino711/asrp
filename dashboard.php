@@ -365,72 +365,6 @@ function formatDateToMonthLetters($date) {
 <!doctype html>
 <html lang="en">
 <head>
-    <style>        
-    .notification-badge {
-        position: absolute;
-        top: 0.2em;
-        right: -0.7em;
-        background: #ef4444;
-        color: #fff;
-        font-size: 0.75em;
-        font-weight: bold;
-        border-radius: 50%;
-        padding: 0.2em 0.55em;
-        min-width: 1.5em;
-        min-height: 1.5em;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 2px 8px rgba(239,68,68,0.15);
-        z-index: 10;
-        transition: all 0.2s;
-        pointer-events: none;
-        border: 2px solid #fff;
-        animation: pulse-badge 1.2s infinite;
-    }
-    @keyframes pulse-badge {
-        0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-        70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
-        100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-    }
-
-    /* Maintenance History Dropdown */
-    .maintenance-dropdown {
-        max-height: 300px;
-        overflow-y: auto;
-        border: 1px solid var(--gray-light);
-        border-radius: var(--border-radius-sm);
-        background: white;
-        margin-top: 0.5rem;
-    }
-    .maintenance-dropdown::-webkit-scrollbar {
-        width: 6px;
-    }
-    .maintenance-dropdown::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 3px;
-    }
-    .maintenance-dropdown::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
-        border-radius: 3px;
-    }
-    .maintenance-dropdown::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
-    }
-    .toggle-maintenance {
-        background: none;
-        border: none;
-        color: var(--primary);
-        font-size: 0.85rem;
-        cursor: pointer;
-        padding: 0.25rem 0.5rem;
-        border-radius: var(--border-radius-sm);
-        transition: var(--transition);
-    }
-    .toggle-maintenance:hover {
-        background: rgba(37, 99, 235, 0.1);
-    }
-    </style>
     <meta charset="utf-8">
     <title>Client Dashboard - ASRT Commercial Spaces</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1058,6 +992,43 @@ function formatDateToMonthLetters($date) {
                 transform: translateY(0);
             }
         }
+
+        /* Maintenance History Dropdown */
+        .maintenance-dropdown {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--gray-light);
+            border-radius: var(--border-radius-sm);
+            background: white;
+            margin-top: 0.5rem;
+        }
+        .maintenance-dropdown::-webkit-scrollbar {
+            width: 6px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        .toggle-maintenance {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--border-radius-sm);
+            transition: var(--transition);
+        }
+        .toggle-maintenance:hover {
+            background: rgba(37, 99, 235, 0.1);
+        }
     </style>
 </head>
 
@@ -1526,6 +1497,152 @@ function formatDateToMonthLetters($date) {
             }
         }
 
+        // Payment Status Notification System
+        let shownPaymentNotifications = new Set();
+        let shownReminderNotifications = new Set();
+
+        function checkPaymentStatusAndNotify() {
+            <?php if (!empty($rented_units)): ?>
+            fetch('AJAX/check_payment_status.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'client_id=' + encodeURIComponent(<?= json_encode($client_id) ?>)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // Show payment confirmation notifications
+                    if (data.paid_invoices && data.paid_invoices.length > 0) {
+                        data.paid_invoices.forEach(invoice => {
+                            const notificationKey = `paid_${invoice.Invoice_ID}`;
+                            
+                            if (!shownPaymentNotifications.has(notificationKey)) {
+                                showPaymentConfirmation(invoice);
+                                shownPaymentNotifications.add(notificationKey);
+                                
+                                // Remove from set after 1 hour to allow re-notification if needed
+                                setTimeout(() => {
+                                    shownPaymentNotifications.delete(notificationKey);
+                                }, 3600000);
+                            }
+                        });
+                    }
+
+                    // Show payment reminder notifications
+                    if (data.upcoming_payments && data.upcoming_payments.length > 0) {
+                        data.upcoming_payments.forEach(invoice => {
+                            const reminderKey = `reminder_${invoice.Invoice_ID}`;
+                            
+                            if (!shownReminderNotifications.has(reminderKey)) {
+                                showPaymentReminder(invoice);
+                                shownReminderNotifications.add(reminderKey);
+                            }
+                        });
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Payment status check failed:', err);
+            });
+            <?php endif; ?>
+        }
+
+        function showPaymentConfirmation(invoice) {
+            const nextDueDate = invoice.NextDueDate ? new Date(invoice.NextDueDate).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }) : 'Next month';
+            
+            Swal.fire({
+                icon: 'success',
+                title: '💰 Payment Confirmed!',
+                html: `
+                    <div class="text-start">
+                        <p class="mb-2"><strong>Unit:</strong> ${invoice.UnitName || 'Your unit'}</p>
+                        <p class="mb-2"><strong>Period:</strong> Paid in full</p>
+                        <p class="mb-0"><strong>Next Payment Due:</strong> ${nextDueDate}</p>
+                    </div>
+                `,
+                confirmButtonText: 'View Payment History',
+                confirmButtonColor: '#10b981',
+                showCancelButton: true,
+                cancelButtonText: 'Close',
+                background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                color: '#065f46',
+                timer: 8000,
+                timerProgressBar: true,
+                didOpen: () => {
+                    // Add celebration effect
+                    const timerInterval = setInterval(() => {
+                        const content = Swal.getHtmlContainer();
+                        if (content) {
+                            const b = content.querySelector('b');
+                            if (b && Math.random() > 0.7) {
+                                b.style.transform = 'scale(1.1)';
+                                setTimeout(() => b.style.transform = 'scale(1)', 200);
+                            }
+                        }
+                    }, 500);
+                    Swal.getTimerLeft();
+                    Swal.addEventListener('timer', () => {
+                        clearInterval(timerInterval);
+                    });
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'invoice_history.php';
+                }
+            });
+        }
+
+        function showPaymentReminder(invoice) {
+            const dueDate = new Date(invoice.EndDate).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            const daysLeft = invoice.DaysUntilDue;
+            let urgencyLevel = 'warning';
+            let urgencyText = 'Upcoming Payment';
+            
+            if (daysLeft <= 1) {
+                urgencyLevel = 'error';
+                urgencyText = 'Payment Due Tomorrow!';
+            } else if (daysLeft <= 3) {
+                urgencyLevel = 'warning';
+                urgencyText = 'Payment Due Soon';
+            }
+            
+            Swal.fire({
+                icon: urgencyLevel,
+                title: `📅 ${urgencyText}`,
+                html: `
+                    <div class="text-start">
+                        <p class="mb-2"><strong>Unit:</strong> ${invoice.UnitName || 'Your unit'}</p>
+                        <p class="mb-2"><strong>Amount Due:</strong> ₱${parseFloat(invoice.InvoiceTotal || 0).toLocaleString()}</p>
+                        <p class="mb-2"><strong>Due Date:</strong> ${dueDate}</p>
+                        <p class="mb-0"><strong>Time Left:</strong> ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</p>
+                    </div>
+                `,
+                confirmButtonText: 'Pay Now',
+                confirmButtonColor: urgencyLevel === 'error' ? '#ef4444' : '#f59e0b',
+                showCancelButton: true,
+                cancelButtonText: 'Remind Me Later',
+                background: urgencyLevel === 'error' ? 
+                    'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 
+                    'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                color: urgencyLevel === 'error' ? '#991b1b' : '#92400e',
+                timer: urgencyLevel === 'error' ? 10000 : 6000,
+                timerProgressBar: true,
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'invoice_history.php';
+                }
+            });
+        }
+
         // Close navbar on mobile when clicking nav links
         document.addEventListener('DOMContentLoaded', function() {
             const navbarCollapse = document.getElementById('navbarNav');
@@ -1685,6 +1802,10 @@ function formatDateToMonthLetters($date) {
             document.querySelectorAll('.card').forEach((card) => {
                 observer.observe(card);
             });
+
+            // Start payment status polling
+            checkPaymentStatusAndNotify();
+            setInterval(checkPaymentStatusAndNotify, 30000); // Check every 30 seconds
         });
 
         // Live poll unread admin messages for client (Payment nav badge)
