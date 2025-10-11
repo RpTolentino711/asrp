@@ -24,6 +24,28 @@ $error_unit = '';
 $success_type = '';
 $error_type = '';
 
+// --- Handle photo description update ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_description') {
+    $history_id = intval($_POST['history_id'] ?? 0);
+    $description = trim($_POST['photo_description'] ?? '');
+    
+    if ($history_id >= 1) {
+        if ($db->updatePhotoDescription($history_id, $description)) {
+            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Photo description updated successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Failed to update photo description.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        }
+    }
+}
+
 // --- Handle photo delete with history tracking ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
@@ -50,6 +72,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Handle photo upload with history tracking ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'upload_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
+    $description = trim($_POST['photo_description'] ?? '');
     
     if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         // Get current active photos to check limit
@@ -86,7 +109,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
                     // Log the upload in history
-                    if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id)) {
+                    if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id, $description)) {
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
                                         Photo uploaded successfully! (Added to history)
@@ -115,6 +138,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $old_photo_path = trim($_POST['old_photo_path'] ?? '');
+    $description = trim($_POST['photo_description'] ?? '');
     
     if ($space_id && !empty($old_photo_path) && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
@@ -143,7 +167,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 $db->deactivatePhoto($space_id, $old_photo_path);
                 
                 // Add new photo as update
-                if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id)) {
+                if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id, $description)) {
                     $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                     <i class="fas fa-check-circle me-2"></i>
                                     Photo updated successfully! (Old photo marked inactive, new photo added)
@@ -1028,6 +1052,31 @@ foreach ($photo_history as $history) {
             color: white;
         }
         
+        /* Photo Description Styles */
+        .photo-description {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 0.75rem;
+        }
+
+        .description-display {
+            font-size: 0.8rem;
+        }
+
+        .description-text {
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .description-timeline {
+            border-left: 3px solid var(--primary);
+            font-size: 0.85rem;
+        }
+
+        .char-counter {
+            text-align: right;
+            font-size: 0.8rem;
+        }
+        
         /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
@@ -1099,6 +1148,14 @@ foreach ($photo_history as $history) {
             .space-type-actions,
             .space-actions {
                 flex-direction: column;
+            }
+
+            .photo-description {
+                font-size: 0.75rem;
+            }
+            
+            .description-timeline {
+                font-size: 0.8rem;
             }
         }
         
@@ -1543,7 +1600,17 @@ foreach ($photo_history as $history) {
                                                                             <input type="hidden" name="old_photo_path" value="<?= htmlspecialchars($photo['Photo_Path']) ?>">
                                                                         </div>
                                                                         <span class="filename-display" id="update<?= $space['Space_ID'].$photo['History_ID'] ?>"></span>
-                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Update</button>
+                                                                        
+                                                                        <!-- Description Field for Update -->
+                                                                        <div class="mb-2 mt-2">
+                                                                            <label class="form-label small fw-semibold">Photo Description (Optional):</label>
+                                                                            <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
+                                                                                      placeholder="Describe this photo (e.g., 'Living room view', 'Kitchen area', etc.)" 
+                                                                                      maxlength="255"><?= htmlspecialchars($photo['description'] ?? '') ?></textarea>
+                                                                            <small class="text-muted">Max 255 characters</small>
+                                                                        </div>
+                                                                        
+                                                                        <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Update Photo</button>
                                                                     </form>
                                                                     
                                                                     <!-- Delete Photo Form -->
@@ -1555,6 +1622,31 @@ foreach ($photo_history as $history) {
                                                                             <i class="fas fa-trash"></i> Delete
                                                                         </button>
                                                                     </form>
+                                                                </div>
+                                                                
+                                                                <!-- Photo Description Display -->
+                                                                <div class="photo-description mt-2">
+                                                                    <?php if (!empty($photo['description'])): ?>
+                                                                        <div class="description-display">
+                                                                            <small class="text-muted d-block">Description:</small>
+                                                                            <div class="description-text bg-light p-2 rounded small">
+                                                                                <?= htmlspecialchars($photo['description']) ?>
+                                                                            </div>
+                                                                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1 w-100" 
+                                                                                    data-bs-toggle="modal" data-bs-target="#editDescriptionModal"
+                                                                                    data-history-id="<?= $photo['History_ID'] ?>"
+                                                                                    data-current-description="<?= htmlspecialchars($photo['description']) ?>">
+                                                                                <i class="fas fa-edit me-1"></i> Edit Description
+                                                                            </button>
+                                                                        </div>
+                                                                    <?php else: ?>
+                                                                        <button type="button" class="btn btn-outline-primary btn-sm w-100" 
+                                                                                data-bs-toggle="modal" data-bs-target="#editDescriptionModal"
+                                                                                data-history-id="<?= $photo['History_ID'] ?>"
+                                                                                data-current-description="">
+                                                                            <i class="fas fa-plus me-1"></i> Add Description
+                                                                        </button>
+                                                                    <?php endif; ?>
                                                                 </div>
                                                             </div>
                                                         <?php endforeach; ?>
@@ -1583,6 +1675,16 @@ foreach ($photo_history as $history) {
                                                                 <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
                                                             </div>
                                                             <span class="filename-display" id="add<?= $space['Space_ID'] ?>"></span>
+                                                            
+                                                            <!-- Description Field for New Upload -->
+                                                            <div class="mb-2 mt-2">
+                                                                <label class="form-label small fw-semibold">Photo Description (Optional):</label>
+                                                                <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
+                                                                          placeholder="Describe this photo (e.g., 'Living room view', 'Kitchen area', etc.)" 
+                                                                          maxlength="255"></textarea>
+                                                                <small class="text-muted">Max 255 characters</small>
+                                                            </div>
+                                                            
                                                             <button type="submit" class="btn btn-success btn-sm mt-2">
                                                                 <i class="fas fa-upload me-1"></i> Upload Photo
                                                             </button>
@@ -1669,7 +1771,17 @@ foreach ($photo_history as $history) {
                                                         <input type="hidden" name="old_photo_path" value="<?= htmlspecialchars($photo['Photo_Path']) ?>">
                                                     </div>
                                                     <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$photo['History_ID'] ?>"></div>
-                                                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Update</button>
+                                                    
+                                                    <!-- Description Field for Update (Mobile) -->
+                                                    <div class="mb-2 mt-2">
+                                                        <label class="form-label small fw-semibold">Description:</label>
+                                                        <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
+                                                                  placeholder="Describe this photo..." 
+                                                                  maxlength="255"><?= htmlspecialchars($photo['description'] ?? '') ?></textarea>
+                                                        <small class="text-muted">Max 255 chars</small>
+                                                    </div>
+                                                    
+                                                    <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Update Photo</button>
                                                 </form>
                                                 
                                                 <!-- Delete Photo Form -->
@@ -1681,6 +1793,33 @@ foreach ($photo_history as $history) {
                                                         <i class="fas fa-trash"></i> Delete
                                                     </button>
                                                 </form>
+                                                
+                                                <!-- Photo Description Display (Mobile) -->
+                                                <div class="photo-description mt-2">
+                                                    <?php if (!empty($photo['description'])): ?>
+                                                        <div class="description-display">
+                                                            <small class="text-muted d-block">Description:</small>
+                                                            <div class="description-text bg-light p-2 rounded small">
+                                                                <?= htmlspecialchars($photo['description']) ?>
+                                                            </div>
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm mt-1 w-100" 
+                                                                    data-bs-toggle="modal" data-bs-target="#editDescriptionModal"
+                                                                    data-history-id="<?= $photo['History_ID'] ?>"
+                                                                    data-current-description="<?= htmlspecialchars($photo['description']) ?>"
+                                                                    style="font-size: 0.7rem;">
+                                                                <i class="fas fa-edit me-1"></i> Edit Desc
+                                                            </button>
+                                                        </div>
+                                                    <?php else: ?>
+                                                        <button type="button" class="btn btn-outline-primary btn-sm w-100" 
+                                                                data-bs-toggle="modal" data-bs-target="#editDescriptionModal"
+                                                                data-history-id="<?= $photo['History_ID'] ?>"
+                                                                data-current-description=""
+                                                                style="font-size: 0.7rem;">
+                                                            <i class="fas fa-plus me-1"></i> Add Desc
+                                                        </button>
+                                                    <?php endif; ?>
+                                                </div>
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -1702,6 +1841,16 @@ foreach ($photo_history as $history) {
                                                     <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
                                                 </div>
                                                 <div class="filename-display" id="mobile-add<?= $space['Space_ID'] ?>"></div>
+                                                
+                                                <!-- Description Field for New Upload (Mobile) -->
+                                                <div class="mb-2 mt-2">
+                                                    <label class="form-label small fw-semibold">Description:</label>
+                                                    <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
+                                                              placeholder="Describe this photo..." 
+                                                              maxlength="255"></textarea>
+                                                    <small class="text-muted">Max 255 chars</small>
+                                                </div>
+                                                
                                                 <button type="submit" class="btn btn-success btn-sm w-100 mt-1" style="font-size: 0.7rem;">
                                                     <i class="fas fa-upload"></i> Upload
                                                 </button>
@@ -1874,6 +2023,13 @@ foreach ($photo_history as $history) {
                                             <small class="text-muted">Unit ID: <?= $space_id ?></small>
                                         </div>
                                         
+                                        <!-- Add description display in timeline -->
+                                        <?php if (!empty($history['description'])): ?>
+                                            <div class="description-timeline bg-light p-2 rounded mt-2 small">
+                                                <strong>Description:</strong> <?= htmlspecialchars($history['description']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        
                                         <?php if ($history['Action'] === 'updated' && $history['Previous_Photo_Path']): ?>
                                             <!-- Photo Update - Show Before/After -->
                                             <div class="photo-comparison mt-2">
@@ -2004,6 +2160,36 @@ foreach ($photo_history as $history) {
         </div>
     </div>
 
+    <!-- Edit Description Modal -->
+    <div class="modal fade" id="editDescriptionModal" tabindex="-1" aria-labelledby="editDescriptionModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editDescriptionModalLabel">Edit Photo Description</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="post">
+                    <div class="modal-body">
+                        <input type="hidden" name="form_type" value="update_description">
+                        <input type="hidden" name="history_id" id="edit_history_id">
+                        <div class="mb-3">
+                            <label for="edit_photo_description" class="form-label">Photo Description</label>
+                            <textarea class="form-control" id="edit_photo_description" name="photo_description" 
+                                      rows="4" maxlength="255" 
+                                      placeholder="Describe this photo (e.g., 'Living room view', 'Kitchen area', etc.)"></textarea>
+                            <div class="form-text">Max 255 characters. This helps identify the photo content.</div>
+                            <div class="form-text char-counter"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Description</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Image Preview Modal -->
     <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -2116,6 +2302,24 @@ foreach ($photo_history as $history) {
             });
         }
 
+        // Edit Description Modal
+        const editDescriptionModal = document.getElementById('editDescriptionModal');
+        if (editDescriptionModal) {
+            editDescriptionModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const historyId = button.getAttribute('data-history-id');
+                const currentDescription = button.getAttribute('data-current-description');
+                
+                const modal = this;
+                modal.querySelector('#edit_history_id').value = historyId;
+                modal.querySelector('#edit_photo_description').value = currentDescription;
+                
+                // Trigger character counter update
+                const textarea = modal.querySelector('#edit_photo_description');
+                textarea.dispatchEvent(new Event('input'));
+            });
+        }
+
         // Image Preview Modal
         const imageModal = document.getElementById('imageModal');
         if (imageModal) {
@@ -2157,6 +2361,33 @@ foreach ($photo_history as $history) {
         if (unitFilter && actionFilter) {
             unitFilter.addEventListener('change', filterTimeline);
             actionFilter.addEventListener('change', filterTimeline);
+        }
+
+        // Character counter for description
+        const descriptionTextarea = document.getElementById('edit_photo_description');
+        if (descriptionTextarea) {
+            descriptionTextarea.addEventListener('input', function() {
+                const maxLength = 255;
+                const currentLength = this.value.length;
+                const counter = this.parentNode.querySelector('.char-counter') || 
+                               (function() {
+                                   const counter = document.createElement('div');
+                                   counter.className = 'form-text char-counter';
+                                   this.parentNode.appendChild(counter);
+                                   return counter;
+                               }).call(this);
+                
+                counter.textContent = `${currentLength}/${maxLength} characters`;
+                
+                if (currentLength > maxLength) {
+                    counter.classList.add('text-danger');
+                } else {
+                    counter.classList.remove('text-danger');
+                }
+            });
+            
+            // Trigger input event to show initial count
+            descriptionTextarea.dispatchEvent(new Event('input'));
         }
 
         // Check photo limit before upload

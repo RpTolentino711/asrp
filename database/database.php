@@ -2481,6 +2481,35 @@ public function getLatestMaintenanceRequests($limit = 5) {
 }
 
 
+// Update photo description
+    public function updatePhotoDescription($history_id, $description) {
+        $sql = "UPDATE photo_history SET description = ? WHERE History_ID = ?";
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$description, $history_id]);
+        } catch (PDOException $e) {
+            error_log("updatePhotoDescription Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+// Get photo with description
+   public function getPhotoWithDescription($history_id) {
+        $sql = "SELECT * FROM photo_history WHERE History_ID = ?";
+        try {
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$history_id]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("getPhotoWithDescription Error: " . $e->getMessage());
+            return null;
+        }
+    }
+
+
+
+
+
 
 public function addPhotoToHistory($space_id, $filename, $action, $previous_filename = null, $admin_id = null) {
     $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
