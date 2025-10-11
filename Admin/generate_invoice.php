@@ -856,11 +856,48 @@ function getTimeRemaining($due_date) {
             margin-top: 0.25rem;
         }
         
-        .chat-image {
+        /* ZOOMABLE CHAT IMAGES */
+        .zoomable-chat-image {
             max-width: 200px;
             max-height: 150px;
             border-radius: 8px;
             margin-top: 0.5rem;
+            cursor: zoom-in;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .zoomable-chat-image:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .zoomable-chat-image.zoomed {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1.5);
+            max-width: 90vw;
+            max-height: 90vh;
+            z-index: 10000;
+            cursor: zoom-out;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        .image-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            display: none;
+            cursor: zoom-out;
+        }
+        
+        .image-overlay.active {
+            display: block;
         }
         
         .chat-form {
@@ -1154,6 +1191,13 @@ function getTimeRemaining($due_date) {
                 flex-direction: column;
                 align-items: stretch;
             }
+
+            /* Mobile image zoom */
+            .zoomable-chat-image.zoomed {
+                transform: translate(-50%, -50%) scale(1.2);
+                max-width: 95vw;
+                max-height: 80vh;
+            }
         }
         
         @media (max-width: 768px) {
@@ -1190,7 +1234,7 @@ function getTimeRemaining($due_date) {
                 text-align: center;
             }
 
-            .chat-image {
+            .zoomable-chat-image {
                 max-width: 150px;
                 max-height: 100px;
             }
@@ -1231,11 +1275,21 @@ function getTimeRemaining($due_date) {
             .chat-message {
                 padding: 0.5rem 0.75rem;
             }
+
+            .zoomable-chat-image {
+                max-width: 120px;
+                max-height: 90px;
+            }
         }
 
         /* Touch-friendly improvements */
         @media (hover: none) and (pointer: coarse) {
             .btn-action, .nav-link, .mobile-menu-btn, .filter-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            .zoomable-chat-image {
                 min-height: 44px;
                 min-width: 44px;
             }
@@ -1497,7 +1551,47 @@ function getTimeRemaining($due_date) {
                     </div>
                 </div>
 
+                <!-- Image Overlay for Zoom -->
+                <div class="image-overlay" id="imageOverlay"></div>
+
 <script>
+// Image zoom functionality
+function initImageZoom() {
+    const overlay = document.getElementById('imageOverlay');
+    
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('zoomable-chat-image')) {
+            const img = e.target;
+            
+            if (img.classList.contains('zoomed')) {
+                // Zoom out
+                img.classList.remove('zoomed');
+                overlay.classList.remove('active');
+            } else {
+                // Zoom in
+                img.classList.add('zoomed');
+                overlay.classList.add('active');
+            }
+        } else if (e.target === overlay) {
+            // Click on overlay - zoom out all images
+            document.querySelectorAll('.zoomable-chat-image.zoomed').forEach(img => {
+                img.classList.remove('zoomed');
+            });
+            overlay.classList.remove('active');
+        }
+    });
+
+    // Close on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.zoomable-chat-image.zoomed').forEach(img => {
+                img.classList.remove('zoomed');
+            });
+            overlay.classList.remove('active');
+        }
+    });
+}
+
 // Live admin chat message loader with client typing bubble
 let clientTyping = false;
 
@@ -1528,7 +1622,7 @@ async function loadAdminChatMessages() {
             html += `<div class='message-sender'>${sender}</div>`;
             html += `<div class='message-text'>${msg.Message.replace(/\n/g, '<br>')}`;
             if (msg.Image_Path) {
-                html += `<img src='../${msg.Image_Path}' class='chat-image mt-2' alt='chat photo'>`;
+                html += `<img src='../${msg.Image_Path}' class='zoomable-chat-image mt-2' alt='chat photo'>`;
             }
             html += `</div>`;
             html += `<div class='message-time'>${msg.Created_At || ''}</div>`;
@@ -1563,12 +1657,18 @@ async function pollClientTyping() {
     }
 }
 
-loadAdminChatMessages();
-pollClientTyping();
-setInterval(() => {
-    pollClientTyping();
+// Initialize everything when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initImageZoom();
     loadAdminChatMessages();
-}, 5000); // Refresh every 5 seconds
+    pollClientTyping();
+    
+    // Refresh messages and typing status every 5 seconds
+    setInterval(() => {
+        pollClientTyping();
+        loadAdminChatMessages();
+    }, 5000);
+});
 </script>
                 
                 <form method="post" enctype="multipart/form-data" class="chat-form mobile-chat-form">
