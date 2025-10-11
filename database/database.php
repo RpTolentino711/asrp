@@ -2460,7 +2460,7 @@ public function getCurrentSpacePhotos($space_id) {
 
 public function getLatestMaintenanceRequests($limit = 5) {
     try {
-        $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto, mr.admin_seen,
+        $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.admin_seen,
                        c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email,
                        s.Name AS UnitName, s.Space_ID
                 FROM maintenancerequest mr
