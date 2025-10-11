@@ -14,9 +14,20 @@ if (isset($_GET['mark_seen']) && $_GET['mark_seen'] == 'true') {
     $db->markMaintenanceRequestsAsSeen();
 }
 
-// Get latest maintenance requests using the Database class method
+// Get latest maintenance requests - REMOVED THE WHERE CLAUSE
 try {
-    $maintenance_requests = $db->getLatestMaintenanceRequests(5);
+    $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto, mr.admin_seen,
+                   c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email,
+                   s.Name AS UnitName, s.Space_ID
+            FROM maintenancerequest mr
+            LEFT JOIN client c ON mr.Client_ID = c.Client_ID
+            LEFT JOIN space s ON mr.Space_ID = s.Space_ID
+            ORDER BY mr.admin_seen ASC, mr.RequestDate DESC
+            LIMIT 5";
+    
+    $stmt = $db->pdo->prepare($sql);
+    $stmt->execute();
+    $maintenance_requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
 } catch (Exception $e) {
     $maintenance_requests = [];
