@@ -78,7 +78,16 @@ public function executeStatement($sql, $params = []) {
 
 
     
-
+public function executeQuery($sql, $params = []) {
+    try {
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Database query error: " . $e->getMessage());
+        return [];
+    }
+}
 
 
 
