@@ -47,7 +47,7 @@ $testimonials = $db->getHomepageTestimonials(20);
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ASRT Commercial Spaces - Premium Business Solutions Click to see Details</title>
+  <title>ASRT Commercial Spaces - Premium Business Solutions</title>
   
   <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
@@ -775,7 +775,7 @@ if (isset($_SESSION['login_error'])) {
                   <div class="card-body">
                     <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
                     <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
-                    <p class="card-text text-muted">Premium commercial space in a strategic location.</p>
+                    <p class="card-text text-muted">Premium commercial space in a strategic location Click to see details.</p>
                     <div class="d-flex justify-content-between align-items-center mb-3">
                       <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
                       <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
