@@ -1725,7 +1725,7 @@ function formatDateToMonthLetters($date) {
     <script>
         Swal.fire({
             icon: 'success',
-            title: 'Welcome Back!',
+            title: 'Welcome!',
             text: 'Login successful. Good to see you again!',
             confirmButtonColor: '#2563eb',
             timer: 3000,
