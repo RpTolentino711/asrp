@@ -1419,25 +1419,29 @@ public function getTotalMaintenanceRequests($startDate, $endDate) {
 
     
 
-    public function getLatestPendingRequests($limit = 5) {
-        $sql = "SELECT rr.Request_ID, c.Client_fn, c.Client_ln, s.Name AS UnitName, 
-                       rr.StartDate, rr.EndDate, rr.Status, rr.Requested_At
-                FROM rentalrequest rr
-                LEFT JOIN client c ON rr.Client_ID = c.Client_ID
-                LEFT JOIN space s ON rr.Space_ID = s.Space_ID
-                WHERE rr.Status = 'Pending'
-                ORDER BY rr.Requested_At DESC
-                LIMIT :limit";
+public function getLatestPendingRequests($limit = 5) {
+    $sql = "SELECT rr.Request_ID, rr.Requested_At, rr.Status, rr.admin_seen, rr.Flow_Status,
+                   c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone,
+                   s.Space_ID, s.Name AS UnitName, s.Price,
+                   rr.StartDate, rr.EndDate
+            FROM rentalrequest rr
+            LEFT JOIN client c ON rr.Client_ID = c.Client_ID
+            LEFT JOIN space s ON rr.Space_ID = s.Space_ID
+            WHERE rr.Status = 'Pending' 
+            AND rr.Flow_Status = 'new'
+            ORDER BY rr.Requested_At DESC
+            LIMIT :limit";
 
-        try {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
-            return $stmt->fetchAll();
-        } catch (PDOException $e) {
-            return [];
-        }
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error getting latest pending requests: " . $e->getMessage());
+        return [];
     }
+}
 
   
 
