@@ -1137,7 +1137,7 @@ if (isset($_SESSION['login_error'])) {
 </section>
 
   <!-- Handyman Services Section -->
-  <section id="services" class="handyman-section">
+ <section id="services" class="handyman-section">
     <div class="container">
       <div class="section-title animate-on-scroll">
         <h2>Professional Services</h2>
@@ -1146,27 +1146,52 @@ if (isset($_SESSION['login_error'])) {
 
       <div class="row g-4 justify-content-center">
         <?php
-        $icon_map = [
+        // Fallback icons for when database icons don't exist
+        $fallback_icons = [
           "CARPENTRY" => "IMG/show/CARPENTRY.png",
           "ELECTRICAL" => "IMG/show/ELECTRICAL.png",
           "PLUMBING" => "IMG/show/PLUMBING.png",
           "PAINTING" => "IMG/show/PAINTING.png",
           "APPLIANCE REPAIR" => "IMG/show/APPLIANCE.png",
+          "PIPELINE" => "IMG/show/PLUMBING.png"
         ];
 
         if (!empty($job_types_display)) {
           foreach ($job_types_display as $row) {
+            // Use the actual icon from database with automatic fallback
+            $icon_filename = $row['Icon'] ?? 'default-icon.png';
+            $img_src = "uploads/jobtype_icons/" . $icon_filename;
+            
+            // Fallback system with auto-check
             $name_upper = strtoupper($row['JobType_Name']);
-            $img_src = $icon_map[$name_upper] ?? "IMG/show/wifi.png";
+            
+            // If the uploaded file doesn't exist, use fallback
+            if (!file_exists($img_src)) {
+                $img_src = isset($fallback_icons[$name_upper]) ? $fallback_icons[$name_upper] : "IMG/show/wifi.png";
+            }
+            
+            // Get handyman count for this job type
+            $handyman_count = $handyman_counts[$row['JobType_ID']] ?? 0;
         ?>
         <div class="col-lg-2 col-md-4 col-sm-6 animate-on-scroll">
           <form method="get" action="handyman_type.php">
             <input type="hidden" name="jobtype_id" value="<?= htmlspecialchars($row['JobType_ID']) ?>">
             <button type="submit" class="handyman-card w-100 border-0" 
                     <?= ($is_logged_in && $client_is_inactive) ? 'disabled style="opacity:0.6; cursor:not-allowed;"' : '' ?>>
-              <img src="<?= $img_src ?>" alt="<?= htmlspecialchars($row['JobType_Name']) ?>" class="handyman-icon">
+              <img src="<?= $img_src ?>" alt="<?= htmlspecialchars($row['JobType_Name']) ?>" class="handyman-icon" 
+                   onerror="this.src='IMG/show/wifi.png'">
               <h5 class="fw-bold"><?= htmlspecialchars($row['JobType_Name']) ?></h5>
-              <p class="text-muted small">Professional service available</p>
+              <p class="text-muted small">
+                <?php if ($handyman_count > 0): ?>
+                  <span class="text-success">
+                    <i class="bi bi-person-check me-1"></i><?= $handyman_count ?> professional<?= $handyman_count > 1 ? 's' : '' ?> available
+                  </span>
+                <?php else: ?>
+                  <span class="text-warning">
+                    <i class="bi bi-clock me-1"></i>Check availability
+                  </span>
+                <?php endif; ?>
+              </p>
             </button>
           </form>
         </div>
@@ -1185,7 +1210,6 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
-
   <!-- Testimonials Section -->
   <section id="testimonials" class="testimonials-section">
     <div class="container">
