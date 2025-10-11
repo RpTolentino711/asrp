@@ -733,6 +733,17 @@ function timeAgo($datetime) {
             75% { transform: rotate(15deg); }
         }
 
+        .tools-shake {
+            animation: toolsShake 0.5s ease-in-out;
+        }
+
+        @keyframes toolsShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-10deg) scale(1.1); }
+            50% { transform: rotate(10deg) scale(1.1); }
+            75% { transform: rotate(-5deg) scale(1.05); }
+        }
+
         .new-request-flash {
             animation: highlight 3s ease-in-out;
         }
@@ -740,6 +751,16 @@ function timeAgo($datetime) {
         @keyframes highlight {
             0% { background-color: rgba(34, 197, 94, 0.1); }
             50% { background-color: rgba(34, 197, 94, 0.3); }
+            100% { background-color: transparent; }
+        }
+
+        .maintenance-highlight {
+            animation: maintenancePulse 3s ease-in-out;
+        }
+
+        @keyframes maintenancePulse {
+            0% { background-color: rgba(245, 158, 11, 0.1); }
+            50% { background-color: rgba(245, 158, 11, 0.3); }
             100% { background-color: transparent; }
         }
         
@@ -1019,7 +1040,7 @@ function timeAgo($datetime) {
                     <i class="fas fa-tools"></i>
                     <span>Maintenance</span>
                     <?php if ($pending_maintenance > 0): ?>
-                        <span class="badge badge-notification bg-warning"><?= $pending_maintenance ?></span>
+                        <span class="badge badge-notification bg-warning" id="sidebarMaintenanceBadge"><?= $pending_maintenance ?></span>
                     <?php endif; ?>
                 </a>
             </div>
@@ -1253,6 +1274,7 @@ function timeAgo($datetime) {
             </div>
         </div>
         
+        <!-- Requests Section -->
         <div class="row">
             <!-- Rental Requests Card -->
             <div class="col-lg-6">
@@ -1274,9 +1296,29 @@ function timeAgo($datetime) {
                 </div>
             </div>
             
-            <!-- Message Board Card -->
+            <!-- Maintenance Requests Card -->
             <div class="col-lg-6">
                 <div class="dashboard-card h-100 animate-fade-in">
+                    <div class="card-header">
+                        <i class="fas fa-tools"></i>
+                        <span>Latest Maintenance Requests</span>
+                        <span class="badge bg-warning ms-2" id="latestMaintenanceBadge"><?= $pending_maintenance ?></span>
+                    </div>
+                    <div class="card-body p-0" id="latestMaintenanceContainer">
+                        <!-- Maintenance requests will be loaded here via AJAX -->
+                        <div class="text-center p-4 text-muted">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Loading maintenance requests...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Messages Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="dashboard-card animate-fade-in">
                     <div class="card-header">
                         <i class="fas fa-comments"></i>
                         <span>Message Requests</span>
@@ -1336,6 +1378,8 @@ function timeAgo($datetime) {
 
     // --- LIVE ADMIN: Real-time Notification System ---
     let lastPendingCount = <?= $pending ?>;
+    let lastMaintenanceCount = <?= $pending_maintenance ?>;
+    let lastNewMaintenanceCount = 0;
     let isFirstLoad = true;
     let isTabActive = true;
     let notificationCooldown = false;
@@ -1347,6 +1391,7 @@ function timeAgo($datetime) {
             // Refresh immediately when tab becomes active
             fetchDashboardCounts();
             fetchLatestRequests();
+            fetchLatestMaintenance();
         }
     });
 
@@ -1408,6 +1453,63 @@ function timeAgo($datetime) {
         }, 10000);
     }
 
+    function showNewMaintenanceNotification(newRequestsCount) {
+        if (notificationCooldown) return;
+        
+        notificationCooldown = true;
+        
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-warning alert-dismissible fade show';
+        notification.style.cssText = `
+            position: fixed; 
+            top: 80px; 
+            right: 20px; 
+            z-index: 9999; 
+            min-width: 320px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-left: 4px solid #f59e0b;
+        `;
+        notification.innerHTML = `
+            <div class="d-flex align-items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-tools text-warning fs-4 me-3 tools-shake"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading mb-1">🔧 New Maintenance Request!</h6>
+                    <p class="mb-2">You have <strong>${newRequestsCount}</strong> new maintenance request${newRequestsCount > 1 ? 's' : ''} to review.</p>
+                    <div class="d-flex gap-2 mt-2">
+                        <a href="manage_maintenance.php" class="btn btn-sm btn-warning text-white">
+                            <i class="fas fa-tools me-1"></i>View Maintenance
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 8 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, 8000);
+        
+        // Reset cooldown after 10 seconds
+        setTimeout(() => {
+            notificationCooldown = false;
+        }, 10000);
+    }
+
     function updateBadgeAnimation(badgeElement, newCount, oldCount) {
         if (newCount > oldCount && !isFirstLoad) {
             badgeElement.classList.add('notification-badge');
@@ -1428,6 +1530,7 @@ function timeAgo($datetime) {
                     const currentMaintenance = data.pending_maintenance ?? 0;
                     const currentUnpaid = data.unpaid_invoices ?? 0;
                     const currentOverdue = data.overdue_invoices ?? 0;
+                    const currentNewMaintenance = data.new_maintenance_requests ?? 0;
 
                     // Update counts on dashboard
                     document.getElementById('pendingRentalsCount').textContent = currentPending;
@@ -1439,12 +1542,19 @@ function timeAgo($datetime) {
                     if (!isFirstLoad && currentPending > lastPendingCount) {
                         const newRequests = currentPending - lastPendingCount;
                         showNewRequestNotification(newRequests);
-                        
-                        // Update sidebar badge with animation
                         updateSidebarBadge(currentPending);
                     }
                     
+                    // Check for new maintenance requests
+                    if (!isFirstLoad && currentNewMaintenance > lastNewMaintenanceCount) {
+                        const newMaintenance = currentNewMaintenance - lastNewMaintenanceCount;
+                        showNewMaintenanceNotification(newMaintenance);
+                        updateMaintenanceSidebarBadge(currentMaintenance);
+                    }
+                    
                     lastPendingCount = currentPending;
+                    lastMaintenanceCount = currentMaintenance;
+                    lastNewMaintenanceCount = currentNewMaintenance;
                     isFirstLoad = false;
                 }
             })
@@ -1466,6 +1576,25 @@ function timeAgo($datetime) {
                 newBadge.className = 'badge badge-notification bg-danger notification-badge';
                 newBadge.textContent = currentCount;
                 rentalLink.appendChild(newBadge);
+            }
+        }
+    }
+
+    function updateMaintenanceSidebarBadge(currentCount) {
+        const sidebarBadge = document.getElementById('sidebarMaintenanceBadge');
+        if (sidebarBadge) {
+            const oldCount = parseInt(sidebarBadge.textContent);
+            sidebarBadge.textContent = currentCount;
+            updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+        } else {
+            // Create badge if it doesn't exist
+            const maintenanceLink = document.querySelector('a[href="manage_maintenance.php"]');
+            if (maintenanceLink) {
+                const newBadge = document.createElement('span');
+                newBadge.id = 'sidebarMaintenanceBadge';
+                newBadge.className = 'badge badge-notification bg-warning notification-badge';
+                newBadge.textContent = currentCount;
+                maintenanceLink.appendChild(newBadge);
             }
         }
     }
@@ -1495,6 +1624,34 @@ function timeAgo($datetime) {
                 console.error('Error fetching latest requests:', err);
                 document.getElementById('latestRequestsContainer').innerHTML = 
                     '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
+            });
+    }
+
+    function fetchLatestMaintenance() {
+        if (!isTabActive) return;
+        
+        fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php')
+            .then(res => res.text())
+            .then(html => {
+                const container = document.getElementById('latestMaintenanceContainer');
+                container.innerHTML = html;
+                
+                // Update the badge count
+                const countElement = container.querySelector('[data-count]');
+                if (countElement) {
+                    const currentCount = parseInt(countElement.getAttribute('data-count'));
+                    const badge = document.getElementById('latestMaintenanceBadge');
+                    if (badge) {
+                        const oldCount = parseInt(badge.textContent);
+                        badge.textContent = currentCount;
+                        updateBadgeAnimation(badge, currentCount, oldCount);
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching maintenance requests:', err);
+                document.getElementById('latestMaintenanceContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading maintenance requests</p></div>';
             });
     }
 
@@ -1593,6 +1750,7 @@ function timeAgo($datetime) {
     document.addEventListener('DOMContentLoaded', () => {
         fetchDashboardCounts();
         fetchLatestRequests();
+        fetchLatestMaintenance();
         fetchMessages();
         
         // Set up filter buttons
@@ -1622,6 +1780,7 @@ function timeAgo($datetime) {
         if (isTabActive) {
             fetchDashboardCounts();
             fetchLatestRequests();
+            fetchLatestMaintenance();
             fetchMessages();
         }
     }, 10000); // 10 seconds
@@ -1754,8 +1913,7 @@ function timeAgo($datetime) {
 
     // Tooltip functionality for status breakdowns
     document.addEventListener('DOMContentLoaded', function() {
-        // Tooltips are handled by CSS hover effects with data-tooltip attributes
-        console.log('Dashboard loaded with live notifications');
+        console.log('Dashboard loaded with live rental & maintenance notifications');
     });
     </script>
 </body>

@@ -1963,60 +1963,121 @@ public function getAllUnitsWithRenterStatus() {
 }
 
 
-// Add this method to your Database class for chart data (daily breakdown for the month)
-// Add these methods to your Database class
-
-// Add or update this method in your Database class
-
-// Add or update this method in your Database class
 
 public function getAdminMonthChartData($startDate, $endDate) {
-    $days = [];
-    $new_rentals = [];
-    $new_maintenance = [];
-    $new_messages = [];
+    try {
+        // Create date array for the entire period
+        $days = [];
+        $period = new DatePeriod(
+            new DateTime($startDate),
+            new DateInterval('P1D'),
+            (new DateTime($endDate))->modify('+1 day')
+        );
 
-    $period = new DatePeriod(
-        new DateTime($startDate),
-        new DateInterval('P1D'),
-        (new DateTime($endDate))->modify('+1 day')
-    );
-
-    foreach ($period as $dt) {
-        $days[] = $dt->format('Y-m-d');
-        $new_rentals[] = 0;
-        $new_maintenance[] = 0;
-        $new_messages[] = 0;
-    }
-
-    $fetchCounts = function($table, $dateCol) use ($startDate, $endDate) {
-        $sql = "SELECT DATE($dateCol) as day, COUNT(*) as cnt FROM $table WHERE DATE($dateCol) BETWEEN ? AND ? GROUP BY day";
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$startDate, $endDate]);
-        $res = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $res[$row['day']] = (int)$row['cnt'];
+        foreach ($period as $dt) {
+            $days[] = $dt->format('Y-m-d');
         }
-        return $res;
-    };
 
-    $rentalCounts = $fetchCounts('rentalrequest', 'Requested_At');
-    $mntCounts    = $fetchCounts('maintenancerequest', 'RequestDate');
-    $msgCounts    = $fetchCounts('free_message', 'Sent_At');
+        // Single query to get all data (more efficient)
+        $sql = " SELECT 
+                dates.day,
+                COALESCE(rentals.cnt, 0) as rental_count,
+                COALESCE(maintenance.cnt, 0) as maintenance_count,
+                COALESCE(messages.cnt, 0) as message_count
+            FROM (
+                SELECT DATE(?) + INTERVAL (a.a + (10 * b.a)) DAY as day
+                FROM (
+                    SELECT 0 as a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 
+                    UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 
+                    UNION ALL SELECT 8 UNION ALL SELECT 9
+                ) as a
+                CROSS JOIN (
+                    SELECT 0 as a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 
+                    UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 
+                    UNION ALL SELECT 8 UNION ALL SELECT 9
+                ) as b
+            ) dates
+            LEFT JOIN (
+                SELECT DATE(Requested_At) as day, COUNT(*) as cnt 
+                FROM rentalrequest 
+                WHERE DATE(Requested_At) BETWEEN ? AND ? 
+                AND Flow_Status = 'new'
+                GROUP BY DATE(Requested_At)
+            ) rentals ON dates.day = rentals.day
+            LEFT JOIN (
+                SELECT DATE(RequestDate) as day, COUNT(*) as cnt 
+                FROM maintenancerequest 
+                WHERE DATE(RequestDate) BETWEEN ? AND ? 
+                AND Status = 'Submitted'
+                GROUP BY DATE(RequestDate)
+            ) maintenance ON dates.day = maintenance.day
+            LEFT JOIN (
+                SELECT DATE(Sent_At) as day, COUNT(*) as cnt 
+                FROM free_message 
+                WHERE DATE(Sent_At) BETWEEN ? AND ? 
+                AND is_deleted = 0
+                GROUP BY DATE(Sent_At)
+            ) messages ON dates.day = messages.day
+            WHERE dates.day BETWEEN ? AND ?
+            ORDER BY dates.day
+        ";
 
-    foreach ($days as $i => $day) {
-        $new_rentals[$i]      = $rentalCounts[$day] ?? 0;
-        $new_maintenance[$i]  = $mntCounts[$day] ?? 0;
-        $new_messages[$i]     = $msgCounts[$day] ?? 0;
+        $stmt = $this->pdo->prepare($sql);
+        $params = array_merge(
+            [$startDate], 
+            array_fill(0, 6, $startDate), 
+            array_fill(0, 6, $endDate),
+            [$startDate, $endDate]
+        );
+        $stmt->execute($params);
+
+        $new_rentals = [];
+        $new_maintenance = [];
+        $new_messages = [];
+        $labels = [];
+
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $labels[] = date('M j', strtotime($row['day']));
+            $new_rentals[] = (int)$row['rental_count'];
+            $new_maintenance[] = (int)$row['maintenance_count'];
+            $new_messages[] = (int)$row['message_count'];
+        }
+
+        return [
+            'labels' => $labels,
+            'new_rentals' => $new_rentals,
+            'new_maintenance' => $new_maintenance,
+            'new_messages' => $new_messages
+        ];
+
+    } catch (Exception $e) {
+        error_log("Error in getAdminMonthChartData: " . $e->getMessage());
+        
+        // Fallback: return empty data for the period
+        $days = [];
+        $period = new DatePeriod(
+            new DateTime($startDate),
+            new DateInterval('P1D'),
+            (new DateTime($endDate))->modify('+1 day')
+        );
+
+        foreach ($period as $dt) {
+            $days[] = $dt->format('Y-m-d');
+        }
+
+        return [
+            'labels' => array_map(function($d){ return date('M j', strtotime($d)); }, $days),
+            'new_rentals' => array_fill(0, count($days), 0),
+            'new_maintenance' => array_fill(0, count($days), 0),
+            'new_messages' => array_fill(0, count($days), 0)
+        ];
     }
-
-    return [
-        'labels'         => array_map(function($d){return date('M j', strtotime($d));}, $days),
-        'new_rentals'    => $new_rentals,
-        'new_maintenance'=> $new_maintenance,
-        'new_messages'   => $new_messages
-    ];
 }
+
+
+
+
+
  public function renameUnit($space_id, $new_name) {
         $sql = "UPDATE space SET Name = ? WHERE Space_ID = ?";
         return $this->executeStatement($sql, [$new_name, $space_id]);
@@ -2027,23 +2088,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
         $sql = "SELECT * FROM invoice WHERE Client_ID = ? AND Space_ID = ? AND Flow_Status = 'new' ORDER BY EndDate DESC LIMIT 1";
         return $this->runQuery($sql, [$client_id, $space_id]);
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     
 // NEW METHOD: Update invoice due date
@@ -2276,6 +2320,28 @@ public function getCurrentSpacePhotos($space_id) {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         error_log("getCurrentSpacePhotos Error: " . $e->getMessage());
+        return [];
+    }
+}
+
+public function getLatestMaintenanceRequests($limit = 5) {
+    try {
+        $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto,
+                       c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email,
+                       s.Name AS UnitName, s.Space_ID
+                FROM maintenancerequest mr
+                LEFT JOIN client c ON mr.Client_ID = c.Client_ID
+                LEFT JOIN space s ON mr.Space_ID = s.Space_ID
+                WHERE mr.Status IN ('Submitted', 'In Progress')
+                ORDER BY mr.RequestDate DESC
+                LIMIT ?";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting latest maintenance requests: " . $e->getMessage());
         return [];
     }
 }
