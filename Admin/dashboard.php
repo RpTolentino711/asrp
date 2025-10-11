@@ -302,6 +302,37 @@ function timeAgo($datetime) {
             font-weight: 600;
             font-size: 0.9rem;
         }
+
+        <!-- Export Report Card -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-file-export"></i>
+                <span>Export Monthly Report</span>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <p class="mb-3">Generate detailed monthly reports in Excel or PDF format for <?= $monthName ?></p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="export_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
+                               class="btn btn-success">
+                                <i class="fas fa-file-excel me-2"></i>Export Excel
+                            </a>
+                            <a href="export_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=pdf" 
+                               class="btn btn-danger">
+                                <i class="fas fa-file-pdf me-2"></i>Export PDF
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="text-muted small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Includes: Financial, Rental, Maintenance & Occupancy data
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         /* Stats Grid */
         .stats-grid {
@@ -1148,6 +1179,37 @@ function timeAgo($datetime) {
                 </div>
             </div>
         </div>
+
+        <!-- Export Report Card -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-file-export"></i>
+                <span>Export Monthly Report</span>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <p class="mb-3">Generate detailed monthly reports in Excel or PDF format for <?= $monthName ?></p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="export_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
+                               class="btn btn-success">
+                                <i class="fas fa-file-excel me-2"></i>Export Excel
+                            </a>
+                            <a href="export_report.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=pdf" 
+                               class="btn btn-danger">
+                                <i class="fas fa-file-pdf me-2"></i>Export PDF
+                            </a>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="text-muted small">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Includes: Financial, Rental, Maintenance & Occupancy data
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <!-- Monthly Earnings Summary -->
         <div class="monthly-summary animate-fade-in">
@@ -1605,65 +1667,76 @@ function timeAgo($datetime) {
         }
     }
 
-function fetchLatestRequests() {
-    if (!isTabActive) return;
-    
-    // Mark requests as seen when loading
-    fetch('../AJAX/ajax_admin_dashboard_latest_requests.php?mark_seen=true')
-        .then(res => res.text())
-        .then(html => {
-            const container = document.getElementById('latestRequestsContainer');
-            container.innerHTML = html;
-            
-            // Update the badge count
-            const containerDiv = container.querySelector('[data-count]');
-            if (containerDiv) {
-                const currentCount = parseInt(containerDiv.getAttribute('data-count'));
-                const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
-                const badge = document.getElementById('latestRequestsBadge');
-                if (badge) {
-                    const oldCount = parseInt(badge.textContent);
-                    badge.textContent = currentCount;
-                    updateBadgeAnimation(badge, currentCount, oldCount);
+    // FIXED: Maintenance requests function
+    function fetchLatestMaintenance() {
+        if (!isTabActive) return;
+        
+        fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php?mark_seen=true')
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
                 }
-            }
-        })
-        .catch(err => {
-            console.error('Error fetching latest requests:', err);
-            document.getElementById('latestRequestsContainer').innerHTML = 
-                '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
-        });
-}
+                return res.text();
+            })
+            .then(html => {
+                const container = document.getElementById('latestMaintenanceContainer');
+                if (container) {
+                    container.innerHTML = html;
+                    
+                    // Update the badge count
+                    const containerDiv = container.querySelector('[data-count]');
+                    if (containerDiv) {
+                        const currentCount = parseInt(containerDiv.getAttribute('data-count'));
+                        const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
+                        const badge = document.getElementById('latestMaintenanceBadge');
+                        if (badge) {
+                            const oldCount = parseInt(badge.textContent);
+                            badge.textContent = currentCount;
+                            updateBadgeAnimation(badge, currentCount, oldCount);
+                        }
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching maintenance requests:', err);
+                document.getElementById('latestMaintenanceContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted">' +
+                    '<i class="fas fa-exclamation-triangle text-warning mb-2"></i>' +
+                    '<p>Error loading maintenance requests</p>' +
+                    '<small class="text-muted">Please try refreshing the page</small>' +
+                    '</div>';
+            });
+    }
 
-function fetchLatestMaintenance() {
-    if (!isTabActive) return;
-    
-    // Mark maintenance requests as seen when loading
-    fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php?mark_seen=true')
-        .then(res => res.text())
-        .then(html => {
-            const container = document.getElementById('latestMaintenanceContainer');
-            container.innerHTML = html;
-            
-            // Update the badge count
-            const containerDiv = container.querySelector('[data-count]');
-            if (containerDiv) {
-                const currentCount = parseInt(containerDiv.getAttribute('data-count'));
-                const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
-                const badge = document.getElementById('latestMaintenanceBadge');
-                if (badge) {
-                    const oldCount = parseInt(badge.textContent);
-                    badge.textContent = currentCount;
-                    updateBadgeAnimation(badge, currentCount, oldCount);
+    function fetchLatestRequests() {
+        if (!isTabActive) return;
+        
+        // Mark requests as seen when loading
+        fetch('../AJAX/ajax_admin_dashboard_latest_requests.php?mark_seen=true')
+            .then(res => res.text())
+            .then(html => {
+                const container = document.getElementById('latestRequestsContainer');
+                container.innerHTML = html;
+                
+                // Update the badge count
+                const containerDiv = container.querySelector('[data-count]');
+                if (containerDiv) {
+                    const currentCount = parseInt(containerDiv.getAttribute('data-count'));
+                    const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
+                    const badge = document.getElementById('latestRequestsBadge');
+                    if (badge) {
+                        const oldCount = parseInt(badge.textContent);
+                        badge.textContent = currentCount;
+                        updateBadgeAnimation(badge, currentCount, oldCount);
+                    }
                 }
-            }
-        })
-        .catch(err => {
-            console.error('Error fetching maintenance requests:', err);
-            document.getElementById('latestMaintenanceContainer').innerHTML = 
-                '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading maintenance requests</p></div>';
-        });
-}
+            })
+            .catch(err => {
+                console.error('Error fetching latest requests:', err);
+                document.getElementById('latestRequestsContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
+            });
+    }
 
     let messageFilter = 'recent';
     function fetchMessages() {
