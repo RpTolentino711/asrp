@@ -72,7 +72,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Handle photo upload with history tracking ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'upload_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
-    $description = trim($_POST['photo_description'] ?? '');
     
     if ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         // Get current active photos to check limit
@@ -109,7 +108,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
                     // Log the upload in history
-                    if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id, $description)) {
+                    if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id)) {
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
                                         Photo uploaded successfully! (Added to history)
@@ -138,7 +137,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $old_photo_path = trim($_POST['old_photo_path'] ?? '');
-    $description = trim($_POST['photo_description'] ?? '');
     
     if ($space_id && !empty($old_photo_path) && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
         $allowed_types = ['image/jpeg', 'image/png', 'image/gif'];
@@ -167,7 +165,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 $db->deactivatePhoto($space_id, $old_photo_path);
                 
                 // Add new photo as update
-                if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id, $description)) {
+                if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id)) {
                     $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                     <i class="fas fa-check-circle me-2"></i>
                                     Photo updated successfully! (Old photo marked inactive, new photo added)
@@ -1588,11 +1586,11 @@ foreach ($photo_history as $history) {
                                                             <div class="photo-item">
                                                                 <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" class="photo-preview" alt="Space Photo">
                                                                 <div class="photo-actions">
-                                                                    <!-- Update Photo Form -->
+                                                                    <!-- Update Photo Form - CLEANED UP (no description field) -->
                                                                     <form method="post" enctype="multipart/form-data">
                                                                         <div class="file-input-container">
                                                                             <div class="file-input-label btn-action btn-update">
-                                                                                <i class="fas fa-sync-alt"></i> Update
+                                                                                <i class="fas fa-sync-alt"></i> Update Photo
                                                                             </div>
                                                                             <input type="file" name="new_photo" accept="image/*" required onchange="showFileName(this, 'update<?= $space['Space_ID'].$photo['History_ID'] ?>')">
                                                                             <input type="hidden" name="form_type" value="update_photo">
@@ -1600,16 +1598,6 @@ foreach ($photo_history as $history) {
                                                                             <input type="hidden" name="old_photo_path" value="<?= htmlspecialchars($photo['Photo_Path']) ?>">
                                                                         </div>
                                                                         <span class="filename-display" id="update<?= $space['Space_ID'].$photo['History_ID'] ?>"></span>
-                                                                        
-                                                                        <!-- Description Field for Update -->
-                                                                        <div class="mb-2 mt-2">
-                                                                            <label class="form-label small fw-semibold">Photo Description (Optional):</label>
-                                                                            <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
-                                                                                      placeholder="Describe this photo (e.g., 'Living room view', 'Kitchen area', etc.)" 
-                                                                                      maxlength="255"><?= htmlspecialchars($photo['description'] ?? '') ?></textarea>
-                                                                            <small class="text-muted">Max 255 characters</small>
-                                                                        </div>
-                                                                        
                                                                         <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Update Photo</button>
                                                                     </form>
                                                                     
@@ -1658,7 +1646,7 @@ foreach ($photo_history as $history) {
                                                     </div>
                                                 <?php endif; ?>
 
-                                                <!-- Add New Photo Section -->
+                                                <!-- Add New Photo Section - CLEANED UP (no description field) -->
                                                 <?php if ($can_add_more): ?>
                                                     <div class="add-photo-section">
                                                         <div class="text-success mb-2">
@@ -1675,16 +1663,6 @@ foreach ($photo_history as $history) {
                                                                 <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
                                                             </div>
                                                             <span class="filename-display" id="add<?= $space['Space_ID'] ?>"></span>
-                                                            
-                                                            <!-- Description Field for New Upload -->
-                                                            <div class="mb-2 mt-2">
-                                                                <label class="form-label small fw-semibold">Photo Description (Optional):</label>
-                                                                <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
-                                                                          placeholder="Describe this photo (e.g., 'Living room view', 'Kitchen area', etc.)" 
-                                                                          maxlength="255"></textarea>
-                                                                <small class="text-muted">Max 255 characters</small>
-                                                            </div>
-                                                            
                                                             <button type="submit" class="btn btn-success btn-sm mt-2">
                                                                 <i class="fas fa-upload me-1"></i> Upload Photo
                                                             </button>
@@ -1759,7 +1737,7 @@ foreach ($photo_history as $history) {
                                         <div class="mobile-photo-item">
                                             <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" alt="Space Photo">
                                             <div class="mobile-photo-actions">
-                                                <!-- Update Photo Form -->
+                                                <!-- Update Photo Form - CLEANED UP (no description field) -->
                                                 <form method="post" enctype="multipart/form-data">
                                                     <div class="file-input-container w-100">
                                                         <div class="file-input-label btn-action btn-update w-100">
@@ -1771,16 +1749,6 @@ foreach ($photo_history as $history) {
                                                         <input type="hidden" name="old_photo_path" value="<?= htmlspecialchars($photo['Photo_Path']) ?>">
                                                     </div>
                                                     <div class="filename-display" id="mobile-update<?= $space['Space_ID'].$photo['History_ID'] ?>"></div>
-                                                    
-                                                    <!-- Description Field for Update (Mobile) -->
-                                                    <div class="mb-2 mt-2">
-                                                        <label class="form-label small fw-semibold">Description:</label>
-                                                        <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
-                                                                  placeholder="Describe this photo..." 
-                                                                  maxlength="255"><?= htmlspecialchars($photo['description'] ?? '') ?></textarea>
-                                                        <small class="text-muted">Max 255 chars</small>
-                                                    </div>
-                                                    
                                                     <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Update Photo</button>
                                                 </form>
                                                 
@@ -1824,7 +1792,7 @@ foreach ($photo_history as $history) {
                                         </div>
                                     <?php endforeach; ?>
 
-                                    <!-- Add New Photo Mobile -->
+                                    <!-- Add New Photo Mobile - CLEANED UP (no description field) -->
                                     <?php if ($can_add_more): ?>
                                         <div class="mobile-photo-item" style="background: transparent; border: 2px dashed #d1d5db;">
                                             <div class="text-success mb-2">
@@ -1841,16 +1809,6 @@ foreach ($photo_history as $history) {
                                                     <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
                                                 </div>
                                                 <div class="filename-display" id="mobile-add<?= $space['Space_ID'] ?>"></div>
-                                                
-                                                <!-- Description Field for New Upload (Mobile) -->
-                                                <div class="mb-2 mt-2">
-                                                    <label class="form-label small fw-semibold">Description:</label>
-                                                    <textarea name="photo_description" class="form-control form-control-sm" rows="2" 
-                                                              placeholder="Describe this photo..." 
-                                                              maxlength="255"></textarea>
-                                                    <small class="text-muted">Max 255 chars</small>
-                                                </div>
-                                                
                                                 <button type="submit" class="btn btn-success btn-sm w-100 mt-1" style="font-size: 0.7rem;">
                                                     <i class="fas fa-upload"></i> Upload
                                                 </button>
