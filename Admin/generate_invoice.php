@@ -489,7 +489,6 @@ if (isset($_POST['mark_paid_advance']) && isset($_POST['invoice_id']) && isset($
     // 3. Create multiple invoices for advance payment
     $last_invoice_id = $invoice_id;
     $current_due_date = $invoice['EndDate'] ?: date('Y-m-d');
-    $next_due_date = '';
     
     for ($i = 1; $i <= $advance_months; $i++) {
         // Calculate next due date (1 month from current due date)

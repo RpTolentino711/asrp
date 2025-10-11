@@ -768,10 +768,14 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
     );
     if (!$last_invoice) return false;
 
-    // Compute new period (add 1 month to last invoice's EndDate)
+    // Compute new period - CORRECTED based on your requirements
     $last_end = $last_invoice['EndDate'];
-    $start_date = date('Y-m-d', strtotime("$last_end +1 day"));
-    $end_date = date('Y-m-d', strtotime("$start_date +1 month -1 day"));
+    
+    // FIX: Start date (Issue Date) = Old Due Date
+    $start_date = $last_end;
+    
+    // FIX: End date (Due Date) = Old Due Date + 1 month
+    $end_date = date('Y-m-d', strtotime("$last_end +1 month"));
 
     $this->pdo->beginTransaction();
     try {
@@ -814,6 +818,7 @@ public function createNextRecurringInvoiceWithChat($invoice_id) {
         return false;
     }
 }
+
     public function getClientMaintenanceHistory($client_id) {
         $sql = "SELECT mr.Request_ID, mr.Space_ID, s.Name AS SpaceName, mr.RequestDate, mr.Status,
                        (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory WHERE Request_ID = mr.Request_ID) AS LastStatusDate,
