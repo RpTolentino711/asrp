@@ -9,6 +9,11 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 $db = new Database();
 
+// MARK MAINTENANCE REQUESTS AS SEEN WHEN LOADED
+if (isset($_GET['mark_seen']) && $_GET['mark_seen'] == 'true') {
+    $db->markMaintenanceRequestsAsSeen();
+}
+
 // Get latest maintenance requests
 try {
     $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto, mr.admin_seen,
@@ -18,7 +23,7 @@ try {
             LEFT JOIN client c ON mr.Client_ID = c.Client_ID
             LEFT JOIN space s ON mr.Space_ID = s.Space_ID
             WHERE mr.Status IN ('Submitted', 'In Progress')
-            ORDER BY mr.RequestDate DESC
+            ORDER BY mr.admin_seen ASC, mr.RequestDate DESC
             LIMIT 5";
     
     $stmt = $db->pdo->prepare($sql);
@@ -63,10 +68,7 @@ if (!empty($maintenance_requests)) {
         // Determine badge color based on status
         $badgeClass = $status === 'Submitted' ? 'bg-warning text-white' : 'bg-info text-white';
         
-        // Add highlight class for new requests
-        $rowClass = $isNew ? 'new-request-flash' : '';
-        
-        echo '<tr class="' . $rowClass . '">';
+        echo '<tr class="' . ($isNew ? 'maintenance-highlight' : '') . '">';
         echo '<td>
                 <div class="fw-bold">' . $clientName . '</div>
                 <small class="text-muted">ID: #' . $requestId . '</small>';

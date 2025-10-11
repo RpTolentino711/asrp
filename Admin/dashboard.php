@@ -1605,61 +1605,65 @@ function timeAgo($datetime) {
         }
     }
 
-    function fetchLatestRequests() {
-        if (!isTabActive) return;
-        
-        fetch('../AJAX/ajax_admin_dashboard_latest_requests.php')
-            .then(res => res.text())
-            .then(html => {
-                const container = document.getElementById('latestRequestsContainer');
-                container.innerHTML = html;
-                
-                // Update the badge count
-                const countElement = container.querySelector('[data-count]');
-                if (countElement) {
-                    const currentCount = parseInt(countElement.getAttribute('data-count'));
-                    const badge = document.getElementById('latestRequestsBadge');
-                    if (badge) {
-                        const oldCount = parseInt(badge.textContent);
-                        badge.textContent = currentCount;
-                        updateBadgeAnimation(badge, currentCount, oldCount);
-                    }
+function fetchLatestRequests() {
+    if (!isTabActive) return;
+    
+    // Mark requests as seen when loading
+    fetch('../AJAX/ajax_admin_dashboard_latest_requests.php?mark_seen=true')
+        .then(res => res.text())
+        .then(html => {
+            const container = document.getElementById('latestRequestsContainer');
+            container.innerHTML = html;
+            
+            // Update the badge count
+            const containerDiv = container.querySelector('[data-count]');
+            if (containerDiv) {
+                const currentCount = parseInt(containerDiv.getAttribute('data-count'));
+                const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
+                const badge = document.getElementById('latestRequestsBadge');
+                if (badge) {
+                    const oldCount = parseInt(badge.textContent);
+                    badge.textContent = currentCount;
+                    updateBadgeAnimation(badge, currentCount, oldCount);
                 }
-            })
-            .catch(err => {
-                console.error('Error fetching latest requests:', err);
-                document.getElementById('latestRequestsContainer').innerHTML = 
-                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
-            });
-    }
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching latest requests:', err);
+            document.getElementById('latestRequestsContainer').innerHTML = 
+                '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
+        });
+}
 
-    function fetchLatestMaintenance() {
-        if (!isTabActive) return;
-        
-        fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php')
-            .then(res => res.text())
-            .then(html => {
-                const container = document.getElementById('latestMaintenanceContainer');
-                container.innerHTML = html;
-                
-                // Update the badge count
-                const countElement = container.querySelector('[data-count]');
-                if (countElement) {
-                    const currentCount = parseInt(countElement.getAttribute('data-count'));
-                    const badge = document.getElementById('latestMaintenanceBadge');
-                    if (badge) {
-                        const oldCount = parseInt(badge.textContent);
-                        badge.textContent = currentCount;
-                        updateBadgeAnimation(badge, currentCount, oldCount);
-                    }
+function fetchLatestMaintenance() {
+    if (!isTabActive) return;
+    
+    // Mark maintenance requests as seen when loading
+    fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php?mark_seen=true')
+        .then(res => res.text())
+        .then(html => {
+            const container = document.getElementById('latestMaintenanceContainer');
+            container.innerHTML = html;
+            
+            // Update the badge count
+            const containerDiv = container.querySelector('[data-count]');
+            if (containerDiv) {
+                const currentCount = parseInt(containerDiv.getAttribute('data-count'));
+                const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
+                const badge = document.getElementById('latestMaintenanceBadge');
+                if (badge) {
+                    const oldCount = parseInt(badge.textContent);
+                    badge.textContent = currentCount;
+                    updateBadgeAnimation(badge, currentCount, oldCount);
                 }
-            })
-            .catch(err => {
-                console.error('Error fetching maintenance requests:', err);
-                document.getElementById('latestMaintenanceContainer').innerHTML = 
-                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading maintenance requests</p></div>';
-            });
-    }
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching maintenance requests:', err);
+            document.getElementById('latestMaintenanceContainer').innerHTML = 
+                '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading maintenance requests</p></div>';
+        });
+}
 
     let messageFilter = 'recent';
     function fetchMessages() {

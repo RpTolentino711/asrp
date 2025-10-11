@@ -1431,16 +1431,39 @@ public function getLatestPendingRequests($limit = 5) {
             ORDER BY 
                 rr.admin_seen ASC,  -- Show unseen requests first
                 rr.Requested_At DESC
-            LIMIT :limit";
+            LIMIT ?";
 
     try {
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
         error_log("Error getting latest pending requests: " . $e->getMessage());
         return [];
+    }
+}
+
+// Add these methods to your Database class
+public function markRentalRequestsAsSeen() {
+    try {
+        $sql = "UPDATE rentalrequest SET admin_seen = 1 WHERE admin_seen = 0 AND Status = 'Pending'";
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute();
+    } catch (Exception $e) {
+        error_log("Error marking rental requests as seen: " . $e->getMessage());
+        return false;
+    }
+}
+
+public function markMaintenanceRequestsAsSeen() {
+    try {
+        $sql = "UPDATE maintenancerequest SET admin_seen = 1 WHERE admin_seen = 0 AND Status = 'Submitted'";
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute();
+    } catch (Exception $e) {
+        error_log("Error marking maintenance requests as seen: " . $e->getMessage());
+        return false;
     }
 }
   
