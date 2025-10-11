@@ -14,7 +14,7 @@ if (isset($_GET['mark_seen']) && $_GET['mark_seen'] == 'true') {
     $db->markMaintenanceRequestsAsSeen();
 }
 
-// Get latest maintenance requests
+// Get latest maintenance requests - REMOVED THE WHERE CLAUSE
 try {
     $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto, mr.admin_seen,
                    c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email,
@@ -22,7 +22,6 @@ try {
             FROM maintenancerequest mr
             LEFT JOIN client c ON mr.Client_ID = c.Client_ID
             LEFT JOIN space s ON mr.Space_ID = s.Space_ID
-            WHERE mr.Status IN ('Submitted', 'In Progress')
             ORDER BY mr.admin_seen ASC, mr.RequestDate DESC
             LIMIT 5";
     
@@ -32,6 +31,13 @@ try {
     
 } catch (Exception $e) {
     $maintenance_requests = [];
+}
+
+// DEBUG: Check what we're getting
+error_log("=== MAINTENANCE REQUESTS DEBUG ===");
+error_log("Requests found: " . count($maintenance_requests));
+foreach($maintenance_requests as $mr) {
+    error_log("Request ID: " . $mr['Request_ID'] . " | Status: " . $mr['Status'] . " | Seen: " . $mr['admin_seen']);
 }
 
 if (!empty($maintenance_requests)) {
@@ -66,7 +72,13 @@ if (!empty($maintenance_requests)) {
         $isNew = ($mr['admin_seen'] == 0 && $status == 'Submitted');
         
         // Determine badge color based on status
-        $badgeClass = $status === 'Submitted' ? 'bg-warning text-white' : 'bg-info text-white';
+        $badgeClass = '';
+        switch ($status) {
+            case 'Submitted': $badgeClass = 'bg-warning text-white'; break;
+            case 'In Progress': $badgeClass = 'bg-info text-white'; break;
+            case 'Completed': $badgeClass = 'bg-success text-white'; break;
+            default: $badgeClass = 'bg-secondary text-white';
+        }
         
         echo '<tr class="' . ($isNew ? 'maintenance-highlight' : '') . '">';
         echo '<td>
