@@ -2460,13 +2460,12 @@ public function getCurrentSpacePhotos($space_id) {
 
 public function getLatestMaintenanceRequests($limit = 5) {
     try {
-        $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto,
+        $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto, mr.admin_seen,
                        c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email,
                        s.Name AS UnitName, s.Space_ID
                 FROM maintenancerequest mr
                 LEFT JOIN client c ON mr.Client_ID = c.Client_ID
                 LEFT JOIN space s ON mr.Space_ID = s.Space_ID
-                WHERE mr.Status IN ('Submitted', 'In Progress')
                 ORDER BY mr.RequestDate DESC
                 LIMIT ?";
         
