@@ -33,13 +33,6 @@ try {
     $maintenance_requests = [];
 }
 
-// DEBUG: Check what we're getting
-error_log("=== MAINTENANCE REQUESTS DEBUG ===");
-error_log("Requests found: " . count($maintenance_requests));
-foreach($maintenance_requests as $mr) {
-    error_log("Request ID: " . $mr['Request_ID'] . " | Status: " . $mr['Status'] . " | Seen: " . $mr['admin_seen']);
-}
-
 if (!empty($maintenance_requests)) {
     $request_count = count($maintenance_requests);
     $new_requests_count = 0;
