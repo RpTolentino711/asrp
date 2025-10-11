@@ -1333,8 +1333,17 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     ]);
 }
 
+
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
-    // Remove date filtering completely to match AJAX logic
+    // If no dates provided, use current month
+    if (!$startDate || !$endDate) {
+        $startDate = date('Y-m-01');
+        $endDate = date('Y-m-t');
+    }
+    
+    // Add time component to include the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted') as pending_maintenance,
@@ -1343,7 +1352,6 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     
     return $this->getRow($sql, []);
 }
-
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
