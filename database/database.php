@@ -1995,7 +1995,6 @@ public function getAllUnitsWithRenterStatus() {
 }
 
 
-
 public function getAdminMonthChartData($startDate, $endDate) {
     try {
         // Create date array for the entire period
@@ -2010,57 +2009,75 @@ public function getAdminMonthChartData($startDate, $endDate) {
             $days[] = $dt->format('Y-m-d');
         }
 
-        // Single query to get all data (more efficient)
-        $sql = " SELECT 
-                dates.day,
+        // Generate dates using a simpler approach
+        $dateRange = [];
+        $currentDate = new DateTime($startDate);
+        $endDateObj = new DateTime($endDate);
+        
+        while ($currentDate <= $endDateObj) {
+            $dateRange[] = $currentDate->format('Y-m-d');
+            $currentDate->modify('+1 day');
+        }
+
+        // Use a simpler query approach with UNION for better compatibility
+        $sql = "
+            SELECT 
+                date_series.date as day,
                 COALESCE(rentals.cnt, 0) as rental_count,
                 COALESCE(maintenance.cnt, 0) as maintenance_count,
                 COALESCE(messages.cnt, 0) as message_count
             FROM (
-                SELECT DATE(?) + INTERVAL (a.a + (10 * b.a)) DAY as day
-                FROM (
-                    SELECT 0 as a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 
-                    UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 
-                    UNION ALL SELECT 8 UNION ALL SELECT 9
-                ) as a
-                CROSS JOIN (
-                    SELECT 0 as a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 
-                    UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 
-                    UNION ALL SELECT 8 UNION ALL SELECT 9
-                ) as b
-            ) dates
+                SELECT ? as date
+        ";
+        
+        // Generate the date series using multiple UNION SELECTs
+        $dateParams = [$startDate];
+        $dateUnions = [];
+        
+        for ($i = 1; $i < count($dateRange); $i++) {
+            $dateUnions[] = "SELECT ? as date";
+            $dateParams[] = $dateRange[$i];
+        }
+        
+        if (!empty($dateUnions)) {
+            $sql .= " UNION ALL " . implode(" UNION ALL ", $dateUnions);
+        }
+        
+        $sql .= "
+            ) date_series
             LEFT JOIN (
                 SELECT DATE(Requested_At) as day, COUNT(*) as cnt 
                 FROM rentalrequest 
                 WHERE DATE(Requested_At) BETWEEN ? AND ? 
                 AND Flow_Status = 'new'
                 GROUP BY DATE(Requested_At)
-            ) rentals ON dates.day = rentals.day
+            ) rentals ON date_series.date = rentals.day
             LEFT JOIN (
                 SELECT DATE(RequestDate) as day, COUNT(*) as cnt 
                 FROM maintenancerequest 
                 WHERE DATE(RequestDate) BETWEEN ? AND ? 
                 AND Status = 'Submitted'
                 GROUP BY DATE(RequestDate)
-            ) maintenance ON dates.day = maintenance.day
+            ) maintenance ON date_series.date = maintenance.day
             LEFT JOIN (
                 SELECT DATE(Sent_At) as day, COUNT(*) as cnt 
                 FROM free_message 
                 WHERE DATE(Sent_At) BETWEEN ? AND ? 
                 AND is_deleted = 0
                 GROUP BY DATE(Sent_At)
-            ) messages ON dates.day = messages.day
-            WHERE dates.day BETWEEN ? AND ?
-            ORDER BY dates.day
+            ) messages ON date_series.date = messages.day
+            ORDER BY date_series.date
         ";
 
-        $stmt = $this->pdo->prepare($sql);
+        // Prepare parameters: dates + 6 boundary parameters
         $params = array_merge(
-            [$startDate], 
-            array_fill(0, 6, $startDate), 
-            array_fill(0, 6, $endDate),
-            [$startDate, $endDate]
+            $dateParams,                    // All the dates
+            [$startDate, $endDate],         // Rental boundaries
+            [$startDate, $endDate],         // Maintenance boundaries  
+            [$startDate, $endDate]          // Message boundaries
         );
+
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
 
         $new_rentals = [];
@@ -2105,7 +2122,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
         ];
     }
 }
-
 
 
 
