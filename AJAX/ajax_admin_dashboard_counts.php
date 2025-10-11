@@ -16,19 +16,13 @@ try {
         'pending_maintenance' => 0,
         'unpaid_invoices' => 0,
         'overdue_invoices' => 0,
-        'new_maintenance_requests' => 0,
-        'unseen_rentals' => 0 // Add this for notification tracking
+        'new_maintenance_requests' => 0 // Track unseen maintenance requests
     ];
     
-    // Pending rental requests (ALL pending, not just unseen)
-    $sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new'";
-    $result = $db->getRow($sql);
-    $counts['pending_rentals'] = $result['count'] ?? 0;
-    
-    // Unseen rental requests (for notifications only)
+    // Pending rental requests (unseen by admin)
     $sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
     $result = $db->getRow($sql);
-    $counts['unseen_rentals'] = $result['count'] ?? 0;
+    $counts['pending_rentals'] = $result['count'] ?? 0;
     
     // Total pending maintenance requests (all statuses)
     $sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')";
@@ -40,13 +34,13 @@ try {
     $result = $db->getRow($sql);
     $counts['new_maintenance_requests'] = $result['count'] ?? 0;
     
-    // Unpaid invoices (ALL unpaid, not just new flow_status)
-    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'";
+    // Unpaid invoices
+    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new'";
     $result = $db->getRow($sql);
     $counts['unpaid_invoices'] = $result['count'] ?? 0;
     
-    // Overdue invoices (ALL overdue, not just new flow_status)
-    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()";
+    // Overdue invoices
+    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new'";
     $result = $db->getRow($sql);
     $counts['overdue_invoices'] = $result['count'] ?? 0;
     
@@ -61,7 +55,6 @@ try {
         'unpaid_invoices' => 0,
         'overdue_invoices' => 0,
         'new_maintenance_requests' => 0,
-        'unseen_rentals' => 0,
         'error' => $e->getMessage()
     ]);
 }
