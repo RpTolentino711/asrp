@@ -1474,6 +1474,64 @@ public function getTotalMaintenanceRequests($startDate, $endDate) {
     ];
 }
 
+
+public function getDetailedRentalData($startDate, $endDate) {
+    try {
+        $sql = "SELECT rr.*, c.Client_fn, c.Client_ln, c.Client_Email, s.Name as UnitName, s.Price
+                FROM rentalrequest rr
+                JOIN client c ON rr.Client_ID = c.Client_ID
+                LEFT JOIN space s ON rr.Space_ID = s.Space_ID
+                WHERE rr.Requested_At BETWEEN ? AND ?
+                ORDER BY rr.Requested_At DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting detailed rental data: " . $e->getMessage());
+        return [];
+    }
+}
+
+public function getDetailedMaintenanceData($startDate, $endDate) {
+    try {
+        $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as UnitName, 
+                       h.Handyman_fn, h.Handyman_ln,
+                       (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory 
+                        WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate
+                FROM maintenancerequest mr
+                JOIN client c ON mr.Client_ID = c.Client_ID
+                LEFT JOIN space s ON mr.Space_ID = s.Space_ID
+                LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+                WHERE mr.RequestDate BETWEEN ? AND ?
+                ORDER BY mr.RequestDate DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting detailed maintenance data: " . $e->getMessage());
+        return [];
+    }
+}
+
+public function getDetailedInvoiceData($startDate, $endDate) {
+    try {
+        $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name as UnitName
+                FROM invoice i
+                JOIN client c ON i.Client_ID = c.Client_ID
+                LEFT JOIN space s ON i.Space_ID = s.Space_ID
+                WHERE i.InvoiceDate BETWEEN ? AND ?
+                ORDER BY i.InvoiceDate DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting detailed invoice data: " . $e->getMessage());
+        return [];
+    }
+}
     
 public function getLatestPendingRequests($limit = 5) {
     $sql = "SELECT rr.Request_ID, rr.Requested_At, rr.Status, rr.admin_seen, rr.Flow_Status,
