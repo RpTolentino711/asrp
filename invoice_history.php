@@ -834,129 +834,6 @@ $show_kicked_message_in_chat = $is_kicked;
             <div class="chat-messages" id="chatMessages">
                 <!-- Chat messages will be loaded here by JavaScript -->
             </div>
-<script>
-// Show unread badge for invoices with unread admin messages
-document.addEventListener('DOMContentLoaded', function() {
-    const clientId = <?= json_encode($client_id) ?>;
-    const invoiceOptions = [
-        ...document.querySelectorAll('#dueInvoiceSelect option[data-invoice-id]'),
-        ...document.querySelectorAll('#archivedInvoiceSelect option[data-invoice-id]')
-    ];
-    const invoiceIds = invoiceOptions.map(opt => opt.getAttribute('data-invoice-id'));
-    if (invoiceIds.length === 0) return;
-    fetch('AJAX/get_unread_admin_chat_counts.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'client_id=' + encodeURIComponent(clientId) + '&invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
-    })
-    .then(res => res.json())
-    .then(counts => {
-        invoiceOptions.forEach(opt => {
-            const id = opt.getAttribute('data-invoice-id');
-            if (counts[id] && counts[id] > 0) {
-                opt.textContent += ' \uD83D\uDD14'; // Bell emoji as badge
-            }
-        });
-    });
-});
-// Mark all admin messages as read for client
-async function markChatReadClient(invoiceId) {
-    if (!invoiceId) return;
-    try {
-        await fetch('AJAX/mark_invoice_chat_read_client.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'invoice_id=' + encodeURIComponent(invoiceId)
-        });
-    } catch (e) {}
-}
-
-// Live chat message loader with admin typing bubble
-let adminTyping = false;
-let lastTypingBubble = null;
-
-async function loadChatMessages() {
-    const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) return;
-    const invoiceId = <?= json_encode($selected_invoice_id) ?>;
-    if (!invoiceId) return;
-    try {
-        const response = await fetch('AJAX/invoice_chat_messages.php?invoice_id=' + invoiceId);
-        const data = await response.json();
-        chatMessages.innerHTML = '';
-        if (data.error) {
-            chatMessages.innerHTML = `<div class='text-center text-danger py-4'>${data.error}</div>`;
-            return;
-        }
-        if (data.length === 0) {
-            chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='bi bi-chat-dots fs-1 mb-3 d-block'></i><h5>No messages yet</h5><p>Start a conversation about your invoice or payment inquiry.</p></div>`;
-            return;
-        }
-        data.forEach(msg => {
-            const is_client = msg.Sender_Type === 'client';
-            const is_admin = msg.Sender_Type === 'admin';
-            const is_system = msg.Sender_Type === 'system';
-            let bubbleClass = is_client ? 'client' : (is_admin ? 'admin' : 'system');
-            let html = `<div class='chat-message ${bubbleClass}'>`;
-            html += `<div class='message-bubble ${bubbleClass}'>${msg.Message.replace(/\n/g, '<br>')}`;
-            if (msg.Image_Path) {
-                html += `<img src='${msg.Image_Path}' class='message-image' alt='Chat attachment' onclick='showImageModal("${msg.Image_Path}")'>`;
-            }
-            html += `</div>`;
-            if (!is_system) {
-                html += `<div class='message-meta'><strong>${msg.SenderName || ''}</strong> <span class='text-muted ms-2'>${msg.Created_At || ''}</span></div>`;
-            } else {
-                html += `<div class='message-meta text-center'><span class='text-muted'>${msg.Created_At || ''}</span></div>`;
-            }
-            html += `</div>`;
-            chatMessages.innerHTML += html;
-        });
-        // Add typing bubble if admin is typing
-        if (adminTyping) {
-            let typingHtml = `<div class='chat-message admin'>` +
-                `<div class='message-bubble admin' style='opacity:0.7;'>` +
-                `<span class='me-2'><i class='bi bi-three-dots'></i></span>Admin is typing...` +
-                `</div></div>`;
-            chatMessages.innerHTML += typingHtml;
-        }
-        scrollToBottom();
-    } catch (err) {
-        chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
-    }
-}
-
-// Poll admin typing status
-async function pollAdminTyping() {
-    const invoiceId = <?= json_encode($selected_invoice_id) ?>;
-    if (!invoiceId) return;
-    try {
-        const response = await fetch('AJAX/invoice_admin_typing.php?invoice_id=' + invoiceId);
-        const data = await response.json();
-        adminTyping = !!data.typing;
-    } catch (e) {
-        adminTyping = false;
-    }
-}
-
-// On page load and invoice change, mark as read
-document.addEventListener('DOMContentLoaded', function() {
-    const invoiceId = <?= json_encode($selected_invoice_id) ?>;
-    if (invoiceId) markChatReadClient(invoiceId);
-    // Also mark as read on invoice selector change
-    document.querySelectorAll('select[name="invoice_id"]').forEach(sel => {
-        sel.addEventListener('change', function() {
-            if (this.value) markChatReadClient(this.value);
-        });
-    });
-});
-
-loadChatMessages();
-pollAdminTyping();
-setInterval(() => {
-    pollAdminTyping();
-    loadChatMessages();
-}, 5000); // Refresh every 5 seconds
-</script>
 
             <!-- Status Alerts -->
             <?php if ($is_kicked): ?>
@@ -1068,8 +945,243 @@ setInterval(() => {
     <?php require('footer.php'); ?>
 
     <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Client-side scroll control variables
+        let shouldAutoScroll = true;
+        let userManuallyScrolled = false;
+        let adminTyping = false;
+
+        // Helper function to check if user is at bottom of chat
+        function isAtBottom(element, threshold = 100) {
+            return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+        }
+
+        // Detect when user manually scrolls
+        function initScrollDetection() {
+            const chatMessages = document.getElementById('chatMessages');
+            if (!chatMessages) return;
+            
+            chatMessages.addEventListener('scroll', function() {
+                // If user scrolls up manually, set flag to prevent auto-scroll
+                if (!isAtBottom(chatMessages)) {
+                    userManuallyScrolled = true;
+                    shouldAutoScroll = false;
+                } else {
+                    // If user scrolls back to bottom, re-enable auto-scroll
+                    userManuallyScrolled = false;
+                    shouldAutoScroll = true;
+                }
+            });
+            
+            // Reset auto-scroll when user sends a new message
+            const chatForm = document.querySelector('.message-form');
+            if (chatForm) {
+                chatForm.addEventListener('submit', function() {
+                    userManuallyScrolled = false;
+                    shouldAutoScroll = true;
+                });
+            }
+        }
+
+        // Reset scroll behavior when opening a different chat
+        function resetScrollBehavior() {
+            userManuallyScrolled = false;
+            shouldAutoScroll = true;
+        }
+
+        // Show unread badge for invoices with unread admin messages
+        document.addEventListener('DOMContentLoaded', function() {
+            const clientId = <?= json_encode($client_id) ?>;
+            const invoiceOptions = [
+                ...document.querySelectorAll('#dueInvoiceSelect option[data-invoice-id]'),
+                ...document.querySelectorAll('#archivedInvoiceSelect option[data-invoice-id]')
+            ];
+            const invoiceIds = invoiceOptions.map(opt => opt.getAttribute('data-invoice-id'));
+            if (invoiceIds.length === 0) return;
+            fetch('AJAX/get_unread_admin_chat_counts.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'client_id=' + encodeURIComponent(clientId) + '&invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
+            })
+            .then(res => res.json())
+            .then(counts => {
+                invoiceOptions.forEach(opt => {
+                    const id = opt.getAttribute('data-invoice-id');
+                    if (counts[id] && counts[id] > 0) {
+                        opt.textContent += ' \uD83D\uDD14'; // Bell emoji as badge
+                    }
+                });
+            });
+        });
+
+        // Mark all admin messages as read for client
+        async function markChatReadClient(invoiceId) {
+            if (!invoiceId) return;
+            try {
+                await fetch('AJAX/mark_invoice_chat_read_client.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'invoice_id=' + encodeURIComponent(invoiceId)
+                });
+            } catch (e) {}
+        }
+
+        // Live chat message loader with auto-scroll control
+        async function loadChatMessages() {
+            const chatMessages = document.getElementById('chatMessages');
+            if (!chatMessages) return;
+            const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+            if (!invoiceId) return;
+            
+            // Store current scroll position and whether user is at bottom
+            const wasAtBottom = isAtBottom(chatMessages);
+            const previousScrollTop = chatMessages.scrollTop;
+            const previousScrollHeight = chatMessages.scrollHeight;
+            
+            try {
+                const response = await fetch('AJAX/invoice_chat_messages.php?invoice_id=' + invoiceId);
+                const data = await response.json();
+                
+                // If user has manually scrolled up, don't auto-scroll
+                if (userManuallyScrolled && !wasAtBottom) {
+                    shouldAutoScroll = false;
+                } else {
+                    shouldAutoScroll = true;
+                }
+                
+                chatMessages.innerHTML = '';
+                if (data.error) {
+                    chatMessages.innerHTML = `<div class='text-center text-danger py-4'>${data.error}</div>`;
+                    return;
+                }
+                if (data.length === 0) {
+                    chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='bi bi-chat-dots fs-1 mb-3 d-block'></i><h5>No messages yet</h5><p>Start a conversation about your invoice or payment inquiry.</p></div>`;
+                    return;
+                }
+                
+                data.forEach(msg => {
+                    const is_client = msg.Sender_Type === 'client';
+                    const is_admin = msg.Sender_Type === 'admin';
+                    const is_system = msg.Sender_Type === 'system';
+                    let bubbleClass = is_client ? 'client' : (is_admin ? 'admin' : 'system');
+                    let html = `<div class='chat-message ${bubbleClass}'>`;
+                    html += `<div class='message-bubble ${bubbleClass}'>${msg.Message.replace(/\n/g, '<br>')}`;
+                    if (msg.Image_Path) {
+                        html += `<img src='${msg.Image_Path}' class='message-image' alt='Chat attachment' onclick='showImageModal("${msg.Image_Path}")'>`;
+                    }
+                    html += `</div>`;
+                    if (!is_system) {
+                        html += `<div class='message-meta'><strong>${msg.SenderName || ''}</strong> <span class='text-muted ms-2'>${msg.Created_At || ''}</span></div>`;
+                    } else {
+                        html += `<div class='message-meta text-center'><span class='text-muted'>${msg.Created_At || ''}</span></div>`;
+                    }
+                    html += `</div>`;
+                    chatMessages.innerHTML += html;
+                });
+                
+                // Add typing bubble if admin is typing
+                if (adminTyping) {
+                    let typingHtml = `<div class='chat-message admin'>` +
+                        `<div class='message-bubble admin' style='opacity:0.7;'>` +
+                        `<span class='me-2'><i class='bi bi-three-dots'></i></span>Admin is typing...` +
+                        `</div></div>`;
+                    chatMessages.innerHTML += typingHtml;
+                }
+                
+                // Handle scrolling based on user behavior
+                if (shouldAutoScroll) {
+                    // Auto-scroll to bottom if user was at bottom or it's a new message
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                } else {
+                    // Maintain scroll position when loading new messages but user is reading old ones
+                    const newScrollHeight = chatMessages.scrollHeight;
+                    const heightDifference = newScrollHeight - previousScrollHeight;
+                    chatMessages.scrollTop = previousScrollTop + heightDifference;
+                }
+                
+            } catch (err) {
+                chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
+            }
+        }
+
+        // Poll admin typing status
+        async function pollAdminTyping() {
+            const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+            if (!invoiceId) return;
+            try {
+                const response = await fetch('AJAX/invoice_admin_typing.php?invoice_id=' + invoiceId);
+                const data = await response.json();
+                adminTyping = !!data.typing;
+            } catch (e) {
+                adminTyping = false;
+            }
+        }
+
+        // Initialize everything when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initScrollDetection();
+            loadChatMessages();
+            pollAdminTyping();
+            
+            // Reset scroll behavior when page loads
+            resetScrollBehavior();
+            
+            // Mark as read when page loads
+            const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+            if (invoiceId) markChatReadClient(invoiceId);
+            
+            // Also mark as read on invoice selector change
+            document.querySelectorAll('select[name="invoice_id"]').forEach(sel => {
+                sel.addEventListener('change', function() {
+                    if (this.value) {
+                        markChatReadClient(this.value);
+                        resetScrollBehavior();
+                    }
+                });
+            });
+            
+            // Refresh messages and typing status every 5 seconds
+            setInterval(() => {
+                pollAdminTyping();
+                loadChatMessages();
+            }, 5000);
+        });
+
+        // Client typing indicator AJAX
+        document.addEventListener('DOMContentLoaded', function() {
+            const textarea = document.querySelector('.client-chat-textarea');
+            const invoiceId = <?= json_encode($selected_invoice_id) ?>;
+            let typing = false;
+            let typingTimeout = null;
+            if (textarea && invoiceId) {
+                textarea.addEventListener('input', function() {
+                    if (!typing) {
+                        typing = true;
+                        sendTypingStatus(1);
+                    }
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(() => {
+                        typing = false;
+                        sendTypingStatus(0);
+                    }, 3000); // 3 seconds after last input
+                });
+                // On blur, clear typing
+                textarea.addEventListener('blur', function() {
+                    typing = false;
+                    sendTypingStatus(0);
+                });
+            }
+            function sendTypingStatus(isTyping) {
+                fetch('AJAX/invoice_client_typing.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
+                });
+            }
+        });
+
         // Scroll animations
         const observerOptions = {
             threshold: 0.1,
@@ -1087,14 +1199,6 @@ setInterval(() => {
         document.querySelectorAll('.animate-on-scroll').forEach((el) => {
             observer.observe(el);
         });
-
-        // Auto-scroll to bottom of chat
-        function scrollToBottom() {
-            const chatMessages = document.getElementById('chatMessages');
-            if (chatMessages) {
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            }
-        }
 
         // Image modal functionality
         function showImageModal(imageSrc) {
@@ -1141,9 +1245,6 @@ setInterval(() => {
                     this.style.height = (this.scrollHeight) + 'px';
                 });
             }
-            
-            // Scroll to bottom on page load
-            scrollToBottom();
         });
 
         // Enhanced file input feedback
@@ -1168,64 +1269,6 @@ setInterval(() => {
             }
         });
     </script>
-    <script>
-    // Client typing indicator AJAX
-    document.addEventListener('DOMContentLoaded', function() {
-        const textarea = document.querySelector('.client-chat-textarea');
-        const invoiceId = <?= json_encode($selected_invoice_id) ?>;
-        let typing = false;
-        let typingTimeout = null;
-        if (textarea && invoiceId) {
-            textarea.addEventListener('input', function() {
-                if (!typing) {
-                    typing = true;
-                    sendTypingStatus(1);
-                }
-                clearTimeout(typingTimeout);
-                typingTimeout = setTimeout(() => {
-                    typing = false;
-                    sendTypingStatus(0);
-                }, 3000); // 3 seconds after last input
-            });
-            // On blur, clear typing
-            textarea.addEventListener('blur', function() {
-                typing = false;
-                sendTypingStatus(0);
-            });
-        }
-        function sendTypingStatus(isTyping) {
-            fetch('AJAX/invoice_client_typing.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
-            });
-        }
-    });
-    </script>
-
-    
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Mark all chat messages as read when viewing the payment page
-    <?php if (isset($_SESSION['client_id'])): ?>
-    fetch('AJAX/mark_invoice_chat_read.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'client_id=' + encodeURIComponent(<?= $_SESSION['client_id'] ?>)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            console.log('Chat messages marked as read');
-        } else {
-            console.error('Failed to mark messages as read:', data.error);
-        }
-    })
-    .catch(error => console.error('Error marking messages as read:', error));
-    <?php endif; ?>
-});
-</script>
 
 </body>
 </html>
-
