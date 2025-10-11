@@ -1322,14 +1322,14 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ?) as new_messages_count
+        (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count
         FROM invoice 
         WHERE Status = 'paid' 
-        AND Created_At BETWEEN ? AND ?";
+        AND InvoiceDate BETWEEN ? AND ?"; // Use InvoiceDate instead of Created_At
     
     return $this->getRow($sql, [
         $startDate, $endDateWithTime, 
-        $startDate, $endDateWithTime
+        $startDate, $endDate
     ]);
 }
 
@@ -1347,17 +1347,13 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as overdue_invoices";
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
     
-    return $this->getRow($sql, [
-        $startDate, $endDateWithTime, 
-        $startDate, $endDateWithTime,
-        $startDate, $endDateWithTime,
-        $startDate, $endDateWithTime
-    ]);
+    return $this->getRow($sql); // Remove date parameters for real-time counts
 }
 
 
@@ -2005,19 +2001,7 @@ public function getAllUnitsWithRenterStatus() {
 
 public function getAdminMonthChartData($startDate, $endDate) {
     try {
-        // Create date array for the entire period
-        $days = [];
-        $period = new DatePeriod(
-            new DateTime($startDate),
-            new DateInterval('P1D'),
-            (new DateTime($endDate))->modify('+1 day')
-        );
-
-        foreach ($period as $dt) {
-            $days[] = $dt->format('Y-m-d');
-        }
-
-        // Generate dates using a simpler approach
+        // Generate date range
         $dateRange = [];
         $currentDate = new DateTime($startDate);
         $endDateObj = new DateTime($endDate);
@@ -2027,99 +2011,52 @@ public function getAdminMonthChartData($startDate, $endDate) {
             $currentDate->modify('+1 day');
         }
 
-        // Use a simpler query approach with UNION for better compatibility
-        $sql = "
-            SELECT 
-                date_series.date as day,
-                COALESCE(rentals.cnt, 0) as rental_count,
-                COALESCE(maintenance.cnt, 0) as maintenance_count,
-                COALESCE(messages.cnt, 0) as message_count
-            FROM (
-                SELECT ? as date
-        ";
-        
-        // Generate the date series using multiple UNION SELECTs
-        $dateParams = [$startDate];
-        $dateUnions = [];
-        
-        for ($i = 1; $i < count($dateRange); $i++) {
-            $dateUnions[] = "SELECT ? as date";
-            $dateParams[] = $dateRange[$i];
-        }
-        
-        if (!empty($dateUnions)) {
-            $sql .= " UNION ALL " . implode(" UNION ALL ", $dateUnions);
-        }
-        
-        $sql .= "
-            ) date_series
-            LEFT JOIN (
-                SELECT DATE(Requested_At) as day, COUNT(*) as cnt 
-                FROM rentalrequest 
-                WHERE DATE(Requested_At) BETWEEN ? AND ? 
-                AND Flow_Status = 'new'
-                GROUP BY DATE(Requested_At)
-            ) rentals ON date_series.date = rentals.day
-            LEFT JOIN (
-                SELECT DATE(RequestDate) as day, COUNT(*) as cnt 
-                FROM maintenancerequest 
-                WHERE DATE(RequestDate) BETWEEN ? AND ? 
-                AND Status = 'Submitted'
-                GROUP BY DATE(RequestDate)
-            ) maintenance ON date_series.date = maintenance.day
-            LEFT JOIN (
-                SELECT DATE(Sent_At) as day, COUNT(*) as cnt 
-                FROM free_message 
-                WHERE DATE(Sent_At) BETWEEN ? AND ? 
-                AND is_deleted = 0
-                GROUP BY DATE(Sent_At)
-            ) messages ON date_series.date = messages.day
-            ORDER BY date_series.date
-        ";
-
-        // Prepare parameters: dates + 6 boundary parameters
-        $params = array_merge(
-            $dateParams,                    // All the dates
-            [$startDate, $endDate],         // Rental boundaries
-            [$startDate, $endDate],         // Maintenance boundaries  
-            [$startDate, $endDate]          // Message boundaries
-        );
-
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-
-        $new_rentals = [];
-        $new_maintenance = [];
-        $new_messages = [];
-        $labels = [];
-
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $labels[] = date('M j', strtotime($row['day']));
-            $new_rentals[] = (int)$row['rental_count'];
-            $new_maintenance[] = (int)$row['maintenance_count'];
-            $new_messages[] = (int)$row['message_count'];
-        }
-
-        return [
-            'labels' => $labels,
-            'new_rentals' => $new_rentals,
-            'new_maintenance' => $new_maintenance,
-            'new_messages' => $new_messages
+        $chartData = [
+            'labels' => [],
+            'new_rentals' => [],
+            'new_maintenance' => [],
+            'new_messages' => []
         ];
+
+        // Get data for each day
+        foreach ($dateRange as $day) {
+            $dayStart = $day . ' 00:00:00';
+            $dayEnd = $day . ' 23:59:59';
+            
+            // Rentals for the day
+            $sqlRentals = "SELECT COUNT(*) as count FROM rentalrequest 
+                          WHERE Requested_At BETWEEN ? AND ?";
+            $rentals = $this->getRow($sqlRentals, [$dayStart, $dayEnd]);
+            
+            // Maintenance for the day  
+            $sqlMaintenance = "SELECT COUNT(*) as count FROM maintenancerequest 
+                              WHERE RequestDate BETWEEN ? AND ?";
+            $maintenance = $this->getRow($sqlMaintenance, [$dayStart, $dayEnd]);
+            
+            // Messages for the day
+            $sqlMessages = "SELECT COUNT(*) as count FROM free_message 
+                           WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?";
+            $messages = $this->getRow($sqlMessages, [$dayStart, $dayEnd]);
+
+            $chartData['labels'][] = date('M j', strtotime($day));
+            $chartData['new_rentals'][] = $rentals['count'] ?? 0;
+            $chartData['new_maintenance'][] = $maintenance['count'] ?? 0;
+            $chartData['new_messages'][] = $messages['count'] ?? 0;
+        }
+
+        return $chartData;
 
     } catch (Exception $e) {
         error_log("Error in getAdminMonthChartData: " . $e->getMessage());
         
-        // Fallback: return empty data for the period
+        // Fallback: return empty data
         $days = [];
-        $period = new DatePeriod(
-            new DateTime($startDate),
-            new DateInterval('P1D'),
-            (new DateTime($endDate))->modify('+1 day')
-        );
-
-        foreach ($period as $dt) {
-            $days[] = $dt->format('Y-m-d');
+        $currentDate = new DateTime($startDate);
+        $endDateObj = new DateTime($endDate);
+        
+        while ($currentDate <= $endDateObj) {
+            $days[] = $currentDate->format('Y-m-d');
+            $currentDate->modify('+1 day');
         }
 
         return [
@@ -2130,7 +2067,6 @@ public function getAdminMonthChartData($startDate, $endDate) {
         ];
     }
 }
-
 
 
 

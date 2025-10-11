@@ -22,10 +22,17 @@ $startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . 
 $endDate = date("Y-m-t", strtotime($startDate));
 $monthName = date('F Y', strtotime($startDate));
 
-// Get statistics for the selected period
-$counts = $db->getAdminDashboardCounts($startDate, $endDate);
+// Get statistics - UPDATED VERSION
+// Real-time counts for dashboard widgets (no date filter)
+$counts = $db->getAdminDashboardCounts();
+
+// Monthly stats for the selected period
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
 $chartData = $db->getAdminMonthChartData($startDate, $endDate);
+
+// Monthly breakdowns for the summary section
+$rentalRequestsData = $db->getTotalRentalRequests($startDate, $endDate);
+$maintenanceRequestsData = $db->getTotalMaintenanceRequests($startDate, $endDate);
 
 // Extract values
 $pending = $counts['pending_rentals'] ?? 0;
@@ -36,13 +43,9 @@ $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 
-// UPDATED: Handle the new array return types
-$rentalRequestsData = $db->getTotalRentalRequests($startDate, $endDate);
-$maintenanceRequestsData = $db->getTotalMaintenanceRequests($startDate, $endDate);
-
-// Extract totals from the arrays
-$total_rental_requests = $rentalRequestsData['total'] ?? 0;
-$total_maintenance_requests = $maintenanceRequestsData['total'] ?? 0;
+// For AJAX real-time updates
+$new_maintenance_requests = $counts['new_maintenance_requests'] ?? 0;
+$unseen_rentals = $counts['unseen_rentals'] ?? 0;
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -1379,7 +1382,8 @@ function timeAgo($datetime) {
     // --- LIVE ADMIN: Real-time Notification System ---
     let lastPendingCount = <?= $pending ?>;
     let lastMaintenanceCount = <?= $pending_maintenance ?>;
-    let lastNewMaintenanceCount = 0;
+    let lastUnseenRentals = <?= $unseen_rentals ?>;
+    let lastNewMaintenanceCount = <?= $new_maintenance_requests ?>;
     let isFirstLoad = true;
     let isTabActive = true;
     let notificationCooldown = false;
@@ -1530,6 +1534,7 @@ function timeAgo($datetime) {
                     const currentMaintenance = data.pending_maintenance ?? 0;
                     const currentUnpaid = data.unpaid_invoices ?? 0;
                     const currentOverdue = data.overdue_invoices ?? 0;
+                    const currentUnseenRentals = data.unseen_rentals ?? 0;
                     const currentNewMaintenance = data.new_maintenance_requests ?? 0;
 
                     // Update counts on dashboard
@@ -1538,9 +1543,9 @@ function timeAgo($datetime) {
                     document.getElementById('unpaidInvoicesCount').textContent = currentUnpaid;
                     document.getElementById('overdueInvoicesCount').textContent = currentOverdue;
 
-                    // Check for new rental requests
-                    if (!isFirstLoad && currentPending > lastPendingCount) {
-                        const newRequests = currentPending - lastPendingCount;
+                    // Check for new rental requests (using unseen count for notifications)
+                    if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
+                        const newRequests = currentUnseenRentals - lastUnseenRentals;
                         showNewRequestNotification(newRequests);
                         updateSidebarBadge(currentPending);
                     }
@@ -1554,6 +1559,7 @@ function timeAgo($datetime) {
                     
                     lastPendingCount = currentPending;
                     lastMaintenanceCount = currentMaintenance;
+                    lastUnseenRentals = currentUnseenRentals;
                     lastNewMaintenanceCount = currentNewMaintenance;
                     isFirstLoad = false;
                 }
