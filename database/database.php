@@ -2479,6 +2479,9 @@ public function getLatestMaintenanceRequests($limit = 5) {
     }
 }
 
+
+
+
 public function addPhotoToHistory($space_id, $filename, $action, $previous_filename = null, $admin_id = null) {
     $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
             VALUES (?, ?, ?, ?, ?, ?)";
