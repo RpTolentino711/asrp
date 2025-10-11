@@ -1592,17 +1592,33 @@ function initImageZoom() {
     });
 }
 
-// Live admin chat message loader with client typing bubble
+// Live admin chat message loader with auto-scroll control
 let clientTyping = false;
+let shouldAutoScroll = true;
+let userManuallyScrolled = false;
 
 async function loadAdminChatMessages() {
     const chatMessages = document.getElementById('adminChatMessages');
     if (!chatMessages) return;
     const invoiceId = <?= json_encode($chat_invoice_id) ?>;
     if (!invoiceId) return;
+    
+    // Store current scroll position and whether user is at bottom
+    const wasAtBottom = isAtBottom(chatMessages);
+    const previousScrollTop = chatMessages.scrollTop;
+    const previousScrollHeight = chatMessages.scrollHeight;
+    
     try {
         const response = await fetch('../AJAX/admin_invoice_chat_messages.php?invoice_id=' + invoiceId);
         const data = await response.json();
+        
+        // If user has manually scrolled up, don't auto-scroll
+        if (userManuallyScrolled && !wasAtBottom) {
+            shouldAutoScroll = false;
+        } else {
+            shouldAutoScroll = true;
+        }
+        
         chatMessages.innerHTML = '';
         if (data.error) {
             chatMessages.innerHTML = `<div class='text-center text-danger py-4'>${data.error}</div>`;
@@ -1612,6 +1628,7 @@ async function loadAdminChatMessages() {
             chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='fas fa-comments fa-3x mb-3 d-block opacity-50'></i><h5>No messages yet</h5><p>Start a conversation about this invoice.</p></div>`;
             return;
         }
+        
         data.forEach(msg => {
             const is_admin = msg.Sender_Type === 'admin';
             const is_system = msg.Sender_Type === 'system';
@@ -1629,6 +1646,7 @@ async function loadAdminChatMessages() {
             html += `</div>`;
             chatMessages.innerHTML += html;
         });
+        
         // Add typing bubble if client is typing
         if (clientTyping) {
             let typingHtml = `<div class='chat-message client'>` +
@@ -1637,11 +1655,59 @@ async function loadAdminChatMessages() {
                 `<div class='message-time'></div></div>`;
             chatMessages.innerHTML += typingHtml;
         }
-        // Optional: auto-scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Handle scrolling based on user behavior
+        if (shouldAutoScroll) {
+            // Auto-scroll to bottom if user was at bottom or it's a new message
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        } else {
+            // Maintain scroll position when loading new messages but user is reading old ones
+            const newScrollHeight = chatMessages.scrollHeight;
+            const heightDifference = newScrollHeight - previousScrollHeight;
+            chatMessages.scrollTop = previousScrollTop + heightDifference;
+        }
+        
     } catch (err) {
         chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
     }
+}
+
+// Helper function to check if user is at bottom of chat
+function isAtBottom(element, threshold = 100) {
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+}
+
+// Detect when user manually scrolls
+function initScrollDetection() {
+    const chatMessages = document.getElementById('adminChatMessages');
+    if (!chatMessages) return;
+    
+    chatMessages.addEventListener('scroll', function() {
+        // If user scrolls up manually, set flag to prevent auto-scroll
+        if (!isAtBottom(chatMessages)) {
+            userManuallyScrolled = true;
+            shouldAutoScroll = false;
+        } else {
+            // If user scrolls back to bottom, re-enable auto-scroll
+            userManuallyScrolled = false;
+            shouldAutoScroll = true;
+        }
+    });
+    
+    // Reset auto-scroll when user sends a new message
+    const chatForm = document.querySelector('.chat-form');
+    if (chatForm) {
+        chatForm.addEventListener('submit', function() {
+            userManuallyScrolled = false;
+            shouldAutoScroll = true;
+        });
+    }
+}
+
+// Reset scroll behavior when opening a different chat
+function resetScrollBehavior() {
+    userManuallyScrolled = false;
+    shouldAutoScroll = true;
 }
 
 // Poll client typing status
@@ -1660,14 +1726,26 @@ async function pollClientTyping() {
 // Initialize everything when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initImageZoom();
+    initScrollDetection();
     loadAdminChatMessages();
     pollClientTyping();
+    
+    // Reset scroll behavior when page loads
+    resetScrollBehavior();
     
     // Refresh messages and typing status every 5 seconds
     setInterval(() => {
         pollClientTyping();
         loadAdminChatMessages();
     }, 5000);
+});
+
+// Reset scroll behavior when leaving chat
+document.addEventListener('DOMContentLoaded', function() {
+    const backButton = document.querySelector('a[href*="generate_invoice.php"]');
+    if (backButton) {
+        backButton.addEventListener('click', resetScrollBehavior);
+    }
 });
 </script>
                 
@@ -1690,8 +1768,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 <div class="text-center mt-3">
                     <?php if (strtolower($invoice['Status'] ?? '') !== 'paid' && strtolower($invoice['Flow_Status'] ?? '') !== 'done'): ?>
-                        
-                        
                         <!-- Custom Due Date Mark as Paid Button -->
                         <button class="btn-action btn-paid" onclick="showCustomPaidModal(<?= $invoice['Invoice_ID'] ?>)">
                             <i class="fas fa-calendar-plus"></i> Mark as Paid (Custom Due Date)
