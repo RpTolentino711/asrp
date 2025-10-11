@@ -759,7 +759,9 @@ if (isset($_SESSION['login_error'])) {
                 <div class="card unit-card">
                   <?php if (!empty($first_photo_url)): ?>
                     <div style="position:relative;">
-                      <img src="<?= $first_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
+                      <img src="<?= $first_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" 
+                           data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>" 
+                           data-bs-slide-to="0">
                       <?php if ($photo_count > 1): ?>
                         <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= $photo_count ?> photos </span>
                       <?php endif; ?>
@@ -823,7 +825,7 @@ if (isset($_SESSION['login_error'])) {
                         <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
                           <div class="carousel-inner">
                             <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
-                              <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
+                              <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>" data-slide-index="<?= $idx ?>">
                                 <img src="<?= $photo_data['url'] ?>" class="d-block mx-auto img-fluid rounded shadow" alt="<?= $photo_data['description'] ?>" style="max-height:60vh; object-fit: contain;">
                                 <?php if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo'): ?>
                                   <div class="mt-3">
@@ -877,7 +879,9 @@ if (isset($_SESSION['login_error'])) {
                       <?php if (!empty($photos_with_descriptions) && array_filter($photos_with_descriptions, function($photo) { 
                           return !empty($photo['full_description']) && $photo['full_description'] !== 'Unit Photo'; 
                       })): ?>
-                       
+                        <small class="text-info ms-2">
+                          <i class="bi bi-info-circle me-1"></i>Hover over thumbnails for descriptions
+                        </small>
                       <?php endif; ?>
                     </div>
                   </div>
@@ -910,7 +914,7 @@ if (isset($_SESSION['login_error'])) {
                                   
                   // Add photo thumbnails to rental modal with description tooltips
                   $thumb_counter = 0;
-                  foreach ($photos_with_descriptions as $photo_data) {
+                  foreach ($photos_with_descriptions as $idx => $photo_data) {
                       if ($thumb_counter < 4) { // Show max 4 thumbnails
                           $tooltip_attr = '';
                           if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo') {
@@ -921,7 +925,8 @@ if (isset($_SESSION['login_error'])) {
                           <div class="col-3">
                               <div class="position-relative">
                                   <img src="' . $photo_data['url'] . '" class="img-thumbnail" alt="Unit Photo" style="width: 100%; height: 80px; object-fit: cover; cursor: pointer;" 
-                                       data-bs-toggle="modal" data-bs-target="#' . $photo_modal_id . '" ' . $tooltip_attr . '>
+                                       data-bs-toggle="modal" data-bs-target="#' . $photo_modal_id . '" 
+                                       data-bs-slide-to="' . $idx . '" ' . $tooltip_attr . '>
                                   ' . (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo' ? '
                                   <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white p-1" style="font-size: 0.7rem; line-height: 1.2; max-height: 30px; overflow: hidden;">
                                       ' . (strlen($photo_data['description']) > 30 ? substr($photo_data['description'], 0, 27) . '...' : $photo_data['description']) . '
@@ -1495,6 +1500,37 @@ if (isset($_SESSION['login_error'])) {
         return new bootstrap.Tooltip(tooltipTriggerEl, {
             delay: {show: 500, hide: 100},
             customClass: 'enhanced-tooltip'
+        });
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle direct photo navigation when clicking thumbnails in rental modal
+    document.querySelectorAll('[data-bs-slide-to]').forEach(element => {
+        element.addEventListener('click', function() {
+            const slideTo = this.getAttribute('data-bs-slide-to');
+            const targetModal = this.getAttribute('data-bs-target');
+            
+            // Wait for the photo modal to be fully shown
+            const photoModal = document.querySelector(targetModal);
+            if (photoModal) {
+                photoModal.addEventListener('shown.bs.modal', function() {
+                    // Find the carousel within this modal
+                    const carousel = this.querySelector('.carousel');
+                    if (carousel && slideTo !== null) {
+                        const bsCarousel = bootstrap.Carousel.getOrCreateInstance(carousel);
+                        bsCarousel.to(parseInt(slideTo));
+                    }
+                }, { once: true });
+            }
+        });
+    });
+
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            delay: {show: 500, hide: 100}
         });
     });
 });
