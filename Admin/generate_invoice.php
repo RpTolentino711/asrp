@@ -282,7 +282,80 @@ if (isset($_POST['send_message']) && isset($_POST['invoice_id'])) {
     exit();
 }
 
-// --- NEW: Handle custom due date when marking as paid ---
+// --- NEW: Handle advance rent payment (multiple months) ---
+if (isset($_POST['mark_paid_advance']) && isset($_POST['invoice_id']) && isset($_POST['advance_months'])) {
+    $invoice_id = intval($_POST['invoice_id']);
+    $advance_months = intval($_POST['advance_months']);
+    
+    // Validate advance months
+    if ($advance_months < 1 || $advance_months > 12) {
+        header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new') . "&error=invalid_advance_months");
+        exit();
+    }
+
+    // Fetch the invoice to check status
+    $invoice = $db->getSingleInvoiceForDisplay($invoice_id);
+    if (!$invoice) {
+        exit("Invoice not found.");
+    }
+
+    if (strtolower($invoice['Status']) === 'paid' || strtolower($invoice['Flow_Status']) === 'done') {
+        // Already paid!
+        header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new'));
+        exit();
+    }
+
+    // 1. Mark invoice as paid in the database (updates Status and Flow_Status)
+    $db->markInvoiceAsPaid($invoice_id);
+
+    // 1b. Also mark latest rentalrequest as done for this invoice's client/unit
+    $db->markRentalRequestDone($invoice['Client_ID'], $invoice['Space_ID']);
+
+    // 2. Post PAID message in old chat (serves as a receipt)
+    $paid_msg = "This rent has been PAID on " . date('Y-m-d') . ". Payment includes advance rent for " . $advance_months . " month(s).";
+    $db->sendInvoiceChat($invoice_id, 'system', null, $paid_msg, null);
+
+    // 3. Create multiple invoices for advance payment
+    $last_invoice_id = $invoice_id;
+    $current_due_date = $invoice['EndDate'] ?: date('Y-m-d');
+    
+    for ($i = 1; $i <= $advance_months; $i++) {
+        // Calculate next due date (1 month from current due date)
+        $next_due_date = date('Y-m-d', strtotime($current_due_date . " +1 month"));
+        
+        // Create next invoice with the calculated due date
+        $new_invoice_id = $db->createNextRecurringInvoiceWithChatCustomDate($last_invoice_id, $next_due_date);
+        
+        if ($new_invoice_id) {
+            // Add system message for advance payment
+            $system_msg = "Advance payment: Month " . $i . " of " . $advance_months . ". Due date: " . $next_due_date;
+            $db->sendInvoiceChat($new_invoice_id, 'system', null, $system_msg, null);
+            
+            // Mark this invoice as paid immediately since it's advance payment
+            $db->markInvoiceAsPaid($new_invoice_id);
+            $db->markRentalRequestDone($invoice['Client_ID'], $invoice['Space_ID']);
+            
+            // Update for next iteration
+            $last_invoice_id = $new_invoice_id;
+            $current_due_date = $next_due_date;
+        }
+    }
+
+    // 4. Create the next unpaid invoice (the one after advance period)
+    $final_invoice_id = $db->createNextRecurringInvoiceWithChatCustomDate($last_invoice_id, $current_due_date);
+    
+    if ($final_invoice_id) {
+        $system_msg = "Advance payment period completed. Next payment due: " . $current_due_date;
+        $db->sendInvoiceChat($final_invoice_id, 'system', null, $system_msg, null);
+        
+        header("Location: generate_invoice.php?chat_invoice_id=$final_invoice_id&status=" . ($_GET['status'] ?? 'new') . "&success=paid_advance&months=$advance_months");
+    } else {
+        header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new') . "&error=advance_invoice_failed");
+    }
+    exit();
+}
+
+// --- Handle custom due date when marking as paid ---
 if (isset($_POST['mark_paid_custom']) && isset($_POST['invoice_id']) && isset($_POST['custom_due_date'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $custom_due_date = $_POST['custom_due_date'];
@@ -319,7 +392,7 @@ if (isset($_POST['mark_paid_custom']) && isset($_POST['invoice_id']) && isset($_
     $db->markRentalRequestDone($invoice['Client_ID'], $invoice['Space_ID']);
 
     // 2. Post PAID message in old chat (serves as a receipt)
-    $paid_msg = "This rent has been PAID on " . date('Y-m-d') . ".";
+    $paid_msg = "This rent has been PAID on " . date('Y-m-d') . ". Next payment due: " . $custom_due_date;
     $db->sendInvoiceChat($invoice_id, 'system', null, $paid_msg, null);
 
     // 3. Create next invoice with custom due date
@@ -367,7 +440,7 @@ if (isset($_POST['update_due_date']) && isset($_POST['invoice_id']) && isset($_P
     exit();
 }
 
-// --- Mark as Paid (send paid message in old invoice chat, create new invoice with chat continuity) ---
+// --- Mark as Paid (standard - 1 month) ---
 if (isset($_GET['toggle_status']) && isset($_GET['invoice_id'])) {
     $invoice_id = intval($_GET['invoice_id']);
 
@@ -988,6 +1061,17 @@ function getTimeRemaining($due_date) {
             background: var(--warning);
             color: white;
         }
+
+        .btn-advance {
+            background: rgba(139, 92, 246, 0.1);
+            color: #8b5cf6;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+
+        .btn-advance:hover {
+            background: #8b5cf6;
+            color: white;
+        }
         
         /* Status Badges */
         .badge {
@@ -1096,6 +1180,14 @@ function getTimeRemaining($due_date) {
         .due-date-section {
             background: rgba(245, 158, 11, 0.1);
             border-left: 4px solid var(--warning);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+        }
+
+        .advance-payment-section {
+            background: rgba(139, 92, 246, 0.1);
+            border-left: 4px solid #8b5cf6;
             padding: 1rem;
             border-radius: var(--border-radius);
             margin-bottom: 1rem;
@@ -1444,11 +1536,17 @@ function getTimeRemaining($due_date) {
                     case 'past_date':
                         echo 'Due date must be in the future.';
                         break;
+                    case 'invalid_advance_months':
+                        echo 'Invalid number of advance months. Please enter between 1-12 months.';
+                        break;
                     case 'update_failed':
                         echo 'Failed to update due date. Please try again.';
                         break;
                     case 'recurring_invoice_failed':
                         echo 'Failed to create recurring invoice.';
+                        break;
+                    case 'advance_invoice_failed':
+                        echo 'Failed to create advance payment invoices.';
                         break;
                     default:
                         echo 'An error occurred. Please try again.';
@@ -1468,6 +1566,10 @@ function getTimeRemaining($due_date) {
                     case 'paid_custom':
                         echo 'Invoice marked as paid and new invoice created with custom due date!';
                         break;
+                    case 'paid_advance':
+                        $months = $_GET['months'] ?? 1;
+                        echo "Invoice marked as paid and advance payment processed for $months month(s)!";
+                        break;
                     default:
                         echo 'Operation completed successfully!';
                 }
@@ -1478,7 +1580,13 @@ function getTimeRemaining($due_date) {
         <!-- Info Alert -->
         <div class="alert alert-info animate-fade-in">
             <i class="fas fa-info-circle me-2"></i>
-            Mark an invoice as paid to confirm payment. You can now set a custom due date for the next invoice or use the default (next month). The system will send a chat message as a receipt and create a new invoice. Clients will receive email notifications when you send them messages.
+            <strong>Enhanced Payment Options:</strong> 
+            <ul class="mb-0 mt-2">
+                <li><strong>Standard:</strong> Mark as paid (next invoice due in 1 month)</li>
+                <li><strong>Custom Due Date:</strong> Set a specific due date for the next invoice</li>
+                <li><strong>Advance Payment:</strong> Pay multiple months in advance (2-12 months)</li>
+            </ul>
+            The system will send chat messages as receipts and create the appropriate invoices automatically.
         </div>
         
         <?php if ($show_chat && $invoice): ?>
@@ -1515,14 +1623,49 @@ function getTimeRemaining($due_date) {
                     </div>
                 </div>
 
-                <!-- Due Date Management Section -->
+                <!-- Payment Options Section -->
                 <?php if (strtolower($invoice['Status'] ?? '') !== 'paid' && strtolower($invoice['Flow_Status'] ?? '') !== 'done'): ?>
+                <div class="advance-payment-section">
+                    <h6 class="mb-3">
+                        <i class="fas fa-calendar-plus me-2"></i>
+                        Advance Rent Payment (Multiple Months)
+                    </h6>
+                    <form method="post" class="mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <div class="form-floating">
+                                    <select name="advance_months" class="form-select" id="advanceMonths" required>
+                                        <option value="2">2 Months</option>
+                                        <option value="3">3 Months</option>
+                                        <option value="4">4 Months</option>
+                                        <option value="5">5 Months</option>
+                                        <option value="6">6 Months</option>
+                                        <option value="12">12 Months</option>
+                                    </select>
+                                    <label for="advanceMonths">Advance Payment Period</label>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <input type="hidden" name="invoice_id" value="<?= $chat_invoice_id ?>">
+                                <button type="submit" name="mark_paid_advance" class="btn-action btn-advance w-100">
+                                    <i class="fas fa-calendar-check"></i> Mark as Paid (Advance)
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-text text-muted mt-2">
+                            This will mark current invoice as paid and create paid invoices for the selected advance period.
+                        </div>
+                    </form>
+                </div>
+
                 <div class="due-date-section">
                     <h6 class="mb-3">
                         <i class="fas fa-calendar-alt me-2"></i>
-                        Update Due Date
+                        Custom Due Date Options
                     </h6>
-                    <form method="post" class="mb-0">
+                    
+                    <!-- Custom Due Date Form -->
+                    <form method="post" class="mb-3">
                         <div class="date-input-group">
                             <div class="form-floating">
                                 <input type="date" 
@@ -1532,11 +1675,31 @@ function getTimeRemaining($due_date) {
                                        value="<?= htmlspecialchars($invoice['EndDate'] ?? '') ?>"
                                        min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
                                        required>
-                                <label for="newDueDate">New Due Date</label>
+                                <label for="newDueDate">Update Due Date Only</label>
                             </div>
                             <input type="hidden" name="invoice_id" value="<?= $chat_invoice_id ?>">
                             <button type="submit" name="update_due_date" class="btn-action btn-update">
-                                <i class="fas fa-calendar-check"></i> Update Due Date
+                                <i class="fas fa-calendar"></i> Update Date
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Custom Due Date Mark as Paid -->
+                    <form method="post">
+                        <div class="date-input-group">
+                            <div class="form-floating">
+                                <input type="date" 
+                                       name="custom_due_date" 
+                                       class="form-control" 
+                                       id="customDueDate"
+                                       value="<?= date('Y-m-d', strtotime('+1 month')) ?>"
+                                       min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
+                                       required>
+                                <label for="customDueDate">Mark Paid with Custom Due Date</label>
+                            </div>
+                            <input type="hidden" name="invoice_id" value="<?= $chat_invoice_id ?>">
+                            <button type="submit" name="mark_paid_custom" class="btn-action btn-paid">
+                                <i class="fas fa-check-circle"></i> Mark Paid
                             </button>
                         </div>
                     </form>
@@ -1767,14 +1930,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </form>
                 
                 <div class="text-center mt-3">
-                    <?php if (strtolower($invoice['Status'] ?? '') !== 'paid' && strtolower($invoice['Flow_Status'] ?? '') !== 'done'): ?>
-                        <!-- Custom Due Date Mark as Paid Button -->
-                        <button class="btn-action btn-paid" onclick="showCustomPaidModal(<?= $invoice['Invoice_ID'] ?>)">
-                            <i class="fas fa-calendar-plus"></i> Mark as Paid (Custom Due Date)
-                        </button>
-                    <?php endif; ?>
-                    
-                    <a href="generate_invoice.php?status=<?= htmlspecialchars($status_filter) ?>" class="btn btn-outline-secondary ms-2">
+                    <a href="generate_invoice.php?status=<?= htmlspecialchars($status_filter) ?>" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left me-1"></i> Back to Invoices
                     </a>
                 </div>
@@ -1927,47 +2083,6 @@ document.addEventListener('DOMContentLoaded', function() {
         <?php endif; ?>
     </div>
 
-    <!-- Custom Due Date Modal -->
-    <div class="modal fade" id="customPaidModal" tabindex="-1" aria-labelledby="customPaidModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="customPaidModalLabel">
-                        <i class="fas fa-calendar-plus me-2"></i>
-                        Mark as Paid with Custom Due Date
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="post" id="customPaidForm">
-                    <div class="modal-body">
-                        <div class="alert alert-info mb-3">
-                            <i class="fas fa-info-circle me-2"></i>
-                            This will mark the current invoice as paid and create a new invoice with your custom due date.
-                        </div>
-                        <div class="form-floating">
-                            <input type="date" 
-                                   name="custom_due_date" 
-                                   class="form-control" 
-                                   id="customDueDate"
-                                   min="<?= date('Y-m-d', strtotime('+1 day')) ?>"
-                                   value="<?= date('Y-m-d', strtotime('+1 month')) ?>"
-                                   required>
-                            <label for="customDueDate">Next Invoice Due Date</label>
-                        </div>
-                        <input type="hidden" name="invoice_id" id="modalInvoiceId" value="">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" name="mark_paid_custom" class="btn btn-success">
-                            <i class="fas fa-check-circle me-1"></i>
-                            Mark as Paid & Create Next Invoice
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Live poll unread client messages for admin (desktop and mobile)
@@ -2059,29 +2174,45 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Regular mark as paid confirmation
-        function confirmPaid(button) {
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "Mark this invoice as PAID? The system will send a chat message as a receipt and create the next invoice for the next month with chat continuity.",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#10b981',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Yes, mark it as paid!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.location.href = button.getAttribute('data-href');
+        // Auto-hide alerts after 5 seconds
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-10px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
                 }
-            });
-        }
+            }, 5000);
+        });
 
-        // Custom due date modal
-        function showCustomPaidModal(invoiceId) {
-            document.getElementById('modalInvoiceId').value = invoiceId;
-            const modal = new bootstrap.Modal(document.getElementById('customPaidModal'));
-            modal.show();
-        }
+        // Form validation for custom due date
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const dateInputs = this.querySelectorAll('input[type="date"]');
+                dateInputs.forEach(input => {
+                    if (input.value) {
+                        const selectedDate = new Date(input.value);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0); // Reset time for comparison
+                        
+                        if (selectedDate <= today) {
+                            e.preventDefault();
+                            Swal.fire({
+                                title: 'Invalid Date',
+                                text: 'Due date must be in the future.',
+                                icon: 'error',
+                                confirmButtonColor: '#6366f1'
+                            });
+                            return false;
+                        }
+                    }
+                });
+            });
+        });
 
         // Admin typing indicator AJAX
         document.addEventListener('DOMContentLoaded', function() {
@@ -2113,40 +2244,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
                 });
-            }
-        });
-
-        // Auto-hide alerts after 5 seconds
-        document.querySelectorAll('.alert').forEach(alert => {
-            setTimeout(() => {
-                if (alert.parentNode) {
-                    alert.style.opacity = '0';
-                    alert.style.transform = 'translateY(-10px)';
-                    setTimeout(() => {
-                        if (alert.parentNode) {
-                            alert.remove();
-                        }
-                    }, 300);
-                }
-            }, 5000);
-        });
-
-        // Form validation for custom due date
-        document.getElementById('customPaidForm').addEventListener('submit', function(e) {
-            const dueDateInput = document.getElementById('customDueDate');
-            const selectedDate = new Date(dueDateInput.value);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // Reset time for comparison
-            
-            if (selectedDate <= today) {
-                e.preventDefault();
-                Swal.fire({
-                    title: 'Invalid Date',
-                    text: 'Due date must be in the future.',
-                    icon: 'error',
-                    confirmButtonColor: '#6366f1'
-                });
-                return false;
             }
         });
     </script>
