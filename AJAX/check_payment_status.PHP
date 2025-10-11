@@ -1,37 +1,18 @@
 <?php
 require '../database/database.php';
+session_start();
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET');
-header('Access-Control-Allow-Headers: Content-Type');
 
-// Enable CORS for all origins
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    exit(0);
+if (!isset($_SESSION['client_id'])) {
+    echo json_encode(['success' => false, 'error' => 'Not logged in']);
+    exit();
 }
 
+$client_id = $_SESSION['client_id'];
 $db = new Database();
 
 try {
-    // Get client_id from POST or GET request
-    $client_id = null;
-    
-    if (isset($_POST['client_id']) && !empty($_POST['client_id'])) {
-        $client_id = intval($_POST['client_id']);
-    } elseif (isset($_GET['client_id']) && !empty($_GET['client_id'])) {
-        $client_id = intval($_GET['client_id']);
-    }
-    
-    if (!$client_id || $client_id <= 0) {
-        echo json_encode([
-            'success' => false, 
-            'error' => 'Invalid client ID',
-            'debug' => ['received_client_id' => $client_id]
-        ]);
-        exit();
-    }
-
     // Get recently paid invoices (within the last 5 minutes)
     $five_minutes_ago = date('Y-m-d H:i:s', strtotime('-5 minutes'));
     
@@ -76,21 +57,13 @@ try {
 
     echo json_encode([
         'success' => true,
-        'paid_invoices' => $paid_invoices ?: [],
-        'upcoming_payments' => $upcoming_payments ?: [],
-        'timestamp' => date('Y-m-d H:i:s'),
-        'debug' => [
-            'client_id' => $client_id,
-            'paid_count' => count($paid_invoices ?: []),
-            'upcoming_count' => count($upcoming_payments ?: [])
-        ]
+        'paid_invoices' => $paid_invoices,
+        'upcoming_payments' => $upcoming_payments,
+        'timestamp' => date('Y-m-d H:i:s')
     ]);
 
 } catch (Exception $e) {
     error_log("Payment status check error: " . $e->getMessage());
-    echo json_encode([
-        'success' => false, 
-        'error' => 'Database error: ' . $e->getMessage()
-    ]);
+    echo json_encode(['success' => false, 'error' => 'Database error']);
 }
 ?>

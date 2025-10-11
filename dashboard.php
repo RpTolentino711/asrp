@@ -1497,37 +1497,26 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        // Payment Status Notification System - PUBLIC AJAX VERSION
+        // Payment Status Notification System
         let shownPaymentNotifications = new Set();
         let shownReminderNotifications = new Set();
 
         function checkPaymentStatusAndNotify() {
-            <?php if (!empty($rented_units) && isset($client_id)): ?>
-            console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
-            
-            // Use GET request for public access
-            fetch(`AJAX/check_payment_status.PHP?client_id=<?= $client_id ?>&t=${Date.now()}`)
-            .then(res => {
-                console.log('📡 Response status:', res.status);
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.json();
+            <?php if (!empty($rented_units)): ?>
+            fetch('AJAX/check_payment_status.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'client_id=' + encodeURIComponent(<?= json_encode($client_id) ?>)
             })
+            .then(res => res.json())
             .then(data => {
-                console.log('📊 Payment status data:', data);
-                
                 if (data.success) {
-                    console.log('✅ Found paid invoices:', data.paid_invoices?.length || 0);
-                    console.log('📅 Found upcoming payments:', data.upcoming_payments?.length || 0);
-                    
                     // Show payment confirmation notifications
                     if (data.paid_invoices && data.paid_invoices.length > 0) {
                         data.paid_invoices.forEach(invoice => {
                             const notificationKey = `paid_${invoice.Invoice_ID}`;
                             
                             if (!shownPaymentNotifications.has(notificationKey)) {
-                                console.log('💰 Showing payment confirmation for invoice:', invoice.Invoice_ID);
                                 showPaymentConfirmation(invoice);
                                 shownPaymentNotifications.add(notificationKey);
                                 
@@ -1545,25 +1534,16 @@ function formatDateToMonthLetters($date) {
                             const reminderKey = `reminder_${invoice.Invoice_ID}`;
                             
                             if (!shownReminderNotifications.has(reminderKey)) {
-                                console.log('⏰ Showing payment reminder for invoice:', invoice.Invoice_ID);
                                 showPaymentReminder(invoice);
                                 shownReminderNotifications.add(reminderKey);
                             }
                         });
                     }
-                    
-                    if (data.paid_invoices?.length === 0 && data.upcoming_payments?.length === 0) {
-                        console.log('ℹ️ No payment notifications to show');
-                    }
-                } else {
-                    console.error('❌ Payment status check failed:', data.error);
                 }
             })
             .catch(err => {
-                console.error('❌ Payment status check failed:', err);
+                console.error('Payment status check failed:', err);
             });
-            <?php else: ?>
-            console.log('ℹ️ No rented units, skipping payment check');
             <?php endif; ?>
         }
 
@@ -1591,7 +1571,24 @@ function formatDateToMonthLetters($date) {
                 background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
                 color: '#065f46',
                 timer: 8000,
-                timerProgressBar: true
+                timerProgressBar: true,
+                didOpen: () => {
+                    // Add celebration effect
+                    const timerInterval = setInterval(() => {
+                        const content = Swal.getHtmlContainer();
+                        if (content) {
+                            const b = content.querySelector('b');
+                            if (b && Math.random() > 0.7) {
+                                b.style.transform = 'scale(1.1)';
+                                setTimeout(() => b.style.transform = 'scale(1)', 200);
+                            }
+                        }
+                    }, 500);
+                    Swal.getTimerLeft();
+                    Swal.addEventListener('timer', () => {
+                        clearInterval(timerInterval);
+                    });
+                }
             }).then((result) => {
                 if (result.isConfirmed) {
                     window.location.href = 'invoice_history.php';
@@ -1644,29 +1641,6 @@ function formatDateToMonthLetters($date) {
                     window.location.href = 'invoice_history.php';
                 }
             });
-        }
-
-        // Test function to manually trigger notifications
-        function testPaymentNotifications() {
-            console.log('🧪 Testing payment notifications...');
-            
-            // Test payment confirmation
-            const testPaidInvoice = {
-                Invoice_ID: 999,
-                UnitName: 'Test Unit',
-                NextDueDate: '2025-01-15'
-            };
-            showPaymentConfirmation(testPaidInvoice);
-            
-            // Test payment reminder
-            const testReminderInvoice = {
-                Invoice_ID: 998,
-                UnitName: 'Test Unit',
-                InvoiceTotal: 11000,
-                EndDate: '2024-12-20',
-                DaysUntilDue: 2
-            };
-            setTimeout(() => showPaymentReminder(testReminderInvoice), 2000);
         }
 
         // Close navbar on mobile when clicking nav links
@@ -1832,9 +1806,6 @@ function formatDateToMonthLetters($date) {
             // Start payment status polling
             checkPaymentStatusAndNotify();
             setInterval(checkPaymentStatusAndNotify, 30000); // Check every 30 seconds
-            
-            // Make test function available globally
-            window.testPaymentNotifications = testPaymentNotifications;
         });
 
         // Live poll unread admin messages for client (Payment nav badge)
