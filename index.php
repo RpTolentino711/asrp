@@ -579,6 +579,42 @@ $testimonials = $db->getHomepageTestimonials(20);
     .modal-footer {
       border-top: 1px solid var(--gray-light);
     }
+
+
+
+    .description-text {
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.carousel-indicators button:hover::before {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    max-width: 300px;
+    z-index: 1000;
+}
+
+/* Tooltip customization for long descriptions */
+.tooltip {
+    max-width: 400px !important;
+}
+
+.tooltip-inner {
+    max-width: 400px;
+    white-space: pre-wrap;
+    text-align: left;
+    padding: 8px 12px;
+}
   </style>
 </head>
 
@@ -685,7 +721,7 @@ if (isset($_SESSION['login_error'])) {
               $modal_id = "unitModal" . $modal_counter;
               $photo_modal_id = "photoModal" . $modal_counter;
 
-              // UPDATED: Get photos with descriptions from photo_history table
+              // Get photos with descriptions from photo_history table (supports 1000 characters)
               $photos_with_descriptions = [];
               
               // Get active photos from photo_history table
@@ -695,7 +731,8 @@ if (isset($_SESSION['login_error'])) {
                       if (!empty($photo['Photo_Path']) && $photo['Status'] === 'active') {
                           $photos_with_descriptions[] = [
                               'url' => "uploads/unit_photos/" . htmlspecialchars($photo['Photo_Path']),
-                              'description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : 'Unit Photo'
+                              'description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : 'Unit Photo',
+                              'full_description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : ''
                           ];
                       }
                   }
@@ -707,7 +744,8 @@ if (isset($_SESSION['login_error'])) {
                   if (!empty($space[$photo_field])) {
                       $photos_with_descriptions[] = [
                           'url' => "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]),
-                          'description' => 'Unit Photo'
+                          'description' => 'Unit Photo',
+                          'full_description' => ''
                       ];
                   }
               }
@@ -758,7 +796,7 @@ if (isset($_SESSION['login_error'])) {
                 </div>
               </div>
 
-              <!-- Photo Modal with Descriptions -->
+              <!-- Photo Modal with Enhanced Descriptions (1000 characters support) -->
               <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-xl">
                   <div class="modal-content bg-dark">
@@ -771,9 +809,14 @@ if (isset($_SESSION['login_error'])) {
                     <div class="modal-body text-center">
                       <?php if (count($photos_with_descriptions) === 1): ?>
                         <img src="<?= $photos_with_descriptions[0]['url'] ?>" alt="<?= $photos_with_descriptions[0]['description'] ?>" class="img-fluid rounded shadow" style="max-height:60vh; object-fit: contain;">
-                        <?php if (!empty($photos_with_descriptions[0]['description']) && $photos_with_descriptions[0]['description'] !== 'Unit Photo'): ?>
+                        <?php if (!empty($photos_with_descriptions[0]['full_description']) && $photos_with_descriptions[0]['full_description'] !== 'Unit Photo'): ?>
                           <div class="mt-3">
-                            <p class="text-white fw-semibold"><?= $photos_with_descriptions[0]['description'] ?></p>
+                            <p class="text-white fw-semibold mb-2">Photo Description:</p>
+                            <div class="bg-dark bg-opacity-50 p-3 rounded text-start">
+                              <p class="text-white mb-0 description-text" style="max-height: 120px; overflow-y: auto; line-height: 1.5;">
+                                <?= $photos_with_descriptions[0]['full_description'] ?>
+                              </p>
+                            </div>
                           </div>
                         <?php endif; ?>
                       <?php elseif (count($photos_with_descriptions) > 1): ?>
@@ -782,9 +825,14 @@ if (isset($_SESSION['login_error'])) {
                             <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
                               <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
                                 <img src="<?= $photo_data['url'] ?>" class="d-block mx-auto img-fluid rounded shadow" alt="<?= $photo_data['description'] ?>" style="max-height:60vh; object-fit: contain;">
-                                <?php if (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo'): ?>
+                                <?php if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo'): ?>
                                   <div class="mt-3">
-                                    <p class="text-white fw-semibold"><?= $photo_data['description'] ?></p>
+                                    <p class="text-white fw-semibold mb-2">Photo Description:</p>
+                                    <div class="bg-dark bg-opacity-50 p-3 rounded text-start">
+                                      <p class="text-white mb-0 description-text" style="max-height: 120px; overflow-y: auto; line-height: 1.5;">
+                                        <?= $photo_data['full_description'] ?>
+                                      </p>
+                                    </div>
                                   </div>
                                 <?php endif; ?>
                               </div>
@@ -799,12 +847,19 @@ if (isset($_SESSION['login_error'])) {
                               <span class="visually-hidden">Next</span>
                           </button>
                           
-                          <!-- Carousel Indicators -->
+                          <!-- Carousel Indicators with Tooltips for Descriptions -->
                           <div class="carousel-indicators" style="bottom: -50px;">
                             <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
-                              <button type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide-to="<?= $idx ?>" 
+                              <button type="button" 
+                                      data-bs-target="#zoomCarousel<?= $modal_counter ?>" 
+                                      data-bs-slide-to="<?= $idx ?>" 
                                       class="<?= $idx === 0 ? 'active' : '' ?>" 
                                       aria-label="Slide <?= $idx + 1 ?>"
+                                      <?php if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo'): ?>
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top" 
+                                        title="<?= htmlspecialchars($photo_data['full_description']) ?>"
+                                      <?php endif; ?>
                                       style="width: 60px; height: 40px; margin: 0 2px; border: none; background-size: cover; background-position: center; background-image: url('<?= $photo_data['url'] ?>');">
                               </button>
                             <?php endforeach; ?>
@@ -819,6 +874,13 @@ if (isset($_SESSION['login_error'])) {
                     </div>
                     <div class="modal-footer border-0">
                       <small class="text-muted"><?= $photo_count ?> photo<?= $photo_count !== 1 ? 's' : '' ?> available</small>
+                      <?php if (!empty($photos_with_descriptions) && array_filter($photos_with_descriptions, function($photo) { 
+                          return !empty($photo['full_description']) && $photo['full_description'] !== 'Unit Photo'; 
+                      })): ?>
+                        <small class="text-info ms-2">
+                          <i class="bi bi-info-circle me-1"></i>Hover over thumbnails for descriptions
+                        </small>
+                      <?php endif; ?>
                     </div>
                   </div>
                 </div>
@@ -829,7 +891,7 @@ if (isset($_SESSION['login_error'])) {
               if ($is_logged_in && !$client_is_inactive) {
                   $modals .= '
                   <div class="modal fade" id="' . $modal_id . '" tabindex="-1" aria-labelledby="' . $modal_id . 'Label" aria-hidden="true">
-                      <div class="modal-dialog modal-dialog-centered">
+                      <div class="modal-dialog modal-dialog-centered modal-lg">
                           <div class="modal-content">
                               <div class="modal-header">
                                   <h5 class="modal-title" id="' . $modal_id . 'Label">Contact Admin to Rent: ' . htmlspecialchars($space['Name']) . '</h5>
@@ -841,44 +903,51 @@ if (isset($_SESSION['login_error'])) {
                                         To rent this unit and join our community, please submit your rental request. The admin will review your application and contact you to guide you through the next steps.
                                   </div>
                                   
-                                  <!-- Unit Photos Preview in Rental Modal -->
+                                  <!-- Unit Photos Preview in Rental Modal with Enhanced Descriptions -->
                                   ' . (count($photos_with_descriptions) > 0 ? '
                                   <div class="mb-4">
                                       <h6 class="fw-bold mb-3">Unit Photos:</h6>
                                       <div class="row g-2">' : '') . '
                                       ';
                                   
-                                  // Add photo thumbnails to rental modal
-                                  $thumb_counter = 0;
-                                  foreach ($photos_with_descriptions as $photo_data) {
-                                      if ($thumb_counter < 4) { // Show max 4 thumbnails
-                                          $modals .= '
-                                          <div class="col-3">
-                                              <div class="position-relative">
-                                                  <img src="' . $photo_data['url'] . '" class="img-thumbnail" alt="Unit Photo" style="width: 100%; height: 80px; object-fit: cover; cursor: pointer;" 
-                                                       data-bs-toggle="modal" data-bs-target="#' . $photo_modal_id . '">
-                                                  ' . (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo' ? '
-                                                  <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white p-1" style="font-size: 0.7rem;">
-                                                      ' . $photo_data['description'] . '
-                                                  </div>' : '') . '
-                                              </div>
-                                          </div>';
-                                          $thumb_counter++;
-                                      }
-                                  }
-                                  
-                                  if (count($photos_with_descriptions) > 4) {
-                                      $modals .= '
-                                          <div class="col-3">
-                                              <div class="img-thumbnail d-flex align-items-center justify-content-center bg-light" style="width: 100%; height: 80px;">
-                                                  <small class="text-muted">+' . (count($photos_with_descriptions) - 4) . ' more</small>
-                                              </div>
-                                          </div>';
-                                  }
-                                  
-                                  $modals .= (count($photos_with_descriptions) > 0 ? '
+                  // Add photo thumbnails to rental modal with description tooltips
+                  $thumb_counter = 0;
+                  foreach ($photos_with_descriptions as $photo_data) {
+                      if ($thumb_counter < 4) { // Show max 4 thumbnails
+                          $tooltip_attr = '';
+                          if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo') {
+                              $tooltip_attr = 'data-bs-toggle="tooltip" data-bs-placement="top" title="' . htmlspecialchars($photo_data['full_description']) . '"';
+                          }
+                          
+                          $modals .= '
+                          <div class="col-3">
+                              <div class="position-relative">
+                                  <img src="' . $photo_data['url'] . '" class="img-thumbnail" alt="Unit Photo" style="width: 100%; height: 80px; object-fit: cover; cursor: pointer;" 
+                                       data-bs-toggle="modal" data-bs-target="#' . $photo_modal_id . '" ' . $tooltip_attr . '>
+                                  ' . (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo' ? '
+                                  <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white p-1" style="font-size: 0.7rem; line-height: 1.2; max-height: 30px; overflow: hidden;">
+                                      ' . (strlen($photo_data['description']) > 30 ? substr($photo_data['description'], 0, 27) . '...' : $photo_data['description']) . '
+                                  </div>' : '') . '
+                              </div>
+                          </div>';
+                          $thumb_counter++;
+                      }
+                  }
+                  
+                  if (count($photos_with_descriptions) > 4) {
+                      $modals .= '
+                          <div class="col-3">
+                              <div class="img-thumbnail d-flex align-items-center justify-content-center bg-light" style="width: 100%; height: 80px;">
+                                  <small class="text-muted">+' . (count($photos_with_descriptions) - 4) . ' more</small>
+                              </div>
+                          </div>';
+                  }
+                  
+                  $modals .= (count($photos_with_descriptions) > 0 ? '
                                       </div>
-                                      <small class="text-muted mt-2 d-block">Click on photos to view full gallery</small>
+                                      <small class="text-muted mt-2 d-block">
+                                          <i class="bi bi-info-circle me-1"></i>Click on photos to view full gallery with detailed descriptions
+                                      </small>
                                   </div>' : '') . '
                                   
                                   <div class="row">
@@ -1394,6 +1463,20 @@ if (isset($_SESSION['login_error'])) {
         this.style.transform = 'translateY(0)';
       });
     });
+
+
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            delay: {show: 500, hide: 100},
+            customClass: 'enhanced-tooltip'
+        });
+    });
+});
+
   </script>
 </body>
 </html>
