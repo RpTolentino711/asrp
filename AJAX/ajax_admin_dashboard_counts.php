@@ -15,8 +15,7 @@ try {
         'pending_rentals' => 0,
         'pending_maintenance' => 0,
         'unpaid_invoices' => 0,
-        'overdue_invoices' => 0,
-        'new_maintenance_requests' => 0 // Add this new field
+        'overdue_invoices' => 0
     ];
     
     // Pending rental requests (all, not filtered by date)
@@ -24,15 +23,10 @@ try {
     $result = $db->getRow($sql);
     $counts['pending_rentals'] = $result['count'] ?? 0;
     
-    // Pending maintenance requests (all) - NEW: Track unseen maintenance requests
+    // Pending maintenance requests (all)
     $sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')";
     $result = $db->getRow($sql);
     $counts['pending_maintenance'] = $result['count'] ?? 0;
-    
-    // NEW: Get count of maintenance requests that haven't been seen yet
-    $sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0";
-    $result = $db->getRow($sql);
-    $counts['new_maintenance_requests'] = $result['count'] ?? 0;
     
     // Unpaid invoices (all)
     $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new'";
@@ -54,7 +48,6 @@ try {
         'pending_maintenance' => 0,
         'unpaid_invoices' => 0,
         'overdue_invoices' => 0,
-        'new_maintenance_requests' => 0,
         'error' => $e->getMessage()
     ]);
 }
