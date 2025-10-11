@@ -521,6 +521,359 @@ function renderCountdown($due_date, $invoice_id) {
             position: relative;
         }
 
+        /* Mobile Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
+        }
+        
+        /* Sidebar Styling */
+        .sidebar {
+            position: fixed;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, var(--dark), var(--darker));
+            color: white;
+            padding: 1.5rem 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: var(--transition);
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 0 1.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.35rem;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .sidebar-brand i {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+        
+        .nav-item {
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: rgba(255, 255, 255, 0.85);
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .nav-link i {
+            width: 24px;
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+        }
+        
+        .badge-notification {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+        
+        /* Header */
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .page-title h1 {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: var(--dark);
+            margin-bottom: 0;
+        }
+
+        .page-title p {
+            font-size: 0.9rem;
+        }
+        
+        .title-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-size: 1.25rem;
+        }
+        
+        /* Dashboard Card */
+        .dashboard-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .card-header i {
+            color: var(--primary);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Table Styling */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+        }
+        
+        .custom-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 700px;
+        }
+        
+        .custom-table th {
+            background-color: #f9fafb;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            text-align: left;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+        }
+        
+        .custom-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+        
+        .custom-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .custom-table tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        /* Chat Interface */
+        .chat-container {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .chat-meta {
+            padding: 1rem;
+            background: #f9fafb;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--primary);
+        }
+        
+        .chat-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: #fafafa;
+            border-radius: var(--border-radius);
+        }
+        
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius);
+            max-width: 80%;
+        }
+        
+        .chat-message.admin {
+            background: rgba(99, 102, 241, 0.1);
+            border-left: 4px solid var(--primary);
+            margin-left: auto;
+        }
+        
+        .chat-message.client {
+            background: rgba(107, 114, 128, 0.1);
+            border-left: 4px solid #6b7280;
+        }
+        
+        .chat-message.system {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--warning);
+            text-align: center;
+            margin: 0 auto;
+            font-style: italic;
+        }
+        
+        .message-sender {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        
+        /* ZOOMABLE CHAT IMAGES */
+        .zoomable-chat-image {
+            max-width: 200px;
+            max-height: 150px;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            cursor: zoom-in;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        
+        .zoomable-chat-image:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .zoomable-chat-image.zoomed {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(1.5);
+            max-width: 90vw;
+            max-height: 90vh;
+            z-index: 10000;
+            cursor: zoom-out;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        .image-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            display: none;
+            cursor: zoom-out;
+        }
+        
+        .image-overlay.active {
+            display: block;
+        }
+        
+        .chat-form {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+        }
+        
         /* Payment Period Cards */
         .period-cards {
             display: grid;
@@ -688,8 +1041,293 @@ function renderCountdown($due_date, $invoice_id) {
             font-weight: 500;
         }
 
+        /* Due Date Management */
+        .due-date-section {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 4px solid var(--warning);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
+        }
+
+        .date-input-group {
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+
+        .date-input-group .form-control {
+            flex: 1;
+        }
+
+        /* Filter Buttons */
+        .filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            text-decoration: none;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+        }
+        
+        .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .filter-btn:not(.active) {
+            background: #f8f9fa;
+            color: #6b7280;
+        }
+
+        .filter-btn:not(.active):hover {
+            background: #e9ecef;
+            color: var(--dark);
+        }
+        
+        /* Action Buttons */
+        .btn-action {
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .btn-chat {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        
+        .btn-chat:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-paid {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--secondary);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-paid:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-update {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .btn-update:hover {
+            background: var(--warning);
+            color: white;
+        }
+        
+        /* Status Badges */
+        .badge {
+            padding: 0.35rem 0.65rem;
+            font-weight: 600;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Mobile Card Layout */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-card.overdue {
+            border-left-color: var(--danger);
+        }
+
+        .mobile-card.warning {
+            border-left-color: var(--warning);
+        }
+
+        .mobile-card.completed {
+            border-left-color: var(--secondary);
+        }
+
+        .mobile-card-header {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            align-items: flex-start;
+        }
+
+        .mobile-card-detail .label {
+            font-weight: 500;
+            color: #6b7280;
+            min-width: 80px;
+        }
+
+        .mobile-card-detail .value {
+            color: var(--dark);
+            text-align: right;
+            flex: 1;
+        }
+
+        .mobile-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .mobile-actions .btn-action {
+            flex: 1;
+            justify-content: center;
+            min-width: 120px;
+        }
+
+        /* Chat Mobile Optimizations */
+        .mobile-chat-meta {
+            background: rgba(99, 102, 241, 0.05);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-chat-form {
+            background: #f9fafb;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+        }
+
+        /* Hide desktop table on mobile */
+        .table-mobile {
+            display: none;
+        }
+        
         /* Mobile Responsive */
-        @media (max-width: 768px) {
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .page-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .title-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .custom-table {
+                display: none;
+            }
+
+            .table-mobile {
+                display: block;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .chat-container {
+                padding: 1rem;
+            }
+
+            .chat-messages {
+                max-height: 300px;
+            }
+
+            .chat-message {
+                max-width: 95%;
+            }
+
+            .filter-buttons {
+                justify-content: center;
+            }
+
+            .date-input-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            /* Payment Period Responsive */
             .period-cards {
                 grid-template-columns: repeat(3, 1fr);
                 gap: 0.75rem;
@@ -711,9 +1349,63 @@ function renderCountdown($due_date, $invoice_id) {
                 padding: 0.5rem 0.25rem;
                 font-size: 0.8rem;
             }
-        }
 
-        @media (max-width: 480px) {
+            /* Mobile image zoom */
+            .zoomable-chat-image.zoomed {
+                transform: translate(-50%, -50%) scale(1.2);
+                max-width: 95vw;
+                max-height: 80vh;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 0.75rem;
+            }
+
+            .chat-form .row {
+                flex-direction: column;
+            }
+
+            .chat-form .col-md-8,
+            .chat-form .col-md-2 {
+                margin-bottom: 0.5rem;
+            }
+
+            .form-control, .form-select {
+                font-size: 16px;
+            }
+
+            .mobile-actions {
+                flex-direction: column;
+            }
+
+            .mobile-actions .btn-action {
+                min-width: auto;
+            }
+
+            .filter-buttons {
+                flex-direction: column;
+            }
+
+            .filter-btn {
+                text-align: center;
+            }
+
+            .zoomable-chat-image {
+                max-width: 150px;
+                max-height: 100px;
+            }
+
+            .chat-meta .row {
+                flex-direction: column;
+            }
+
+            .chat-meta .col-md-6:last-child {
+                text-align: left;
+                margin-top: 0.5rem;
+            }
+
             .period-cards {
                 grid-template-columns: repeat(2, 1fr);
             }
@@ -724,70 +1416,107 @@ function renderCountdown($due_date, $invoice_id) {
             }
         }
 
-        /* Rest of your existing CSS styles... */
-        .mobile-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-            display: none;
+        @media (max-width: 480px) {
+            .page-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .dashboard-card {
+                border-radius: 8px;
+            }
+
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+            }
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+
+            .chat-messages {
+                max-height: 250px;
+                padding: 0.75rem;
+            }
+
+            .chat-message {
+                padding: 0.5rem 0.75rem;
+            }
+
+            .zoomable-chat-image {
+                max-width: 120px;
+                max-height: 90px;
+            }
+
+            .period-cards {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+
+            .period-card {
+                padding: 0.75rem 0.25rem;
+            }
+
+            .period-number {
+                font-size: 1.1rem;
+            }
+
+            .period-label {
+                font-size: 0.8rem;
+            }
+
+            .period-date {
+                font-size: 0.7rem;
+            }
         }
 
-        .mobile-overlay.active {
-            display: block;
-        }
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-action, .nav-link, .mobile-menu-btn, .filter-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+            
+            .zoomable-chat-image {
+                min-height: 44px;
+                min-width: 44px;
+            }
 
-        .mobile-header {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
-            z-index: 1001;
-            padding: 0 1rem;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .mobile-menu-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            color: var(--dark);
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: var(--transition);
-        }
-
-        .sidebar {
-            position: fixed;
-            width: var(--sidebar-width);
-            height: 100vh;
-            background: linear-gradient(180deg, var(--dark), var(--darker));
-            color: white;
-            padding: 1.5rem 1rem;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-            transition: var(--transition);
-            overflow-y: auto;
+            .period-card {
+                min-height: 100px;
+            }
         }
         
-        .main-content {
-            margin-left: var(--sidebar-width);
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Loading state */
+        .loading-state {
+            text-align: center;
             padding: 2rem;
-            transition: var(--transition);
+            color: #6b7280;
         }
-        
-        /* Add all your existing CSS styles here... */
-        /* [Include all your existing CSS styles from the previous code] */
-        
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -1406,10 +2135,291 @@ function renderCountdown($due_date, $invoice_id) {
                     }
                 }, 5000);
             });
+
+            // Image zoom functionality
+            function initImageZoom() {
+                const overlay = document.getElementById('imageOverlay');
+                
+                document.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('zoomable-chat-image')) {
+                        const img = e.target;
+                        
+                        if (img.classList.contains('zoomed')) {
+                            // Zoom out
+                            img.classList.remove('zoomed');
+                            overlay.classList.remove('active');
+                        } else {
+                            // Zoom in
+                            img.classList.add('zoomed');
+                            overlay.classList.add('active');
+                        }
+                    } else if (e.target === overlay) {
+                        // Click on overlay - zoom out all images
+                        document.querySelectorAll('.zoomable-chat-image.zoomed').forEach(img => {
+                            img.classList.remove('zoomed');
+                        });
+                        overlay.classList.remove('active');
+                    }
+                });
+
+                // Close on escape key
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape') {
+                        document.querySelectorAll('.zoomable-chat-image.zoomed').forEach(img => {
+                            img.classList.remove('zoomed');
+                        });
+                        overlay.classList.remove('active');
+                    }
+                });
+            }
+
+            // Initialize image zoom
+            initImageZoom();
+
+            // Live poll unread client messages for admin
+            function pollAdminUnreadBadges() {
+                const invoiceLinks = document.querySelectorAll('.btn-chat[data-invoice-id]');
+                const invoiceIds = Array.from(invoiceLinks).map(link => link.getAttribute('data-invoice-id'));
+                if (invoiceIds.length === 0) return;
+                fetch('../AJAX/get_unread_client_chat_counts.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'invoice_ids=' + encodeURIComponent(JSON.stringify(invoiceIds))
+                })
+                .then(res => res.json())
+                .then(counts => {
+                    invoiceIds.forEach(id => {
+                        // Desktop badge
+                        const badge = document.getElementById('unread-badge-' + id);
+                        if (badge) {
+                            const count = counts[id] || 0;
+                            if (count > 0) {
+                                badge.textContent = count;
+                                badge.classList.remove('d-none');
+                            } else {
+                                badge.textContent = '';
+                                badge.classList.add('d-none');
+                            }
+                        }
+                        // Mobile badge
+                        const badgeMobile = document.getElementById('unread-badge-mobile-' + id);
+                        if (badgeMobile) {
+                            const count = counts[id] || 0;
+                            if (count > 0) {
+                                badgeMobile.textContent = count;
+                                badgeMobile.classList.remove('d-none');
+                            } else {
+                                badgeMobile.textContent = '';
+                                badgeMobile.classList.add('d-none');
+                            }
+                        }
+                    });
+                });
+            }
+
+            // Initialize unread badges
+            pollAdminUnreadBadges();
+            setInterval(pollAdminUnreadBadges, 5000);
+
+            // Mark messages as read for admin via AJAX when chat is opened
+            document.querySelectorAll('.btn-chat[data-invoice-id]').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    const invoiceId = this.getAttribute('data-invoice-id');
+                    if (!invoiceId) return;
+                    fetch('../AJAX/mark_admin_chat_read.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'invoice_id=' + encodeURIComponent(invoiceId)
+                    });
+                });
+            });
+
+            // Admin typing indicator AJAX
+            const textarea = document.querySelector('.admin-chat-textarea');
+            const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+            let typing = false;
+            let typingTimeout = null;
+            if (textarea && invoiceId) {
+                textarea.addEventListener('input', function() {
+                    if (!typing) {
+                        typing = true;
+                        sendTypingStatus(1);
+                    }
+                    clearTimeout(typingTimeout);
+                    typingTimeout = setTimeout(() => {
+                        typing = false;
+                        sendTypingStatus(0);
+                    }, 3000); // 3 seconds after last input
+                });
+                // On blur, clear typing
+                textarea.addEventListener('blur', function() {
+                    typing = false;
+                    sendTypingStatus(0);
+                });
+            }
+            function sendTypingStatus(isTyping) {
+                fetch('../AJAX/invoice_admin_typing.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'invoice_id=' + encodeURIComponent(invoiceId) + '&typing=' + (isTyping ? '1' : '0')
+                });
+            }
         });
 
-        // Image zoom functionality and chat loading functions
-        // [Include your existing image zoom and chat loading JavaScript here]
+        // Live admin chat message loader with auto-scroll control
+        let clientTyping = false;
+        let shouldAutoScroll = true;
+        let userManuallyScrolled = false;
+
+        async function loadAdminChatMessages() {
+            const chatMessages = document.getElementById('adminChatMessages');
+            if (!chatMessages) return;
+            const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+            if (!invoiceId) return;
+            
+            // Store current scroll position and whether user is at bottom
+            const wasAtBottom = isAtBottom(chatMessages);
+            const previousScrollTop = chatMessages.scrollTop;
+            const previousScrollHeight = chatMessages.scrollHeight;
+            
+            try {
+                const response = await fetch('../AJAX/admin_invoice_chat_messages.php?invoice_id=' + invoiceId);
+                const data = await response.json();
+                
+                // If user has manually scrolled up, don't auto-scroll
+                if (userManuallyScrolled && !wasAtBottom) {
+                    shouldAutoScroll = false;
+                } else {
+                    shouldAutoScroll = true;
+                }
+                
+                chatMessages.innerHTML = '';
+                if (data.error) {
+                    chatMessages.innerHTML = `<div class='text-center text-danger py-4'>${data.error}</div>`;
+                    return;
+                }
+                if (data.length === 0) {
+                    chatMessages.innerHTML = `<div class='text-center text-muted py-4'><i class='fas fa-comments fa-3x mb-3 d-block opacity-50'></i><h5>No messages yet</h5><p>Start a conversation about this invoice.</p></div>`;
+                    return;
+                }
+                
+                data.forEach(msg => {
+                    const is_admin = msg.Sender_Type === 'admin';
+                    const is_system = msg.Sender_Type === 'system';
+                    const is_client = msg.Sender_Type === 'client';
+                    let bubbleClass = is_admin ? 'admin' : (is_system ? 'system' : (is_client ? 'client' : ''));
+                    let sender = msg.SenderName || (is_system ? 'System' : (is_admin ? 'Admin' : 'Client'));
+                    let html = `<div class='chat-message ${bubbleClass}'>`;
+                    html += `<div class='message-sender'>${sender}</div>`;
+                    html += `<div class='message-text'>${msg.Message.replace(/\n/g, '<br>')}`;
+                    if (msg.Image_Path) {
+                        html += `<img src='../${msg.Image_Path}' class='zoomable-chat-image mt-2' alt='chat photo'>`;
+                    }
+                    html += `</div>`;
+                    html += `<div class='message-time'>${msg.Created_At || ''}</div>`;
+                    html += `</div>`;
+                    chatMessages.innerHTML += html;
+                });
+                
+                // Add typing bubble if client is typing
+                if (clientTyping) {
+                    let typingHtml = `<div class='chat-message client'>` +
+                        `<div class='message-sender'>Client</div>` +
+                        `<div class='message-text' style='opacity:0.7;'><span class='me-2'><i class='fas fa-ellipsis-h'></i></span>Client is typing...</div>` +
+                        `<div class='message-time'></div></div>`;
+                    chatMessages.innerHTML += typingHtml;
+                }
+                
+                // Handle scrolling based on user behavior
+                if (shouldAutoScroll) {
+                    // Auto-scroll to bottom if user was at bottom or it's a new message
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                } else {
+                    // Maintain scroll position when loading new messages but user is reading old ones
+                    const newScrollHeight = chatMessages.scrollHeight;
+                    const heightDifference = newScrollHeight - previousScrollHeight;
+                    chatMessages.scrollTop = previousScrollTop + heightDifference;
+                }
+                
+            } catch (err) {
+                chatMessages.innerHTML = `<div class='text-center text-danger py-4'>Failed to load messages.</div>`;
+            }
+        }
+
+        // Helper function to check if user is at bottom of chat
+        function isAtBottom(element, threshold = 100) {
+            return element.scrollTop + element.clientHeight >= element.scrollHeight - threshold;
+        }
+
+        // Detect when user manually scrolls
+        function initScrollDetection() {
+            const chatMessages = document.getElementById('adminChatMessages');
+            if (!chatMessages) return;
+            
+            chatMessages.addEventListener('scroll', function() {
+                // If user scrolls up manually, set flag to prevent auto-scroll
+                if (!isAtBottom(chatMessages)) {
+                    userManuallyScrolled = true;
+                    shouldAutoScroll = false;
+                } else {
+                    // If user scrolls back to bottom, re-enable auto-scroll
+                    userManuallyScrolled = false;
+                    shouldAutoScroll = true;
+                }
+            });
+            
+            // Reset auto-scroll when user sends a new message
+            const chatForm = document.querySelector('.chat-form');
+            if (chatForm) {
+                chatForm.addEventListener('submit', function() {
+                    userManuallyScrolled = false;
+                    shouldAutoScroll = true;
+                });
+            }
+        }
+
+        // Reset scroll behavior when opening a different chat
+        function resetScrollBehavior() {
+            userManuallyScrolled = false;
+            shouldAutoScroll = true;
+        }
+
+        // Poll client typing status
+        async function pollClientTyping() {
+            const invoiceId = <?= json_encode($chat_invoice_id) ?>;
+            if (!invoiceId) return;
+            try {
+                const response = await fetch('../AJAX/invoice_client_typing.php?invoice_id=' + invoiceId);
+                const data = await response.json();
+                clientTyping = !!data.typing;
+            } catch (e) {
+                clientTyping = false;
+            }
+        }
+
+        // Initialize everything when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initScrollDetection();
+            loadAdminChatMessages();
+            pollClientTyping();
+            
+            // Reset scroll behavior when page loads
+            resetScrollBehavior();
+            
+            // Refresh messages and typing status every 5 seconds
+            setInterval(() => {
+                pollClientTyping();
+                loadAdminChatMessages();
+            }, 5000);
+        });
+
+        // Reset scroll behavior when leaving chat
+        document.addEventListener('DOMContentLoaded', function() {
+            const backButton = document.querySelector('a[href*="generate_invoice.php"]');
+            if (backButton) {
+                backButton.addEventListener('click', resetScrollBehavior);
+            }
+        });
     </script>
 </body>
 </html>
