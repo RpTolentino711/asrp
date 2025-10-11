@@ -19,13 +19,13 @@ try {
         'new_maintenance_requests' => 0 // Track unseen maintenance requests
     ];
     
-    // Pending rental requests (unseen by admin)
-    $sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
+    // Pending rental requests - MATCH MAIN DASHBOARD LOGIC
+    $sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new'";
     $result = $db->getRow($sql);
     $counts['pending_rentals'] = $result['count'] ?? 0;
     
-    // Total pending maintenance requests (all statuses)
-    $sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')";
+    // Pending maintenance requests - ONLY 'Submitted' status (not 'In Progress')
+    $sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'";
     $result = $db->getRow($sql);
     $counts['pending_maintenance'] = $result['count'] ?? 0;
     
@@ -34,13 +34,13 @@ try {
     $result = $db->getRow($sql);
     $counts['new_maintenance_requests'] = $result['count'] ?? 0;
     
-    // Unpaid invoices
-    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new'";
+    // Unpaid invoices - REMOVE Flow_Status filter
+    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'";
     $result = $db->getRow($sql);
     $counts['unpaid_invoices'] = $result['count'] ?? 0;
     
-    // Overdue invoices
-    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new'";
+    // Overdue invoices - REMOVE Flow_Status filter
+    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()";
     $result = $db->getRow($sql);
     $counts['overdue_invoices'] = $result['count'] ?? 0;
     

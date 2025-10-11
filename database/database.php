@@ -1322,41 +1322,28 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     $sql = "SELECT 
         COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE Sent_At BETWEEN ? AND ?) as new_messages_count
+        (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count
         FROM invoice 
         WHERE Status = 'paid' 
-        AND Created_At BETWEEN ? AND ?";
+        AND InvoiceDate BETWEEN ? AND ?";
     
     return $this->getRow($sql, [
         $startDate, $endDateWithTime, 
         $startDate, $endDateWithTime
     ]);
 }
-
 
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
-    // If no dates provided, use current month
-    if (!$startDate || !$endDate) {
-        $startDate = date('Y-m-01');
-        $endDate = date('Y-m-t');
-    }
-    
-    // Add time component to include the entire end date
-    $endDateWithTime = $endDate . ' 23:59:59';
-    
+    // Remove date filtering completely to match AJAX logic
     $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new' AND Requested_At BETWEEN ? AND ?) as pending_rentals,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress') AND RequestDate BETWEEN ? AND ?) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new' AND Created_At BETWEEN ? AND ?) as overdue_invoices";
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted') as pending_maintenance,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices";
     
-    return $this->getRow($sql, [
-        $startDate, $endDateWithTime, 
-        $startDate, $endDateWithTime,
-        $startDate, $endDateWithTime,
-        $startDate, $endDateWithTime
-    ]);
+    return $this->getRow($sql, []);
 }
+
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
@@ -1393,8 +1380,10 @@ public function getTotalRentalRequests($startDate, $endDate) {
 }
 
 
-
 public function getTotalMaintenanceRequests($startDate, $endDate) {
+    // Include the time component to cover the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         COUNT(*) as total_maintenance,
         COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted_requests,
@@ -1403,7 +1392,7 @@ public function getTotalMaintenanceRequests($startDate, $endDate) {
         FROM maintenancerequest 
         WHERE RequestDate BETWEEN ? AND ?";
     
-    $result = $this->getRow($sql, [$startDate, $endDate]);
+    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
     return [
         'total' => $result['total_maintenance'] ?? 0,
         'submitted' => $result['submitted_requests'] ?? 0,
