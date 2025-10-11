@@ -1635,6 +1635,21 @@ public function getCompletedMaintenanceRequests() {
 
 
 
+public function getRequestCompletionDate($requestId) {
+    try {
+        $sql = "SELECT StatusChangeDate FROM maintenancerequeststatushistory 
+                WHERE Request_ID = ? AND NewStatus = 'Completed' 
+                ORDER BY StatusChangeDate DESC LIMIT 1";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$requestId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? date('M j, Y g:i A', strtotime($result['StatusChangeDate'])) : null;
+    } catch (Exception $e) {
+        error_log("Error getting completion date: " . $e->getMessage());
+        return null;
+    }
+}
+
 
 
     public function getAllHandymenWithJobTypes() {
@@ -1673,6 +1688,18 @@ public function getCompletedMaintenanceRequests() {
             return false;
         }
     }
+
+    public function markMaintenanceRequestAsSeen($requestId) {
+    try {
+        $sql = "UPDATE maintenancerequest SET admin_seen = 1 WHERE Request_ID = ?";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$requestId]);
+        return true;
+    } catch (Exception $e) {
+        error_log("Error marking maintenance request as seen: " . $e->getMessage());
+        return false;
+    }
+}
 
     
 

@@ -11,7 +11,7 @@ $db = new Database();
 
 // Get latest maintenance requests
 try {
-    $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto,
+    $sql = "SELECT mr.Request_ID, mr.RequestDate, mr.Status, mr.IssuePhoto, mr.admin_seen,
                    c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email,
                    s.Name AS UnitName, s.Space_ID
             FROM maintenancerequest mr
@@ -31,8 +31,16 @@ try {
 
 if (!empty($maintenance_requests)) {
     $request_count = count($maintenance_requests);
+    $new_requests_count = 0;
     
-    echo '<div class="table-container" data-count="' . $request_count . '">
+    // Count new (unseen) requests
+    foreach ($maintenance_requests as $mr) {
+        if ($mr['admin_seen'] == 0 && $mr['Status'] == 'Submitted') {
+            $new_requests_count++;
+        }
+    }
+    
+    echo '<div class="table-container" data-count="' . $request_count . '" data-new-count="' . $new_requests_count . '">
             <table class="custom-table">
             <thead>
                 <tr>
@@ -50,15 +58,24 @@ if (!empty($maintenance_requests)) {
         $requestDate = date('M j, Y g:i A', strtotime($mr['RequestDate'] ?? ''));
         $requestId = htmlspecialchars($mr['Request_ID']);
         $status = htmlspecialchars($mr['Status']);
+        $isNew = ($mr['admin_seen'] == 0 && $status == 'Submitted');
         
         // Determine badge color based on status
         $badgeClass = $status === 'Submitted' ? 'bg-warning text-white' : 'bg-info text-white';
         
-        echo '<tr>';
+        // Add highlight class for new requests
+        $rowClass = $isNew ? 'new-request-flash' : '';
+        
+        echo '<tr class="' . $rowClass . '">';
         echo '<td>
                 <div class="fw-bold">' . $clientName . '</div>
-                <small class="text-muted">ID: #' . $requestId . '</small>
-              </td>';
+                <small class="text-muted">ID: #' . $requestId . '</small>';
+        
+        if ($isNew) {
+            echo '<span class="badge bg-danger ms-2 new-request-indicator">New</span>';
+        }
+        
+        echo '</td>';
         echo '<td>' . $unitName . '</td>';
         echo '<td>
                 <div class="small">' . $requestDate . '</div>
@@ -77,7 +94,7 @@ if (!empty($maintenance_requests)) {
     echo '</div>';
     
 } else {
-    echo '<div class="text-center p-4 text-muted" data-count="0">
+    echo '<div class="text-center p-4 text-muted" data-count="0" data-new-count="0">
             <i class="fas fa-tools fa-3x mb-3 text-muted"></i>
             <h5>No Maintenance Requests</h5>
             <p class="mb-3">All maintenance requests are processed</p>

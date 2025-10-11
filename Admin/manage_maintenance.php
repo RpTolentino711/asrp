@@ -9,6 +9,16 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// MARK ALL MAINTENANCE REQUESTS AS SEEN WHEN ADMIN VIEWS THE PAGE
+$db->executeStatement(
+    "UPDATE maintenancerequest SET admin_seen = 1 WHERE Status = 'Submitted' AND admin_seen = 0"
+);
+
+if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+    header('Location: login.php');
+    exit();
+}
+
 // Get filter from URL or default to 'active'
 $filter = isset($_GET['filter']) ? $_GET['filter'] : 'active';
 
