@@ -1418,18 +1418,23 @@ public function getTotalMaintenanceRequests($startDate, $endDate) {
 }
 
     
-
 public function getLatestPendingRequests($limit = 5) {
     $sql = "SELECT rr.Request_ID, rr.Requested_At, rr.Status, rr.admin_seen, rr.Flow_Status,
                    c.Client_ID, c.Client_fn, c.Client_ln, c.Client_Email, c.Client_Phone,
                    s.Space_ID, s.Name AS UnitName, s.Price,
-                   rr.StartDate, rr.EndDate
+                   rr.StartDate, rr.EndDate,
+                   CASE 
+                       WHEN rr.admin_seen = 0 THEN 'New'
+                       ELSE 'Seen' 
+                   END as request_status
             FROM rentalrequest rr
             LEFT JOIN client c ON rr.Client_ID = c.Client_ID
             LEFT JOIN space s ON rr.Space_ID = s.Space_ID
             WHERE rr.Status = 'Pending' 
             AND rr.Flow_Status = 'new'
-            ORDER BY rr.Requested_At DESC
+            ORDER BY 
+                rr.admin_seen ASC,  -- Show unseen requests first
+                rr.Requested_At DESC
             LIMIT :limit";
 
     try {
@@ -1442,7 +1447,6 @@ public function getLatestPendingRequests($limit = 5) {
         return [];
     }
 }
-
   
 
 public function markInvoiceAsPaid($invoice_id) {
