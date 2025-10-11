@@ -1185,15 +1185,11 @@ function timeAgo($datetime) {
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                        <p class="mb-3">Generate detailed monthly reports in Excel or PDF format for <?= $monthName ?></p>
+                        <p class="mb-3">Generate detailed monthly reports in Excel<?= $monthName ?></p>
                         <div class="d-flex gap-2 flex-wrap">
                             <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
                                class="btn btn-success">
                                 <i class="fas fa-file-excel me-2"></i>Export Excel
-                            </a>
-                            <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=pdf" 
-                               class="btn btn-danger">
-                                <i class="fas fa-file-pdf me-2"></i>Export PDF
                             </a>
                         </div>
                     </div>
