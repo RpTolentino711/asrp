@@ -685,37 +685,43 @@ if (isset($_SESSION['login_error'])) {
               $modal_id = "unitModal" . $modal_counter;
               $photo_modal_id = "photoModal" . $modal_counter;
 
-              // UPDATED: Get photos from photo_history table instead of space.Photo column
-              $photo_urls = [];
+              // UPDATED: Get photos with descriptions from photo_history table
+              $photos_with_descriptions = [];
               
               // Get active photos from photo_history table
               $current_photos = $db->getCurrentSpacePhotos($space['Space_ID']);
               if (!empty($current_photos)) {
                   foreach ($current_photos as $photo) {
                       if (!empty($photo['Photo_Path']) && $photo['Status'] === 'active') {
-                          $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo['Photo_Path']);
+                          $photos_with_descriptions[] = [
+                              'url' => "uploads/unit_photos/" . htmlspecialchars($photo['Photo_Path']),
+                              'description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : 'Unit Photo'
+                          ];
                       }
                   }
               }
               
               // Fallback for backward compatibility - check if old photo columns exist
-              // This can be removed once migration is complete
               $photo_fields = ['Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
               foreach ($photo_fields as $photo_field) {
                   if (!empty($space[$photo_field])) {
-                      $photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]);
+                      $photos_with_descriptions[] = [
+                          'url' => "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]),
+                          'description' => 'Unit Photo'
+                      ];
                   }
               }
               
               // Limit to maximum 6 photos for display
-              $photo_urls = array_slice($photo_urls, 0, 6);
-              $photo_count = count($photo_urls);
+              $photos_with_descriptions = array_slice($photos_with_descriptions, 0, 6);
+              $photo_count = count($photos_with_descriptions);
+              $first_photo_url = !empty($photos_with_descriptions) ? $photos_with_descriptions[0]['url'] : null;
               ?>
               <div class="col-lg-4 col-md-6 animate-on-scroll">
                 <div class="card unit-card">
-                  <?php if (!empty($photo_urls)): ?>
+                  <?php if (!empty($first_photo_url)): ?>
                     <div style="position:relative;">
-                      <img src="<?= $photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
+                      <img src="<?= $first_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>">
                       <?php if ($photo_count > 1): ?>
                         <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= $photo_count ?> photos </span>
                       <?php endif; ?>
@@ -752,7 +758,7 @@ if (isset($_SESSION['login_error'])) {
                 </div>
               </div>
 
-              <!-- Photo Modal -->
+              <!-- Photo Modal with Descriptions -->
               <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-xl">
                   <div class="modal-content bg-dark">
@@ -763,14 +769,24 @@ if (isset($_SESSION['login_error'])) {
                       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body text-center">
-                      <?php if (count($photo_urls) === 1): ?>
-                        <img src="<?= $photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh; object-fit: contain;">
-                      <?php elseif (count($photo_urls) > 1): ?>
+                      <?php if (count($photos_with_descriptions) === 1): ?>
+                        <img src="<?= $photos_with_descriptions[0]['url'] ?>" alt="<?= $photos_with_descriptions[0]['description'] ?>" class="img-fluid rounded shadow" style="max-height:60vh; object-fit: contain;">
+                        <?php if (!empty($photos_with_descriptions[0]['description']) && $photos_with_descriptions[0]['description'] !== 'Unit Photo'): ?>
+                          <div class="mt-3">
+                            <p class="text-white fw-semibold"><?= $photos_with_descriptions[0]['description'] ?></p>
+                          </div>
+                        <?php endif; ?>
+                      <?php elseif (count($photos_with_descriptions) > 1): ?>
                         <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
                           <div class="carousel-inner">
-                            <?php foreach ($photo_urls as $idx => $url): ?>
+                            <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
                               <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
-                                <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh; object-fit: contain;">
+                                <img src="<?= $photo_data['url'] ?>" class="d-block mx-auto img-fluid rounded shadow" alt="<?= $photo_data['description'] ?>" style="max-height:60vh; object-fit: contain;">
+                                <?php if (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo'): ?>
+                                  <div class="mt-3">
+                                    <p class="text-white fw-semibold"><?= $photo_data['description'] ?></p>
+                                  </div>
+                                <?php endif; ?>
                               </div>
                             <?php endforeach; ?>
                           </div>
@@ -782,6 +798,17 @@ if (isset($_SESSION['login_error'])) {
                               <span class="carousel-control-next-icon" aria-hidden="true"></span>
                               <span class="visually-hidden">Next</span>
                           </button>
+                          
+                          <!-- Carousel Indicators -->
+                          <div class="carousel-indicators" style="bottom: -50px;">
+                            <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
+                              <button type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide-to="<?= $idx ?>" 
+                                      class="<?= $idx === 0 ? 'active' : '' ?>" 
+                                      aria-label="Slide <?= $idx + 1 ?>"
+                                      style="width: 60px; height: 40px; margin: 0 2px; border: none; background-size: cover; background-position: center; background-image: url('<?= $photo_data['url'] ?>');">
+                              </button>
+                            <?php endforeach; ?>
+                          </div>
                         </div>
                       <?php else: ?>
                         <div class="text-center mb-3" style="font-size:56px;color:#2563eb;">
@@ -789,6 +816,9 @@ if (isset($_SESSION['login_error'])) {
                         </div>
                         <p class="text-white">No photos available for this unit</p>
                       <?php endif; ?>
+                    </div>
+                    <div class="modal-footer border-0">
+                      <small class="text-muted"><?= $photo_count ?> photo<?= $photo_count !== 1 ? 's' : '' ?> available</small>
                     </div>
                   </div>
                 </div>
@@ -810,6 +840,47 @@ if (isset($_SESSION['login_error'])) {
                                       <i class="bi bi-info-circle me-2"></i>
                                         To rent this unit and join our community, please submit your rental request. The admin will review your application and contact you to guide you through the next steps.
                                   </div>
+                                  
+                                  <!-- Unit Photos Preview in Rental Modal -->
+                                  ' . (count($photos_with_descriptions) > 0 ? '
+                                  <div class="mb-4">
+                                      <h6 class="fw-bold mb-3">Unit Photos:</h6>
+                                      <div class="row g-2">' : '') . '
+                                      ';
+                                  
+                                  // Add photo thumbnails to rental modal
+                                  $thumb_counter = 0;
+                                  foreach ($photos_with_descriptions as $photo_data) {
+                                      if ($thumb_counter < 4) { // Show max 4 thumbnails
+                                          $modals .= '
+                                          <div class="col-3">
+                                              <div class="position-relative">
+                                                  <img src="' . $photo_data['url'] . '" class="img-thumbnail" alt="Unit Photo" style="width: 100%; height: 80px; object-fit: cover; cursor: pointer;" 
+                                                       data-bs-toggle="modal" data-bs-target="#' . $photo_modal_id . '">
+                                                  ' . (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo' ? '
+                                                  <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white p-1" style="font-size: 0.7rem;">
+                                                      ' . $photo_data['description'] . '
+                                                  </div>' : '') . '
+                                              </div>
+                                          </div>';
+                                          $thumb_counter++;
+                                      }
+                                  }
+                                  
+                                  if (count($photos_with_descriptions) > 4) {
+                                      $modals .= '
+                                          <div class="col-3">
+                                              <div class="img-thumbnail d-flex align-items-center justify-content-center bg-light" style="width: 100%; height: 80px;">
+                                                  <small class="text-muted">+' . (count($photos_with_descriptions) - 4) . ' more</small>
+                                              </div>
+                                          </div>';
+                                  }
+                                  
+                                  $modals .= (count($photos_with_descriptions) > 0 ? '
+                                      </div>
+                                      <small class="text-muted mt-2 d-block">Click on photos to view full gallery</small>
+                                  </div>' : '') . '
+                                  
                                   <div class="row">
                                       <div class="col-md-6">
                                           <h6 class="fw-bold">Admin Contact:</h6>
@@ -856,7 +927,6 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </div>
 </section>
-
   <!-- All rental modals rendered here -->
 <?php if (!empty($modals)) echo $modals; ?>
 
