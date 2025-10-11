@@ -1506,7 +1506,7 @@ function formatDateToMonthLetters($date) {
             console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
             
             // Use GET request for public access
-fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+            fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
             .then(res => {
                 console.log('📡 Response status:', res.status);
                 if (!res.ok) {
