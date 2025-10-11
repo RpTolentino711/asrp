@@ -879,9 +879,7 @@ if (isset($_SESSION['login_error'])) {
                       <?php if (!empty($photos_with_descriptions) && array_filter($photos_with_descriptions, function($photo) { 
                           return !empty($photo['full_description']) && $photo['full_description'] !== 'Unit Photo'; 
                       })): ?>
-                        <small class="text-info ms-2">
-                          <i class="bi bi-info-circle me-1"></i>Hover over thumbnails for descriptions
-                        </small>
+                        
                       <?php endif; ?>
                     </div>
                   </div>
