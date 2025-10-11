@@ -2466,7 +2466,7 @@ public function getLatestMaintenanceRequests($limit = 5) {
                 FROM maintenancerequest mr
                 LEFT JOIN client c ON mr.Client_ID = c.Client_ID
                 LEFT JOIN space s ON mr.Space_ID = s.Space_ID
-                WHERE mr.Status = 'Submitted'
+                WHERE mr.Status IN ('Submitted', 'In Progress')
                 ORDER BY mr.RequestDate DESC
                 LIMIT ?";
         
