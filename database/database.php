@@ -2545,7 +2545,51 @@ public function getLatestMaintenanceRequests($limit = 5) {
         }
     }
 
+public function getActivePhotosForUnits($unit_ids) {
+    if (empty($unit_ids)) return [];
+    
+    $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
+    $sql = "SELECT Space_ID, Photo_Path, Status 
+            FROM photo_history 
+            WHERE Space_ID IN ($placeholders) 
+            AND Status = 'active'
+            ORDER BY Action_Date DESC";
+    
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($unit_ids);
+        
+        $photos = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!isset($photos[$row['Space_ID']])) {
+                $photos[$row['Space_ID']] = [];
+            }
+            $photos[$row['Space_ID']][] = $row;
+        }
+        return $photos;
+    } catch (PDOException $e) {
+        error_log("getActivePhotosForUnits Error: " . $e->getMessage());
+        return [];
+    }
+}
 
+public function getActiveClientPhotosCount($space_id, $client_id) {
+    $sql = "SELECT COUNT(*) as photo_count 
+            FROM photo_history 
+            WHERE Space_ID = ? 
+            AND Status = 'active'
+            AND Action_By = ?";
+    
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$space_id, -$client_id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ? intval($result['photo_count']) : 0;
+    } catch (PDOException $e) {
+        error_log("getActiveClientPhotosCount Error: " . $e->getMessage());
+        return 0;
+    }
+}
 
 
 
