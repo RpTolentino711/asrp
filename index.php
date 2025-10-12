@@ -1012,19 +1012,23 @@ if (isset($_SESSION['login_error'])) {
       <?php
       if (!empty($rented_units_display)) {
         $rented_modal_counter = 0;
-        // Get all rented unit photos for the units being displayed
+        
+        // Get all rented unit photos from photo_history table
         $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
-        $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
+        $rented_unit_photos = $db->getActivePhotosForUnits($rented_unit_ids);
+        
         foreach ($rented_units_display as $rent) {
           $rented_modal_counter++;
           $rented_modal_id = "rentedModal" . $rented_modal_counter;
           
-          // UPDATED: Get photos from JSON array instead of multiple columns
+          // UPDATED: Get photos from photo_history table instead of BusinessPhoto
           $rented_photo_urls = [];
-          if (!empty($rented_unit_photos[$rent['Space_ID']])) {
-            foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
-              if (!empty($photo)) {
-                $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo);
+          $space_id = $rent['Space_ID'];
+          
+          if (!empty($rented_unit_photos[$space_id])) {
+            foreach ($rented_unit_photos[$space_id] as $photo_record) {
+              if (!empty($photo_record['Photo_Path']) && $photo_record['Status'] === 'active') {
+                $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo_record['Photo_Path']);
               }
             }
           }

@@ -2547,6 +2547,35 @@ public function getLatestMaintenanceRequests($limit = 5) {
 
 
 
+    public function getActivePhotosForUnits($unit_ids) {
+    if (empty($unit_ids)) return [];
+    
+    // Prepare placeholders for array of unit IDs
+    $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
+    $sql = "SELECT Space_ID, Photo_Path, Status 
+            FROM photo_history 
+            WHERE Space_ID IN ($placeholders) 
+            AND Status = 'active'
+            AND Action IN ('uploaded', 'updated')
+            ORDER BY Action_Date DESC";
+    
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($unit_ids);
+        
+        $photos = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (!isset($photos[$row['Space_ID']])) {
+                $photos[$row['Space_ID']] = [];
+            }
+            $photos[$row['Space_ID']][] = $row;
+        }
+        return $photos;
+    } catch (PDOException $e) {
+        error_log("getActivePhotosForUnits Error: " . $e->getMessage());
+        return [];
+    }
+}
 
 
 
