@@ -122,7 +122,7 @@ if (isset($_SESSION['feedback_success'])) {
     unset($_SESSION['feedback_success']);
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR photo_history TABLE) ---
+// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
@@ -131,70 +131,22 @@ function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $descript
     // Use negative client_id to distinguish client actions from admin actions
     $client_id = -$_SESSION['client_id']; // Negative value indicates client action
     
+    // For client actions, we'll use the addPhotoToHistory method but with negative client_id
+    if (method_exists($db, 'addPhotoToHistory')) {
+        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
+    }
+    
+    // Fallback: direct SQL if method doesn't exist
     try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, description, Action, Previous_Photo_Path, Action_By, Status) 
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)";
         
         $status = ($action === 'deleted') ? 'inactive' : 'active';
         $stmt = $db->pdo->prepare($sql);
-        return $stmt->execute([
-            $space_id, 
-            $photo_path, 
-            $description,
-            $action, 
-            null, 
-            $client_id, 
-            $status
-        ]);
+        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status, $description]);
     } catch (PDOException $e) {
         error_log("addClientPhotoToHistory Error: " . $e->getMessage());
         return false;
-    }
-}
-
-// Function to get client photos from photo_history
-function getClientPhotos($db, $space_id, $client_id) {
-    try {
-        $sql = "SELECT Photo_Path, description, Action_Date 
-                FROM photo_history 
-                WHERE Space_ID = ? 
-                AND Action_By = ? 
-                AND Action = 'uploaded' 
-                AND Status = 'active'
-                ORDER BY Action_Date DESC";
-        
-        $stmt = $db->pdo->prepare($sql);
-        $stmt->execute([$space_id, -$client_id]); // Use negative client_id for client actions
-        
-        $photos = [];
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $photos[] = $row['Photo_Path'];
-        }
-        return $photos;
-    } catch (PDOException $e) {
-        error_log("getClientPhotos Error: " . $e->getMessage());
-        return [];
-    }
-}
-
-// Function to count client photos
-function countClientPhotos($db, $space_id, $client_id) {
-    try {
-        $sql = "SELECT COUNT(*) as photo_count 
-                FROM photo_history 
-                WHERE Space_ID = ? 
-                AND Action_By = ? 
-                AND Action = 'uploaded' 
-                AND Status = 'active'";
-        
-        $stmt = $db->pdo->prepare($sql);
-        $stmt->execute([$space_id, -$client_id]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        return $result ? intval($result['photo_count']) : 0;
-    } catch (PDOException $e) {
-        error_log("countClientPhotos Error: " . $e->getMessage());
-        return 0;
     }
 }
 
@@ -232,8 +184,10 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                 $photo_upload_error = "Unknown upload error occurred.";
         }
     } else {
-        // Count current photos using photo_history table
-        $used_slots = countClientPhotos($db, $space_id, $client_id);
+        // Get current photos from JSON column
+        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+        $used_slots = count($current_photos);
         
         if ($used_slots >= 6) {
             $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
@@ -283,8 +237,15 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                             $filepath = $upload_dir . $filename;
                             
                             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                                // ADD TO PHOTO HISTORY - Client uploaded photo
-                                if (addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo')) {
+                                // Add to existing photos array and save as JSON
+                                $current_photos[] = $filename;
+                                $json_photos = json_encode($current_photos);
+                                
+                                // Save to database (UPDATED FOR JSON)
+                                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                                    // ADD TO PHOTO HISTORY - Client uploaded photo
+                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
+                                    
                                     $photo_upload_success = "Photo uploaded successfully for this unit!";
                                     $_SESSION['photo_upload_success'] = $photo_upload_success;
                                     // Redirect to prevent resubmission
@@ -295,7 +256,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                                     if (file_exists($filepath)) {
                                         unlink($filepath);
                                     }
-                                    $photo_upload_error = "Database error occurred. Photo was not saved to history.";
+                                    $photo_upload_error = "Database error occurred. Photo was not saved.";
                                 }
                             } else {
                                 $photo_upload_error = "Failed to move uploaded file. Check file permissions.";
@@ -308,7 +269,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
     }
 }
 
-// Photo Delete Processing (UPDATED FOR photo_history TABLE)
+// Photo Delete Processing (UPDATED FOR JSON)
 if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
@@ -326,47 +287,41 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
         if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
             $photo_upload_error = "Invalid photo filename format.";
         } else {
-            // Check if photo exists in photo_history
-            try {
-                $sql = "SELECT Photo_Path FROM photo_history 
-                        WHERE Space_ID = ? 
-                        AND Action_By = ? 
-                        AND Photo_Path = ? 
-                        AND Action = 'uploaded' 
-                        AND Status = 'active'";
+            // Get current photos and remove the specified one
+            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+            
+            if (!in_array($photo_filename, $current_photos)) {
+                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
+            } else {
+                // Remove photo from array
+                $updated_photos = array_values(array_diff($current_photos, [$photo_filename]));
+                $json_photos = json_encode($updated_photos);
                 
-                $stmt = $db->pdo->prepare($sql);
-                $stmt->execute([$space_id, -$client_id, $photo_filename]);
-                $existing_photo = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if (!$existing_photo) {
-                    $photo_upload_error = "Photo not found or you don't have permission to delete it.";
-                } else {
-                    // Mark photo as deleted in photo_history
-                    if (addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo')) {
-                        // Delete file from filesystem
-                        $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                        $file_to_delete = $upload_dir . basename($photo_filename);
-                        if (file_exists($file_to_delete)) {
-                            if (unlink($file_to_delete)) {
-                                $photo_upload_success = "Photo deleted successfully!";
-                            } else {
-                                $photo_upload_success = "Photo deleted from history, but file removal failed.";
-                            }
-                        } else {
+                // Update database with new JSON array (UPDATED FOR JSON)
+                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                    // ADD TO PHOTO HISTORY - Client deleted photo
+                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
+                    
+                    // Delete file from filesystem
+                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                    $file_to_delete = $upload_dir . basename($photo_filename);
+                    if (file_exists($file_to_delete)) {
+                        if (unlink($file_to_delete)) {
                             $photo_upload_success = "Photo deleted successfully!";
+                        } else {
+                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
                         }
-                        $_SESSION['photo_upload_success'] = $photo_upload_success;
-                        // Redirect to prevent resubmission
-                        header("Location: " . $_SERVER['PHP_SELF']);
-                        exit();
                     } else {
-                        $photo_upload_error = "Failed to delete photo from history.";
+                        $photo_upload_success = "Photo deleted successfully!";
                     }
+                    $_SESSION['photo_upload_success'] = $photo_upload_success;
+                    // Redirect to prevent resubmission
+                    header("Location: " . $_SERVER['PHP_SELF']);
+                    exit();
+                } else {
+                    $photo_upload_error = "Failed to delete photo from database.";
                 }
-            } catch (PDOException $e) {
-                error_log("Photo delete error: " . $e->getMessage());
-                $photo_upload_error = "Database error occurred while deleting photo.";
             }
         }
     }
@@ -400,19 +355,14 @@ try {
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
     
-    // Get maintenance history and photos using photo_history table
+    // Get maintenance history and photos only if there are rented units
     $maintenance_history = [];
     $unit_photos = [];
     
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        
-        // Get photos from photo_history table
-        foreach ($rented_units as $unit) {
-            $space_id = intval($unit['Space_ID']);
-            $unit_photos[$space_id] = getClientPhotos($db, $space_id, $client_id);
-        }
+        $unit_photos = $db->getUnitPhotosForClient($client_id);
         
         // Ensure arrays are returned
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
@@ -462,7 +412,6 @@ function formatDateToMonthLetters($date) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
-        /* Your existing CSS styles remain the same */
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -485,8 +434,632 @@ function formatDateToMonthLetters($date) {
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* ... rest of your CSS styles remain exactly the same ... */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            color: var(--secondary);
+            line-height: 1.6;
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Notification Badge */
+        .notification-badge {
+            position: absolute;
+            top: 0.2em;
+            right: -0.7em;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.75em;
+            font-weight: bold;
+            border-radius: 50%;
+            padding: 0.2em 0.55em;
+            min-width: 1.5em;
+            min-height: 1.5em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(239,68,68,0.15);
+            z-index: 10;
+            transition: all 0.2s;
+            pointer-events: none;
+            border: 2px solid #fff;
+            animation: pulse-badge 1.2s infinite;
+        }
         
+        @keyframes pulse-badge {
+            0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+            100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+        }
+
+        /* Modern Navigation */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--gray-light);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .navbar-brand {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--primary) !important;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-link {
+            font-weight: 500;
+            color: var(--gray-dark) !important;
+            padding: 0.75rem 1rem !important;
+            border-radius: var(--border-radius-sm);
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: var(--primary) !important;
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .navbar-toggler {
+            border: none;
+            padding: 0.5rem;
+        }
+
+        .navbar-toggler:focus {
+            box-shadow: none;
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 3rem 0 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="dots" patternUnits="userSpaceOnUse" width="20" height="20"><circle cx="10" cy="10" r="1.5" fill="white" opacity="0.15"/></pattern></defs><rect width="100" height="100" fill="url(%23dots)"/></svg>');
+        }
+
+        .dashboard-header-content {
+            position: relative;
+            z-index: 2;
+        }
+
+        .welcome-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 0;
+        }
+
+        /* Alert Styles */
+        .alert {
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+        }
+
+        /* Card Styles */
+        .card {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            background: var(--lighter);
+            transition: var(--transition);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
+            background: var(--light);
+            border-bottom: 1px solid var(--gray-light);
+            padding: 1.25rem;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Unit Cards */
+        .unit-card {
+            border: 1px solid var(--gray-light);
+            background: var(--lighter);
+            transition: var(--transition);
+        }
+
+        .unit-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .unit-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2rem;
+            margin: 0 auto 1rem;
+        }
+
+        .unit-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .unit-price {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .unit-badge {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+
+        .unit-details {
+            color: var(--gray);
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Photo Gallery */
+        .photo-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 0.75rem;
+            margin: 1rem 0;
+        }
+
+        .photo-item {
+            position: relative;
+            border-radius: var(--border-radius-sm);
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .photo-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .delete-photo-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            opacity: 0;
+            transition: var(--transition);
+            z-index: 10;
+        }
+
+        .photo-item:hover .delete-photo-btn {
+            opacity: 1;
+        }
+
+        .no-photos {
+            text-align: center;
+            color: var(--gray);
+            font-style: italic;
+            padding: 2rem;
+            background: var(--light);
+            border-radius: var(--border-radius-sm);
+            margin: 1rem 0;
+        }
+
+        /* Upload Form */
+        .upload-form {
+            background: var(--light);
+            border-radius: var(--border-radius-sm);
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .upload-form input[type="file"] {
+            border: 2px dashed var(--gray-light);
+            border-radius: var(--border-radius-sm);
+            padding: 1rem;
+            text-align: center;
+            transition: var(--transition);
+            background: white;
+        }
+
+        .upload-form input[type="file"]:hover {
+            border-color: var(--primary);
+        }
+
+        /* Image Preview */
+        .image-preview {
+            display: block;
+            margin-top: 10px;
+            border-radius: var(--border-radius-sm);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Maintenance History */
+        .maintenance-section {
+            background: var(--light);
+            border-radius: var(--border-radius-sm);
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .maintenance-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .maintenance-header h6 {
+            font-weight: 700;
+            color: var(--primary);
+            margin: 0;
+        }
+
+        .maintenance-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .maintenance-item {
+            background: white;
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius-sm);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--gray-light);
+        }
+
+        .maintenance-date {
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .maintenance-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-sm);
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: auto;
+        }
+
+        .maintenance-status.completed {
+            background: var(--success);
+            color: white;
+        }
+
+        .maintenance-status.pending {
+            background: var(--warning);
+            color: white;
+        }
+
+        .maintenance-status.in-progress {
+            background: var(--primary);
+            color: white;
+        }
+
+        .no-maintenance {
+            text-align: center;
+            color: var(--gray);
+            font-style: italic;
+            padding: 1rem;
+        }
+
+        /* Buttons */
+        .btn {
+            border-radius: var(--border-radius-sm);
+            font-weight: 500;
+            padding: 0.6rem 1.2rem;
+            transition: var(--transition);
+            border: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success), #34d399);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #059669, var(--success));
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        /* Form Elements */
+        .form-control,
+        .form-select {
+            border: 1px solid var(--gray-light);
+            border-radius: var(--border-radius-sm);
+            padding: 0.75rem 1rem;
+            transition: var(--transition);
+            background: white;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            outline: none;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Feedback Section */
+        .feedback-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid var(--warning);
+        }
+
+        .rating-select {
+            background: white;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .welcome-title {
+                font-size: 2rem;
+            }
+
+            .dashboard-header {
+                padding: 2rem 0 1.5rem;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .photo-gallery {
+                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                gap: 0.5rem;
+            }
+
+            .unit-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+
+            .maintenance-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .maintenance-status {
+                margin-left: 0;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .welcome-title {
+                font-size: 1.75rem;
+            }
+
+            .navbar-brand {
+                font-size: 1.5rem;
+            }
+
+            .upload-form {
+                padding: 0.75rem;
+            }
+
+            .maintenance-section {
+                padding: 1rem;
+            }
+        }
+
+        /* Loading States */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Empty States */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: var(--gray);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state h5 {
+            color: var(--gray-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Animations */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Maintenance History Dropdown */
+        .maintenance-dropdown {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--gray-light);
+            border-radius: var(--border-radius-sm);
+            background: white;
+            margin-top: 0.5rem;
+        }
+        .maintenance-dropdown::-webkit-scrollbar {
+            width: 6px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        .toggle-maintenance {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--border-radius-sm);
+            transition: var(--transition);
+        }
+        .toggle-maintenance:hover {
+            background: rgba(37, 99, 235, 0.1);
+        }
     </style>
 </head>
 
@@ -647,7 +1220,6 @@ function formatDateToMonthLetters($date) {
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
                     $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
-                    $photo_count = count($photos);
                     
                     // Get dates safely and format them
                     $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
@@ -712,7 +1284,7 @@ function formatDateToMonthLetters($date) {
                                         <h6 class="mb-0">
                                             <i class="bi bi-images me-1"></i>Unit Photos
                                         </h6>
-                                        <small class="text-muted"><?= $photo_count ?>/6</small>
+                                        <small class="text-muted"><?= count($photos) ?>/6</small>
                                     </div>
 
                                     <?php if (!empty($photos)): ?>
@@ -744,7 +1316,7 @@ function formatDateToMonthLetters($date) {
                                     <?php endif; ?>
 
                                     <!-- Upload Form -->
-                                    <?php if ($photo_count < 6): ?>
+                                    <?php if (count($photos) < 6): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">
@@ -906,7 +1478,6 @@ function formatDateToMonthLetters($date) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // Your existing JavaScript remains exactly the same
         // Image modal functionality
         function showImageModal(imageSrc) {
             const modalImage = document.getElementById('modalImage');
