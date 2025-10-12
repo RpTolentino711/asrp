@@ -998,7 +998,8 @@ if (isset($_SESSION['login_error'])) {
   </div>
 </section>
   <!-- All rental modals rendered here -->
-<?php if (!empty($modals)) echo $modals; ?>
+
+  <?php if (!empty($modals)) echo $modals; ?>
 
 <!-- Rented Units Section -->
 <section class="rented-units">
