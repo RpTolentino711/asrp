@@ -6,7 +6,33 @@ ini_set('display_errors', 0); // Don't display errors to AJAX response
 ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
-require '../database/database.php';
+// Fatal error handler for JSON output
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (ob_get_length()) ob_end_clean();
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'error' => 'Fatal error: ' . $error['message'],
+            'debug' => $error
+        ]);
+    }
+});
+
+// Try to require and connect to database
+try {
+    require '../database/database.php';
+    $db = new Database();
+} catch (Exception $e) {
+    if (ob_get_length()) ob_end_clean();
+    error_log("Database connection error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'error' => 'Database connection error: ' . $e->getMessage()
+    ]);
+    exit();
+}
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -17,8 +43,6 @@ header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
-
-$db = new Database();
 
 try {
     // Get client_id from POST or GET request
