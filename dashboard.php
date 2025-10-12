@@ -1779,6 +1779,11 @@ function formatDateToMonthLetters($date) {
             timerProgressBar: true
         });
     </script>
+
+    <script>
+window.addEventListener('load', checkPaymentStatus);
+</script>
+
     <?php endif; ?>
 </body>
 </html>
