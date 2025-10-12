@@ -126,30 +126,6 @@ if (isset($_SESSION['feedback_success'])) {
 $photo_upload_success = '';
 $photo_upload_error = '';
 
-// Function to add client photo to history (using negative client_id to distinguish from admin)
-function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
-    // Use negative client_id to distinguish client actions from admin actions
-    $client_id = -$_SESSION['client_id']; // Negative value indicates client action
-    
-    // For client actions, we'll use the addPhotoToHistory method but with negative client_id
-    if (method_exists($db, 'addPhotoToHistory')) {
-        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
-    }
-    
-    // Fallback: direct SQL if method doesn't exist
-    try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)";
-        
-        $status = ($action === 'deleted') ? 'inactive' : 'active';
-        $stmt = $db->pdo->prepare($sql);
-        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status, $description]);
-    } catch (PDOException $e) {
-        error_log("addClientPhotoToHistory Error: " . $e->getMessage());
-        return false;
-    }
-}
-
 // Photo Upload Processing
 if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {
     $space_id = intval($_POST['space_id']);
@@ -243,9 +219,6 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                                 
                                 // Save to database (UPDATED FOR JSON)
                                 if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                                    // ADD TO PHOTO HISTORY - Client uploaded photo
-                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
-                                    
                                     $photo_upload_success = "Photo uploaded successfully for this unit!";
                                     $_SESSION['photo_upload_success'] = $photo_upload_success;
                                     // Redirect to prevent resubmission
@@ -300,9 +273,6 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
                 
                 // Update database with new JSON array (UPDATED FOR JSON)
                 if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                    // ADD TO PHOTO HISTORY - Client deleted photo
-                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
-                    
                     // Delete file from filesystem
                     $upload_dir = __DIR__ . "/uploads/unit_photos/";
                     $file_to_delete = $upload_dir . basename($photo_filename);
@@ -392,7 +362,6 @@ function formatDateToMonthLetters($date) {
     }
 }
 ?>
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -1528,6 +1497,178 @@ function formatDateToMonthLetters($date) {
             }
         }
 
+        // Payment Status Notification System - FIXED AJAX PATH
+        let shownPaymentNotifications = new Set();
+        let shownReminderNotifications = new Set();
+
+        function checkPaymentStatusAndNotify() {
+            <?php if (!empty($rented_units) && isset($client_id)): ?>
+            console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
+            
+            // FIXED: Use correct path to AJAX folder
+            fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+            .then(res => {
+                console.log('📡 Response status:', res.status);
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log('📊 Payment status data:', data);
+                
+                if (data.success) {
+                    console.log('✅ Found paid invoices:', data.paid_invoices?.length || 0);
+                    console.log('📅 Found upcoming payments:', data.upcoming_payments?.length || 0);
+                    
+                    // Show payment confirmation notifications
+                    if (data.paid_invoices && data.paid_invoices.length > 0) {
+                        data.paid_invoices.forEach(invoice => {
+                            const notificationKey = `paid_${invoice.Invoice_ID}`;
+                            
+                            if (!shownPaymentNotifications.has(notificationKey)) {
+                                console.log('💰 Showing payment confirmation for invoice:', invoice.Invoice_ID);
+                                showPaymentConfirmation(invoice);
+                                shownPaymentNotifications.add(notificationKey);
+                                
+                                // Remove from set after 1 hour to allow re-notification if needed
+                                setTimeout(() => {
+                                    shownPaymentNotifications.delete(notificationKey);
+                                }, 3600000);
+                            }
+                        });
+                    }
+
+                    // Show payment reminder notifications
+                    if (data.upcoming_payments && data.upcoming_payments.length > 0) {
+                        data.upcoming_payments.forEach(invoice => {
+                            const reminderKey = `reminder_${invoice.Invoice_ID}`;
+                            
+                            if (!shownReminderNotifications.has(reminderKey)) {
+                                console.log('⏰ Showing payment reminder for invoice:', invoice.Invoice_ID);
+                                showPaymentReminder(invoice);
+                                shownReminderNotifications.add(reminderKey);
+                            }
+                        });
+                    }
+                    
+                    if (data.paid_invoices?.length === 0 && data.upcoming_payments?.length === 0) {
+                        console.log('ℹ️ No payment notifications to show');
+                    }
+                } else {
+                    console.error('❌ Payment status check failed:', data.error);
+                }
+            })
+            .catch(err => {
+                console.error('❌ Payment status check failed:', err);
+            });
+            <?php else: ?>
+            console.log('ℹ️ No rented units, skipping payment check');
+            <?php endif; ?>
+        }
+
+        function showPaymentConfirmation(invoice) {
+            const nextDueDate = invoice.NextDueDate ? new Date(invoice.NextDueDate).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            }) : 'Next month';
+            
+            Swal.fire({
+                icon: 'success',
+                title: '💰 Payment Confirmed!',
+                html: `
+                    <div class="text-start">
+                        <p class="mb-2"><strong>Unit:</strong> ${invoice.UnitName || 'Your unit'}</p>
+                        <p class="mb-2"><strong>Period:</strong> Paid in full</p>
+                        <p class="mb-0"><strong>Next Payment Due:</strong> ${nextDueDate}</p>
+                    </div>
+                `,
+                confirmButtonText: 'View Payment History',
+                confirmButtonColor: '#10b981',
+                showCancelButton: true,
+                cancelButtonText: 'Close',
+                background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                color: '#065f46',
+                timer: 8000,
+                timerProgressBar: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'invoice_history.php';
+                }
+            });
+        }
+
+        function showPaymentReminder(invoice) {
+            const dueDate = new Date(invoice.EndDate).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            const daysLeft = invoice.DaysUntilDue;
+            let urgencyLevel = 'warning';
+            let urgencyText = 'Upcoming Payment';
+            
+            if (daysLeft <= 1) {
+                urgencyLevel = 'error';
+                urgencyText = 'Payment Due Tomorrow!';
+            } else if (daysLeft <= 3) {
+                urgencyLevel = 'warning';
+                urgencyText = 'Payment Due Soon';
+            }
+            
+            Swal.fire({
+                icon: urgencyLevel,
+                title: `📅 ${urgencyText}`,
+                html: `
+                    <div class="text-start">
+                        <p class="mb-2"><strong>Unit:</strong> ${invoice.UnitName || 'Your unit'}</p>
+                        <p class="mb-2"><strong>Amount Due:</strong> ₱${parseFloat(invoice.InvoiceTotal || 0).toLocaleString()}</p>
+                        <p class="mb-2"><strong>Due Date:</strong> ${dueDate}</p>
+                        <p class="mb-0"><strong>Time Left:</strong> ${daysLeft} day${daysLeft !== 1 ? 's' : ''}</p>
+                    </div>
+                `,
+                confirmButtonText: 'Pay Now',
+                confirmButtonColor: urgencyLevel === 'error' ? '#ef4444' : '#f59e0b',
+                showCancelButton: true,
+                cancelButtonText: 'Remind Me Later',
+                background: urgencyLevel === 'error' ? 
+                    'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)' : 
+                    'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                color: urgencyLevel === 'error' ? '#991b1b' : '#92400e',
+                timer: urgencyLevel === 'error' ? 10000 : 6000,
+                timerProgressBar: true,
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'invoice_history.php';
+                }
+            });
+        }
+
+        // Test function to manually trigger notifications
+        function testPaymentNotifications() {
+            console.log('🧪 Testing payment notifications...');
+            
+            // Test payment confirmation
+            const testPaidInvoice = {
+                Invoice_ID: 999,
+                UnitName: 'Test Unit',
+                NextDueDate: '2025-01-15'
+            };
+            showPaymentConfirmation(testPaidInvoice);
+            
+            // Test payment reminder
+            const testReminderInvoice = {
+                Invoice_ID: 998,
+                UnitName: 'Test Unit',
+                InvoiceTotal: 11000,
+                EndDate: '2024-12-20',
+                DaysUntilDue: 2
+            };
+            setTimeout(() => showPaymentReminder(testReminderInvoice), 2000);
+        }
+
         // Close navbar on mobile when clicking nav links
         document.addEventListener('DOMContentLoaded', function() {
             const navbarCollapse = document.getElementById('navbarNav');
@@ -1687,6 +1828,13 @@ function formatDateToMonthLetters($date) {
             document.querySelectorAll('.card').forEach((card) => {
                 observer.observe(card);
             });
+
+            // Start payment status polling
+            checkPaymentStatusAndNotify();
+            setInterval(checkPaymentStatusAndNotify, 30000); // Check every 30 seconds
+            
+            // Make test function available globally
+            window.testPaymentNotifications = testPaymentNotifications;
         });
 
         // Live poll unread admin messages for client (Payment nav badge)
