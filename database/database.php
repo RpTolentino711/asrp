@@ -236,23 +236,15 @@ public function getAllUnitPhotosForUnits($unit_ids) {
 }
 
 
-// Replace your current addClientPhotoToHistory function with this:
 function addClientPhotoToHistory($db, $space_id, $photo_path, $action) {
     $client_id = -$_SESSION['client_id'];
+    $status = ($action === 'deleted') ? 'inactive' : 'active';
     
-    // Try using the Database class method first
-    if (method_exists($db, 'addPhotoToHistory')) {
-        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
-    }
-    
-    // Fallback: direct SQL using PDO
     try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
-                VALUES (?, ?, ?, ?, ?, ?)";
-        
-        $status = ($action === 'deleted') ? 'inactive' : 'active';
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Action_By, Status) 
+                VALUES (?, ?, ?, ?, ?)";
         $stmt = $db->pdo->prepare($sql);
-        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status]);
+        return $stmt->execute([$space_id, $photo_path, $action, $client_id, $status]);
     } catch (PDOException $e) {
         error_log("addClientPhotoToHistory Error: " . $e->getMessage());
         return false;
