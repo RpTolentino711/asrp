@@ -1506,7 +1506,7 @@ function formatDateToMonthLetters($date) {
     console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
     
     // USE ../AJAX/ like the working get_unread_admin_chat_counts.php
-    fetch(`check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+    fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
     .then(res => {
         console.log('📡 Response status:', res.status);
         if (!res.ok) {
