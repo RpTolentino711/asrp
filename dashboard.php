@@ -122,31 +122,79 @@ if (isset($_SESSION['feedback_success'])) {
     unset($_SESSION['feedback_success']);
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
+// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR photo_history TABLE) ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
-// Function to add client photo to history (using negative client_id to distinguish from admin)
+// Function to add client photo to history using PDO
 function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
     // Use negative client_id to distinguish client actions from admin actions
-    $client_id = -$_SESSION['client_id']; // Negative value indicates client action
+    $client_id = -$_SESSION['client_id'];
     
-    // For client actions, we'll use the addPhotoToHistory method but with negative client_id
-    if (method_exists($db, 'addPhotoToHistory')) {
-        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
-    }
-    
-    // Fallback: direct SQL if method doesn't exist
     try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, description, Action, Previous_Photo_Path, Action_By, Status) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)";
         
         $status = ($action === 'deleted') ? 'inactive' : 'active';
         $stmt = $db->pdo->prepare($sql);
-        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status, $description]);
+        return $stmt->execute([
+            $space_id, 
+            $photo_path, 
+            $description,
+            $action, 
+            null, 
+            $client_id, 
+            $status
+        ]);
     } catch (PDOException $e) {
-        error_log("addClientPhotoToHistory Error: " . $e->getMessage());
+        error_log("addClientPhotoToHistory PDO Error: " . $e->getMessage());
         return false;
+    }
+}
+
+// Function to get client photos from photo_history using PDO
+function getClientPhotos($db, $space_id, $client_id) {
+    try {
+        $sql = "SELECT Photo_Path, description, Action_Date 
+                FROM photo_history 
+                WHERE Space_ID = ? 
+                AND Action_By = ? 
+                AND Action = 'uploaded' 
+                AND Status = 'active'
+                ORDER BY Action_Date DESC";
+        
+        $stmt = $db->pdo->prepare($sql);
+        $stmt->execute([$space_id, -$client_id]);
+        
+        $photos = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $photos[] = $row['Photo_Path'];
+        }
+        return $photos;
+    } catch (PDOException $e) {
+        error_log("getClientPhotos PDO Error: " . $e->getMessage());
+        return [];
+    }
+}
+
+// Function to count client photos using PDO
+function countClientPhotos($db, $space_id, $client_id) {
+    try {
+        $sql = "SELECT COUNT(*) as photo_count 
+                FROM photo_history 
+                WHERE Space_ID = ? 
+                AND Action_By = ? 
+                AND Action = 'uploaded' 
+                AND Status = 'active'";
+        
+        $stmt = $db->pdo->prepare($sql);
+        $stmt->execute([$space_id, -$client_id]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result ? intval($result['photo_count']) : 0;
+    } catch (PDOException $e) {
+        error_log("countClientPhotos PDO Error: " . $e->getMessage());
+        return 0;
     }
 }
 
@@ -184,10 +232,8 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                 $photo_upload_error = "Unknown upload error occurred.";
         }
     } else {
-        // Get current photos from JSON column
-        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-        $used_slots = count($current_photos);
+        // Count current photos using photo_history table
+        $used_slots = countClientPhotos($db, $space_id, $client_id);
         
         if ($used_slots >= 6) {
             $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
@@ -237,15 +283,8 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                             $filepath = $upload_dir . $filename;
                             
                             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                                // Add to existing photos array and save as JSON
-                                $current_photos[] = $filename;
-                                $json_photos = json_encode($current_photos);
-                                
-                                // Save to database (UPDATED FOR JSON)
-                                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                                    // ADD TO PHOTO HISTORY - Client uploaded photo
-                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
-                                    
+                                // ADD TO PHOTO HISTORY - Client uploaded photo
+                                if (addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo')) {
                                     $photo_upload_success = "Photo uploaded successfully for this unit!";
                                     $_SESSION['photo_upload_success'] = $photo_upload_success;
                                     // Redirect to prevent resubmission
@@ -256,7 +295,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                                     if (file_exists($filepath)) {
                                         unlink($filepath);
                                     }
-                                    $photo_upload_error = "Database error occurred. Photo was not saved.";
+                                    $photo_upload_error = "Database error occurred. Photo was not saved to history.";
                                 }
                             } else {
                                 $photo_upload_error = "Failed to move uploaded file. Check file permissions.";
@@ -269,7 +308,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
     }
 }
 
-// Photo Delete Processing (UPDATED FOR JSON)
+// Photo Delete Processing (UPDATED FOR photo_history TABLE)
 if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
@@ -287,41 +326,47 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
         if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
             $photo_upload_error = "Invalid photo filename format.";
         } else {
-            // Get current photos and remove the specified one
-            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-            
-            if (!in_array($photo_filename, $current_photos)) {
-                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
-            } else {
-                // Remove photo from array
-                $updated_photos = array_values(array_diff($current_photos, [$photo_filename]));
-                $json_photos = json_encode($updated_photos);
+            // Check if photo exists in photo_history using PDO
+            try {
+                $sql = "SELECT Photo_Path FROM photo_history 
+                        WHERE Space_ID = ? 
+                        AND Action_By = ? 
+                        AND Photo_Path = ? 
+                        AND Action = 'uploaded' 
+                        AND Status = 'active'";
                 
-                // Update database with new JSON array (UPDATED FOR JSON)
-                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                    // ADD TO PHOTO HISTORY - Client deleted photo
-                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
-                    
-                    // Delete file from filesystem
-                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                    $file_to_delete = $upload_dir . basename($photo_filename);
-                    if (file_exists($file_to_delete)) {
-                        if (unlink($file_to_delete)) {
-                            $photo_upload_success = "Photo deleted successfully!";
-                        } else {
-                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
-                        }
-                    } else {
-                        $photo_upload_success = "Photo deleted successfully!";
-                    }
-                    $_SESSION['photo_upload_success'] = $photo_upload_success;
-                    // Redirect to prevent resubmission
-                    header("Location: " . $_SERVER['PHP_SELF']);
-                    exit();
+                $stmt = $db->pdo->prepare($sql);
+                $stmt->execute([$space_id, -$client_id, $photo_filename]);
+                $existing_photo = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$existing_photo) {
+                    $photo_upload_error = "Photo not found or you don't have permission to delete it.";
                 } else {
-                    $photo_upload_error = "Failed to delete photo from database.";
+                    // Mark photo as deleted in photo_history using PDO
+                    if (addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo')) {
+                        // Delete file from filesystem
+                        $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                        $file_to_delete = $upload_dir . basename($photo_filename);
+                        if (file_exists($file_to_delete)) {
+                            if (unlink($file_to_delete)) {
+                                $photo_upload_success = "Photo deleted successfully!";
+                            } else {
+                                $photo_upload_success = "Photo deleted from history, but file removal failed.";
+                            }
+                        } else {
+                            $photo_upload_success = "Photo deleted successfully!";
+                        }
+                        $_SESSION['photo_upload_success'] = $photo_upload_success;
+                        // Redirect to prevent resubmission
+                        header("Location: " . $_SERVER['PHP_SELF']);
+                        exit();
+                    } else {
+                        $photo_upload_error = "Failed to delete photo from history.";
+                    }
                 }
+            } catch (PDOException $e) {
+                error_log("Photo delete PDO error: " . $e->getMessage());
+                $photo_upload_error = "Database error occurred while deleting photo.";
             }
         }
     }
@@ -346,7 +391,7 @@ if ($client_details && is_array($client_details)) {
     $client_display = !empty($full_name) ? $full_name : (!empty($username) ? $username : "Unknown User");
 }
 
-// Get data with error handling
+// Get data with error handling using PDO
 try {
     $feedback_prompts = $db->getFeedbackPrompts($client_id);
     $rented_units = $db->getRentedUnits($client_id);
@@ -355,23 +400,28 @@ try {
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
     
-    // Get maintenance history and photos only if there are rented units
+    // Get maintenance history and photos using photo_history table
     $maintenance_history = [];
     $unit_photos = [];
     
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
+        
+        // Get photos from photo_history table using PDO
+        foreach ($rented_units as $unit) {
+            $space_id = intval($unit['Space_ID']);
+            $unit_photos[$space_id] = getClientPhotos($db, $space_id, $client_id);
+        }
         
         // Ensure arrays are returned
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }
     
-} catch (Exception $e) {
-    // Log error and set defaults
-    error_log("Dashboard data fetch error: " . $e->getMessage());
+} catch (PDOException $e) {
+    // Log PDO error and set defaults
+    error_log("Dashboard PDO data fetch error: " . $e->getMessage());
     $feedback_prompts = [];
     $rented_units = [];
     $maintenance_history = [];
@@ -406,7 +456,7 @@ function formatDateToMonthLetters($date) {
     <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome@6.5.2/css/all.min.css">
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -1220,6 +1270,7 @@ function formatDateToMonthLetters($date) {
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
                     $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                    $photo_count = count($photos);
                     
                     // Get dates safely and format them
                     $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
@@ -1284,7 +1335,7 @@ function formatDateToMonthLetters($date) {
                                         <h6 class="mb-0">
                                             <i class="bi bi-images me-1"></i>Unit Photos
                                         </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/6</small>
+                                        <small class="text-muted"><?= $photo_count ?>/6</small>
                                     </div>
 
                                     <?php if (!empty($photos)): ?>
@@ -1316,7 +1367,7 @@ function formatDateToMonthLetters($date) {
                                     <?php endif; ?>
 
                                     <!-- Upload Form -->
-                                    <?php if (count($photos) < 6): ?>
+                                    <?php if ($photo_count < 6): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">
@@ -1478,6 +1529,7 @@ function formatDateToMonthLetters($date) {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Your existing JavaScript remains exactly the same
         // Image modal functionality
         function showImageModal(imageSrc) {
             const modalImage = document.getElementById('modalImage');
