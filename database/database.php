@@ -2550,7 +2550,7 @@ public function getLatestMaintenanceRequests($limit = 5) {
 
 
 
-public function getActivePhotosForUnits($unit_ids) {
+public function getActiveClientPhotosForUnits($unit_ids, $client_id) {
     if (empty($unit_ids)) return [];
     
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
@@ -2558,11 +2558,14 @@ public function getActivePhotosForUnits($unit_ids) {
             FROM photo_history 
             WHERE Space_ID IN ($placeholders) 
             AND Status = 'active'
+            AND Action_By = ?
             ORDER BY Action_Date DESC";
     
     try {
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($unit_ids);
+        // Combine unit_ids with client_id (negative for client actions)
+        $params = array_merge($unit_ids, [-$client_id]);
+        $stmt->execute($params);
         
         $photos = [];
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -2573,7 +2576,7 @@ public function getActivePhotosForUnits($unit_ids) {
         }
         return $photos;
     } catch (PDOException $e) {
-        error_log("getActivePhotosForUnits Error: " . $e->getMessage());
+        error_log("getActiveClientPhotosForUnits Error: " . $e->getMessage());
         return [];
     }
 }
