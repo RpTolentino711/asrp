@@ -301,8 +301,8 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
                 // Update database with new JSON array (UPDATED FOR JSON)
                 if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
                     // ADD TO PHOTO HISTORY - Client deleted photo
-                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
-                    
+                                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
+                                    
                     // Delete file from filesystem
                     $upload_dir = __DIR__ . "/uploads/unit_photos/";
                     $file_to_delete = $upload_dir . basename($photo_filename);
@@ -333,6 +333,49 @@ if (isset($_SESSION['photo_upload_success'])) {
     unset($_SESSION['photo_upload_success']);
 }
 
+// --- GET NEXT PAYMENT DATA ---
+$next_payment = [];
+$current_month = date('F Y');
+$next_month = date('F Y', strtotime('+1 month'));
+
+try {
+    // Get upcoming payments for current and next month
+    $all_invoices = $db->getClientInvoiceHistory($client_id);
+    $upcoming_invoices = array_filter($all_invoices, function($invoice) {
+        $status = strtolower($invoice['Status'] ?? '');
+        $invoice_date = $invoice['InvoiceDate'] ?? '';
+        $due_date = strtotime($invoice['EndDate'] ?? '');
+        
+        // Include unpaid invoices with due dates in current or next month
+        return $status !== 'paid' && 
+               $due_date >= strtotime(date('Y-m-01')) && 
+               $due_date <= strtotime('+2 months');
+    });
+    
+    foreach ($upcoming_invoices as $invoice) {
+        $due_date = strtotime($invoice['EndDate'] ?? '');
+        $month_key = date('F Y', $due_date);
+        
+        if (!isset($next_payment[$month_key])) {
+            $next_payment[$month_key] = [];
+        }
+        
+        $next_payment[$month_key][] = [
+            'space_name' => $invoice['SpaceName'] ?? 'Unknown Unit',
+            'due_date' => date('F j, Y', $due_date),
+            'amount' => $invoice['Amount'] ?? 0,
+            'invoice_id' => $invoice['Invoice_ID'] ?? 0
+        ];
+    }
+    
+    // Sort by date
+    ksort($next_payment);
+    
+} catch (Exception $e) {
+    error_log("Error fetching next payment: " . $e->getMessage());
+    $next_payment = [];
+}
+
 // --- GET PAID MONTHS DATA ---
 $paid_months = [];
 try {
@@ -360,7 +403,7 @@ try {
         }
         
         // Add month if not already added
-        if (!in_array($month_year, $paid_months[$space_id]['months'])) {
+        if (!in_array($month_year, array_column($paid_months[$space_id]['months'], 'display'))) {
             $paid_months[$space_id]['months'][] = [
                 'display' => $month_year,
                 'sort' => $year_month
@@ -634,32 +677,187 @@ function formatDateToMonthLetters($date) {
             color: #92400e;
         }
 
-        /* Card Styles */
-        .card {
-            border: none;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-md);
-            background: var(--lighter);
-            transition: var(--transition);
-            height: 100%;
-            overflow: hidden;
+        /* Collapsible Section Styles */
+        .collapsible-section {
+            margin-bottom: 1rem;
         }
 
-        .card:hover {
-            transform: translateY(-4px);
+        .section-header {
+            background: var(--lighter);
+            border-radius: var(--border-radius);
+            padding: 1.25rem 1.5rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-light);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header:hover {
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .section-header.collapsed {
+            margin-bottom: 0;
+            border-radius: var(--border-radius);
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--secondary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .toggle-icon {
+            transition: var(--transition);
+            font-size: 1.1rem;
+            color: var(--gray);
+        }
+
+        .section-header.collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+
+        .section-content {
+            background: var(--lighter);
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--gray-light);
+            border-top: none;
+            padding: 1.5rem;
+            margin-top: -2px;
+        }
+
+        /* Quick Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--lighter);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            text-align: center;
+            transition: var(--transition);
+            border: 1px solid var(--gray-light);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
             box-shadow: var(--shadow-lg);
         }
 
-        .card-header {
-            background: var(--light);
-            border-bottom: 1px solid var(--gray-light);
-            padding: 1.25rem;
-            font-weight: 600;
-            color: var(--secondary);
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
         }
 
-        .card-body {
-            padding: 1.5rem;
+        .stat-icon.primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+        }
+
+        .stat-icon.success {
+            background: linear-gradient(135deg, var(--success), #34d399);
+            color: white;
+        }
+
+        .stat-icon.warning {
+            background: linear-gradient(135deg, var(--warning), #fbbf24);
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--gray);
+            font-weight: 500;
+        }
+
+        /* Next Payment Section Styles */
+        .next-payment-card {
+            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+            border: 1px solid #fdba74;
+        }
+
+        .next-payment-header {
+            background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+            color: white;
+        }
+
+        .payment-item {
+            background: white;
+            border-radius: var(--border-radius-sm);
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid #f97316;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+
+        .payment-item:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .payment-space {
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .payment-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .payment-date {
+            color: var(--gray-dark);
+            font-size: 0.9rem;
+        }
+
+        .payment-amount {
+            font-weight: 700;
+            color: #ea580c;
+            font-size: 1.1rem;
+        }
+
+        .no-payment {
+            text-align: center;
+            padding: 2rem;
+            color: var(--gray);
         }
 
         /* Paid Months Section Styles */
@@ -710,6 +908,34 @@ function formatDateToMonthLetters($date) {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
+        }
+
+        /* Card Styles */
+        .card {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            background: var(--lighter);
+            transition: var(--transition);
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
+            background: var(--light);
+            border-bottom: 1px solid var(--gray-light);
+            padding: 1.25rem;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .card-body {
+            padding: 1.5rem;
         }
 
         /* Unit Cards */
@@ -1046,6 +1272,24 @@ function formatDateToMonthLetters($date) {
                 margin-left: 0;
             }
 
+            .section-header {
+                padding: 1rem 1.25rem;
+            }
+
+            .section-title {
+                font-size: 1.1rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-details {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
             .months-container {
                 justify-content: center;
             }
@@ -1268,316 +1512,409 @@ function formatDateToMonthLetters($date) {
             </div>
         <?php endif; ?>
 
-        <!-- Paid Months Section -->
-        <?php if (!empty($paid_months)): ?>
-            <div class="card paid-months-card mb-4 fade-in">
-                <div class="card-header paid-months-header">
-                    <h4 class="mb-0">
-                        <i class="bi bi-calendar-check me-2"></i>Your Paid Months
-                    </h4>
+        <!-- Quick Stats -->
+        <div class="stats-grid mb-4">
+            <div class="stat-card fade-in">
+                <div class="stat-icon primary">
+                    <i class="bi bi-buildings"></i>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted mb-4">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Here are all the months you've successfully paid for across your rental units.
-                    </p>
-                    
-                    <?php foreach ($paid_months as $space_id => $data): ?>
-                        <div class="space-months">
-                            <div class="space-name">
-                                <i class="bi bi-building me-2"></i>
-                                <?= htmlspecialchars($data['space_name']) ?>
-                            </div>
-                            <div class="months-container">
-                                <?php foreach ($data['months'] as $month): ?>
-                                    <span class="month-badge">
-                                        <i class="bi bi-check-circle me-1"></i>
-                                        <?= htmlspecialchars($month['display']) ?>
-                                    </span>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                    
-                    <div class="mt-3 text-center">
-                        <small class="text-muted">
-                            <i class="bi bi-shield-check me-1"></i>
-                            All payments are verified and recorded in our system.
-                        </small>
-                    </div>
-                </div>
+                <div class="stat-value"><?= count($rented_units) ?></div>
+                <div class="stat-label">Active Units</div>
             </div>
-        <?php else: ?>
-            <div class="card paid-months-card mb-4 fade-in">
-                <div class="card-header paid-months-header">
-                    <h4 class="mb-0">
-                        <i class="bi bi-calendar-check me-2"></i>Paid Months
-                    </h4>
+            <div class="stat-card fade-in">
+                <div class="stat-icon success">
+                    <i class="bi bi-calendar-check"></i>
                 </div>
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-calendar-x fs-1 text-muted mb-3 d-block"></i>
-                    <h5 class="text-muted">No Payment History Yet</h5>
-                    <p class="text-muted mb-0">Your paid months will appear here once you make payments.</p>
-                </div>
+                <div class="stat-value"><?= count($paid_invoices ?? []) ?></div>
+                <div class="stat-label">Paid Invoices</div>
             </div>
-        <?php endif; ?>
-
-        <!-- Feedback Section -->
-        <?php if (!empty($feedback_prompts)): ?>
-            <div class="alert alert-warning fade-in">
-                <i class="bi bi-chat-heart me-2"></i>
-                We value your experience! Please provide feedback for your recently ended rental(s).
-            </div>
-            
-            <?php foreach ($feedback_prompts as $prompt): ?>
-                <div class="card feedback-card mb-3 fade-in">
-                    <div class="card-header">
-                        <i class="bi bi-star me-2"></i>
-                        Feedback for <?= htmlspecialchars($prompt['SpaceName'] ?? 'Unit') ?>
-                        <small class="text-muted ms-2">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate'] ?? 'N/A') ?>)</small>
-                    </div>
-                    <div class="card-body">
-                        <form method="post" action="">
-                            <input type="hidden" name="invoice_id" value="<?= intval($prompt['Invoice_ID']) ?>">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">
-                                        <i class="bi bi-star-fill me-1"></i>Rating
-                                    </label>
-                                    <select name="rating" class="form-select rating-select" required>
-                                        <option value="">Select Rating</option>
-                                        <option value="5">★★★★★ Excellent (5)</option>
-                                        <option value="4">★★★★☆ Very Good (4)</option>
-                                        <option value="3">★★★☆☆ Good (3)</option>
-                                        <option value="2">★★☆☆☆ Fair (2)</option>
-                                        <option value="1">★☆☆☆☆ Poor (1)</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">
-                                        <i class="bi bi-chat-text me-1"></i>Comments
-                                    </label>
-                                    <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
-                                </div>
-                            </div>
-                            <button class="btn btn-primary" type="submit" name="submit_feedback" value="1">
-                                <i class="bi bi-send me-1"></i>Submit Feedback
-                            </button>
-                        </form>
-                    </div>
+            <div class="stat-card fade-in">
+                <div class="stat-icon warning">
+                    <i class="bi bi-clock-history"></i>
                 </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
-
-        <!-- Rented Units Section -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold mb-0">
-                <i class="bi bi-buildings me-2"></i>Your Rental Portfolio
-            </h2>
-            <div class="badge bg-primary fs-6">
-                <?= count($rented_units) ?> Active Unit<?= count($rented_units) !== 1 ? 's' : '' ?>
+                <div class="stat-value"><?= count($upcoming_invoices ?? []) ?></div>
+                <div class="stat-label">Upcoming Payments</div>
             </div>
         </div>
 
-        <?php if (!empty($rented_units)): ?>
-            <div class="row g-4">
-                <?php foreach ($rented_units as $rent): 
-                    $space_id = intval($rent['Space_ID']);
-                    $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
-                    
-                    // Get dates safely and format them
-                    $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
-                    $rental_end = isset($rent['EndDate']) ? formatDateToMonthLetters($rent['EndDate']) : 'N/A';
-                    $due_date = formatDateToMonthLetters($rental_end);
-
-                    // Use InvoiceDate from the latest invoice with Flow_Status 'new'
-                    if (method_exists($db, 'getLatestNewInvoiceForUnit')) {
-                        try {
-                            $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $space_id);
-                            if ($latest_invoice && is_array($latest_invoice) && isset($latest_invoice['Flow_Status']) && strtolower($latest_invoice['Flow_Status']) === 'new') {
-                                $rental_start = isset($latest_invoice['InvoiceDate']) ? formatDateToMonthLetters($latest_invoice['InvoiceDate']) : $rental_start;
-                                $rental_end = isset($latest_invoice['EndDate']) ? formatDateToMonthLetters($latest_invoice['EndDate']) : $rental_end;
-                                $due_date = formatDateToMonthLetters($rental_end);
-                            }
-                        } catch (Exception $e) {
-                            // Use default values if method fails
-                            error_log("Failed to get latest invoice: " . $e->getMessage());
-                        }
-                    }
-                ?>
-                    <div class="col-12 col-lg-6 col-xl-4">
-                        <div class="card unit-card fade-in h-100">
-                            <div class="card-body d-flex flex-column">
-                                <!-- Unit Icon -->
-                                <div class="unit-icon">
-                                    <i class="bi bi-house-door"></i>
-                                </div>
-
-                                <!-- Unit Info -->
-                                <div class="text-center mb-3">
-                                    <h5 class="unit-title"><?= htmlspecialchars($rent['Name'] ?? 'Unit') ?></h5>
-                                    <div class="unit-price">₱<?= number_format(floatval($rent['Price'] ?? 0), 0) ?>/month</div>
-                                    <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName'] ?? 'Space') ?></span>
-                                </div>
-
-                                <!-- Location & Billing Information -->
-                                <div class="mb-3">
-                                    <div class="unit-details">
-                                        <i class="bi bi-geo-alt me-1"></i>
-                                        <?= htmlspecialchars($rent['Street'] ?? '') ?>, <?= htmlspecialchars($rent['Brgy'] ?? '') ?>, <?= htmlspecialchars($rent['City'] ?? '') ?>
+        <!-- Next Payment Section (Collapsible) -->
+        <div class="collapsible-section">
+            <div class="section-header" onclick="toggleSection('next-payment')">
+                <div class="section-title">
+                    <i class="bi bi-calendar-event"></i>
+                    Next Payment This Month
+                    <?php if (!empty($next_payment)): ?>
+                        <span class="section-badge"><?= array_sum(array_map('count', $next_payment)) ?> Due</span>
+                    <?php endif; ?>
+                </div>
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+            <div class="section-content" id="next-payment-content">
+                <?php if (!empty($next_payment)): ?>
+                    <div class="card next-payment-card border-0">
+                        <div class="card-body">
+                            <?php foreach ($next_payment as $month => $payments): ?>
+                                <h6 class="text-orange mb-3">
+                                    <i class="bi bi-calendar-month me-2"></i><?= htmlspecialchars($month) ?>
+                                </h6>
+                                <?php foreach ($payments as $payment): ?>
+                                    <div class="payment-item">
+                                        <div class="payment-space">
+                                            <i class="bi bi-building me-2"></i>
+                                            <?= htmlspecialchars($payment['space_name']) ?>
+                                        </div>
+                                        <div class="payment-details">
+                                            <div class="payment-date">
+                                                <i class="bi bi-clock me-1"></i>
+                                                Due: <?= htmlspecialchars($payment['due_date']) ?>
+                                            </div>
+                                            <div class="payment-amount">
+                                                ₱<?= number_format(floatval($payment['amount']), 2) ?>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="unit-details">
-                                        <i class="bi bi-calendar-range me-1"></i>
-                                        <strong>Period:</strong> <?= $rental_start ?> to <?= $rental_end ?>
-                                    </div>
-                                    <div class="unit-details">
-                                        <i class="bi bi-calendar-check me-1"></i>
-                                        <strong>Due:</strong> <?= $due_date ?>
-                                    </div>
-                                    <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
-                                        <div class="unit-details text-success">
-                                            <i class="bi bi-check-circle me-1"></i>
-                                            <strong>Status:</strong> Paid
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <!-- Photo Gallery -->
-                                <div class="flex-grow-1">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="mb-0">
-                                            <i class="bi bi-images me-1"></i>Unit Photos
-                                        </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/6</small>
-                                    </div>
-
-                                    <?php if (!empty($photos)): ?>
-                                        <div class="photo-gallery">
-                                            <?php foreach ($photos as $photo): ?>
-                                                <div class="photo-item">
-                                                    <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" 
-                                                         alt="Unit Photo"
-                                                         onclick="showImageModal('uploads/unit_photos/<?= htmlspecialchars($photo) ?>')">
-                                                    <form method="post" class="d-inline">
-                                                        <input type="hidden" name="space_id" value="<?= $space_id ?>">
-                                                        <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
-                                                        <button type="submit" 
-                                                                name="delete_unit_photo" 
-                                                                class="delete-photo-btn"
-                                                                onclick="return confirmDeletePhoto(event, '<?= htmlspecialchars($photo) ?>');"
-                                                                title="Delete photo">
-                                                            <i class="bi bi-x"></i>
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="no-photos">
-                                            <i class="bi bi-camera mb-2 d-block fs-3"></i>
-                                            No photos uploaded yet
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <!-- Upload Form -->
-                                    <?php if (count($photos) < 6): ?>
-                                        <div class="upload-form">
-                                            <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
-                                                <input type="hidden" name="space_id" value="<?= $space_id ?>">
-                                                <div class="mb-2">
-                                                    <input type="file" 
-                                                           name="unit_photo" 
-                                                           accept="image/jpeg,image/jpg,image/png,image/gif" 
-                                                           class="form-control" 
-                                                           id="fileInput_<?= $space_id ?>"
-                                                           required>
-                                                    <small class="text-muted">Max 2MB. JPG, PNG, GIF only. Max dimensions 2048x2048px.</small>
-                                                </div>
-                                                <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100" id="uploadBtn_<?= $space_id ?>">
-                                                    <i class="bi bi-cloud-upload me-1"></i>Upload Photo
-                                                </button>
-                                            </form>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <!-- Maintenance History -->
-                                <div class="maintenance-section mt-auto">
-                                    <div class="maintenance-header">
-                                        <div class="d-flex align-items-center">
-                                            <i class="bi bi-tools"></i>
-                                            <h6 class="mb-0 ms-2">Maintenance History</h6>
-                                        </div>
-                                        <?php if (isset($maintenance_history[$space_id]) && count($maintenance_history[$space_id]) > 3): ?>
-                                            <button type="button" class="toggle-maintenance" onclick="toggleMaintenanceHistory(<?= $space_id ?>)">
-                                                <i class="bi bi-chevron-down" id="maintenance-icon-<?= $space_id ?>"></i>
-                                                View All
-                                            </button>
-                                        <?php endif; ?>
-                                    </div>
-                                    
-                                    <?php if (isset($maintenance_history[$space_id]) && !empty($maintenance_history[$space_id])): ?>
-                                        <ul class="maintenance-list" id="maintenance-preview-<?= $space_id ?>">
-                                            <?php foreach (array_slice($maintenance_history[$space_id], 0, 3) as $mh): ?>
-                                                <li class="maintenance-item">
-                                                    <div>
-                                                        <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
-                                                        <small class="text-muted">Maintenance Request</small>
-                                                    </div>
-                                                    <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
-                                                        <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
-                                                    </span>
-                                                </li>
-                                            <?php endforeach; ?>
-                                        </ul>
-                                        
-                                        <!-- Full Maintenance History (Hidden by default) -->
-                                        <div class="maintenance-dropdown d-none" id="maintenance-full-<?= $space_id ?>">
-                                            <ul class="maintenance-list">
-                                                <?php foreach ($maintenance_history[$space_id] as $mh): ?>
-                                                    <li class="maintenance-item">
-                                                        <div>
-                                                            <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
-                                                            <small class="text-muted">Maintenance Request</small>
-                                                        </div>
-                                                        <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
-                                                            <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
-                                                        </span>
-                                                    </li>
-                                                <?php endforeach; ?>
-                                            </ul>
-                                        </div>
-                                        
-                                        <?php if (count($maintenance_history[$space_id]) > 3): ?>
-                                            <small class="text-muted">
-                                                <i class="bi bi-three-dots me-1"></i>
-                                                +<?= count($maintenance_history[$space_id]) - 3 ?>
-                                            </small>
-                                        <?php endif; ?>
-                                    <?php else: ?>
-                                        <div class="no-maintenance">
-                                            <i class="bi bi-check-circle text-success me-1"></i>
-                                            No maintenance requests yet
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
+                                <?php endforeach; ?>
+                            <?php endforeach; ?>
+                            
+                            <div class="text-center mt-3">
+                                <a href="invoice_history.php" class="btn btn-warning">
+                                    <i class="bi bi-credit-card me-1"></i>View All Invoices
+                                </a>
                             </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="no-payment">
+                        <i class="bi bi-check-circle text-success fs-1 mb-3 d-block"></i>
+                        <h5 class="text-success">No Upcoming Payments</h5>
+                        <p class="text-muted">You're all caught up with your payments!</p>
+                    </div>
+                <?php endif; ?>
             </div>
-        <?php else: ?>
-            <div class="empty-state">
-                <i class="bi bi-house-x"></i>
-                <h5>No Active Rentals</h5>
-                <p>You currently have no active rental units. <a href="tel:9451357685">Contact the Admin</a> to explore available properties.</p>
+        </div>
+
+        <!-- Paid Months Section (Collapsible) -->
+        <div class="collapsible-section">
+            <div class="section-header" onclick="toggleSection('paid-months')">
+                <div class="section-title">
+                    <i class="bi bi-calendar-check"></i>
+                    Payment History
+                    <?php if (!empty($paid_months)): ?>
+                        <span class="section-badge"><?= count($paid_months) ?> Units</span>
+                    <?php endif; ?>
+                </div>
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+            <div class="section-content" id="paid-months-content">
+                <?php if (!empty($paid_months)): ?>
+                    <div class="card paid-months-card border-0">
+                        <div class="card-body">
+                            <p class="text-muted mb-4">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Your complete payment history across all rental units.
+                            </p>
+                            
+                            <?php foreach ($paid_months as $space_id => $data): ?>
+                                <div class="space-months">
+                                    <div class="space-name">
+                                        <i class="bi bi-building me-2"></i>
+                                        <?= htmlspecialchars($data['space_name']) ?>
+                                    </div>
+                                    <div class="months-container">
+                                        <?php foreach ($data['months'] as $month): ?>
+                                            <span class="month-badge">
+                                                <i class="bi bi-check-circle me-1"></i>
+                                                <?= htmlspecialchars($month['display']) ?>
+                                            </span>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                            
+                            <div class="mt-3 text-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-shield-check me-1"></i>
+                                    All payments are verified and recorded in our system.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="no-payment text-center py-4">
+                        <i class="bi bi-calendar-x fs-1 text-muted mb-3 d-block"></i>
+                        <h5 class="text-muted">No Payment History Yet</h5>
+                        <p class="text-muted mb-0">Your paid months will appear here once you make payments.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Feedback Section (Collapsible) -->
+        <?php if (!empty($feedback_prompts)): ?>
+            <div class="collapsible-section">
+                <div class="section-header" onclick="toggleSection('feedback')">
+                    <div class="section-title">
+                        <i class="bi bi-chat-heart"></i>
+                        Feedback Requests
+                        <span class="section-badge"><?= count($feedback_prompts) ?> Pending</span>
+                    </div>
+                    <i class="bi bi-chevron-down toggle-icon"></i>
+                </div>
+                <div class="section-content" id="feedback-content">
+                    <?php foreach ($feedback_prompts as $prompt): ?>
+                        <div class="card feedback-card mb-3 fade-in">
+                            <div class="card-header">
+                                <i class="bi bi-star me-2"></i>
+                                Feedback for <?= htmlspecialchars($prompt['SpaceName'] ?? 'Unit') ?>
+                                <small class="text-muted ms-2">(Invoice Date: <?= htmlspecialchars($prompt['InvoiceDate'] ?? 'N/A') ?>)</small>
+                            </div>
+                            <div class="card-body">
+                                <form method="post" action="">
+                                    <input type="hidden" name="invoice_id" value="<?= intval($prompt['Invoice_ID']) ?>">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-star-fill me-1"></i>Rating
+                                            </label>
+                                            <select name="rating" class="form-select rating-select" required>
+                                                <option value="">Select Rating</option>
+                                                <option value="5">★★★★★ Excellent (5)</option>
+                                                <option value="4">★★★★☆ Very Good (4)</option>
+                                                <option value="3">★★★☆☆ Good (3)</option>
+                                                <option value="2">★★☆☆☆ Fair (2)</option>
+                                                <option value="1">★☆☆☆☆ Poor (1)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">
+                                                <i class="bi bi-chat-text me-1"></i>Comments
+                                            </label>
+                                            <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary" type="submit" name="submit_feedback" value="1">
+                                        <i class="bi bi-send me-1"></i>Submit Feedback
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
         <?php endif; ?>
 
+        <!-- Rented Units Section (Collapsible) -->
+        <div class="collapsible-section">
+            <div class="section-header" onclick="toggleSection('rented-units')">
+                <div class="section-title">
+                    <i class="bi bi-buildings"></i>
+                    Your Rental Portfolio
+                    <span class="section-badge"><?= count($rented_units) ?> Units</span>
+                </div>
+                <i class="bi bi-chevron-down toggle-icon"></i>
+            </div>
+            <div class="section-content" id="rented-units-content">
+                <?php if (!empty($rented_units)): ?>
+                    <div class="row g-4">
+                        <?php foreach ($rented_units as $rent): 
+                            $space_id = intval($rent['Space_ID']);
+                            $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                            
+                            // Get dates safely and format them
+                            $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
+                            $rental_end = isset($rent['EndDate']) ? formatDateToMonthLetters($rent['EndDate']) : 'N/A';
+                            $due_date = formatDateToMonthLetters($rental_end);
+
+                            // Use InvoiceDate from the latest invoice with Flow_Status 'new'
+                            if (method_exists($db, 'getLatestNewInvoiceForUnit')) {
+                                try {
+                                    $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $space_id);
+                                    if ($latest_invoice && is_array($latest_invoice) && isset($latest_invoice['Flow_Status']) && strtolower($latest_invoice['Flow_Status']) === 'new') {
+                                        $rental_start = isset($latest_invoice['InvoiceDate']) ? formatDateToMonthLetters($latest_invoice['InvoiceDate']) : $rental_start;
+                                        $rental_end = isset($latest_invoice['EndDate']) ? formatDateToMonthLetters($latest_invoice['EndDate']) : $rental_end;
+                                        $due_date = formatDateToMonthLetters($rental_end);
+                                    }
+                                } catch (Exception $e) {
+                                    // Use default values if method fails
+                                    error_log("Failed to get latest invoice: " . $e->getMessage());
+                                }
+                            }
+                        ?>
+                            <div class="col-12 col-lg-6 col-xl-4">
+                                <div class="card unit-card fade-in h-100">
+                                    <div class="card-body d-flex flex-column">
+                                        <!-- Unit Icon -->
+                                        <div class="unit-icon">
+                                            <i class="bi bi-house-door"></i>
+                                        </div>
+
+                                        <!-- Unit Info -->
+                                        <div class="text-center mb-3">
+                                            <h5 class="unit-title"><?= htmlspecialchars($rent['Name'] ?? 'Unit') ?></h5>
+                                            <div class="unit-price">₱<?= number_format(floatval($rent['Price'] ?? 0), 0) ?>/month</div>
+                                            <span class="unit-badge"><?= htmlspecialchars($rent['SpaceTypeName'] ?? 'Space') ?></span>
+                                        </div>
+
+                                        <!-- Location & Billing Information -->
+                                        <div class="mb-3">
+                                            <div class="unit-details">
+                                                <i class="bi bi-geo-alt me-1"></i>
+                                                <?= htmlspecialchars($rent['Street'] ?? '') ?>, <?= htmlspecialchars($rent['Brgy'] ?? '') ?>, <?= htmlspecialchars($rent['City'] ?? '') ?>
+                                            </div>
+                                            <div class="unit-details">
+                                                <i class="bi bi-calendar-range me-1"></i>
+                                                <strong>Period:</strong> <?= $rental_start ?> to <?= $rental_end ?>
+                                            </div>
+                                            <div class="unit-details">
+                                                <i class="bi bi-calendar-check me-1"></i>
+                                                <strong>Due:</strong> <?= $due_date ?>
+                                            </div>
+                                            <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
+                                                <div class="unit-details text-success">
+                                                    <i class="bi bi-check-circle me-1"></i>
+                                                    <strong>Status:</strong> Paid
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <!-- Photo Gallery -->
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <h6 class="mb-0">
+                                                    <i class="bi bi-images me-1"></i>Unit Photos
+                                                </h6>
+                                                <small class="text-muted"><?= count($photos) ?>/6</small>
+                                            </div>
+
+                                            <?php if (!empty($photos)): ?>
+                                                <div class="photo-gallery">
+                                                    <?php foreach ($photos as $photo): ?>
+                                                        <div class="photo-item">
+                                                            <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" 
+                                                                 alt="Unit Photo"
+                                                                 onclick="showImageModal('uploads/unit_photos/<?= htmlspecialchars($photo) ?>')">
+                                                            <form method="post" class="d-inline">
+                                                                <input type="hidden" name="space_id" value="<?= $space_id ?>">
+                                                                <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($photo) ?>">
+                                                                <button type="submit" 
+                                                                        name="delete_unit_photo" 
+                                                                        class="delete-photo-btn"
+                                                                        onclick="return confirmDeletePhoto(event, '<?= htmlspecialchars($photo) ?>');"
+                                                                        title="Delete photo">
+                                                                    <i class="bi bi-x"></i>
+                                                                </button>
+                                                            </form>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php else: ?>
+                                                <div class="no-photos">
+                                                    <i class="bi bi-camera mb-2 d-block fs-3"></i>
+                                                    No photos uploaded yet
+                                                </div>
+                                            <?php endif; ?>
+
+                                            <!-- Upload Form -->
+                                            <?php if (count($photos) < 6): ?>
+                                                <div class="upload-form">
+                                                    <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
+                                                        <input type="hidden" name="space_id" value="<?= $space_id ?>">
+                                                        <div class="mb-2">
+                                                            <input type="file" 
+                                                                   name="unit_photo" 
+                                                                   accept="image/jpeg,image/jpg,image/png,image/gif" 
+                                                                   class="form-control" 
+                                                                   id="fileInput_<?= $space_id ?>"
+                                                                   required>
+                                                            <small class="text-muted">Max 2MB. JPG, PNG, GIF only. Max dimensions 2048x2048px.</small>
+                                                        </div>
+                                                        <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100" id="uploadBtn_<?= $space_id ?>">
+                                                            <i class="bi bi-cloud-upload me-1"></i>Upload Photo
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <!-- Maintenance History -->
+                                        <div class="maintenance-section mt-auto">
+                                            <div class="maintenance-header">
+                                                <div class="d-flex align-items-center">
+                                                    <i class="bi bi-tools"></i>
+                                                    <h6 class="mb-0 ms-2">Maintenance History</h6>
+                                                </div>
+                                                <?php if (isset($maintenance_history[$space_id]) && count($maintenance_history[$space_id]) > 3): ?>
+                                                    <button type="button" class="toggle-maintenance" onclick="toggleMaintenanceHistory(<?= $space_id ?>)">
+                                                        <i class="bi bi-chevron-down" id="maintenance-icon-<?= $space_id ?>"></i>
+                                                        View All
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                            
+                                            <?php if (isset($maintenance_history[$space_id]) && !empty($maintenance_history[$space_id])): ?>
+                                                <ul class="maintenance-list" id="maintenance-preview-<?= $space_id ?>">
+                                                    <?php foreach (array_slice($maintenance_history[$space_id], 0, 3) as $mh): ?>
+                                                        <li class="maintenance-item">
+                                                            <div>
+                                                                <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
+                                                                <small class="text-muted">Maintenance Request</small>
+                                                            </div>
+                                                            <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
+                                                                <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
+                                                            </span>
+                                                        </li>
+                                                    <?php endforeach; ?>
+                                                </ul>
+                                                
+                                                <!-- Full Maintenance History (Hidden by default) -->
+                                                <div class="maintenance-dropdown d-none" id="maintenance-full-<?= $space_id ?>">
+                                                    <ul class="maintenance-list">
+                                                        <?php foreach ($maintenance_history[$space_id] as $mh): ?>
+                                                            <li class="maintenance-item">
+                                                                <div>
+                                                                    <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
+                                                                    <small class="text-muted">Maintenance Request</small>
+                                                                </div>
+                                                                <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
+                                                                    <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
+                                                                </span>
+                                                            </li>
+                                                        <?php endforeach; ?>
+                                                    </ul>
+                                                </div>
+                                                
+                                                <?php if (count($maintenance_history[$space_id]) > 3): ?>
+                                                    <small class="text-muted">
+                                                        <i class="bi bi-three-dots me-1"></i>
+                                                        +<?= count($maintenance_history[$space_id]) - 3 ?>
+                                                    </small>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <div class="no-maintenance">
+                                                    <i class="bi bi-check-circle text-success me-1"></i>
+                                                    No maintenance requests yet
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="bi bi-house-x"></i>
+                        <h5>No Active Rentals</h5>
+                        <p>You currently have no active rental units. <a href="tel:9451357685">Contact the Admin</a> to explore available properties.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- Quick Actions -->
-        <div class="row mt-5">
+        <div class="row mt-4">
             <div class="col-md-4 mb-3">
-                <div class="card text-center">
+                <div class="card text-center h-100">
                     <div class="card-body">
                         <div class="text-primary mb-3">
                             <i class="bi bi-credit-card-2-back fs-1"></i>
@@ -1591,7 +1928,7 @@ function formatDateToMonthLetters($date) {
                 </div>
             </div>
             <div class="col-md-4 mb-3">
-                <div class="card text-center">
+                <div class="card text-center h-100">
                     <div class="card-body">
                         <div class="text-success mb-3">
                             <i class="bi bi-tools fs-1"></i>
@@ -1605,7 +1942,7 @@ function formatDateToMonthLetters($date) {
                 </div>
             </div>
             <div class="col-md-4 mb-3">
-                <div class="card text-center">
+                <div class="card text-center h-100">
                     <div class="card-body">
                         <div class="text-warning mb-3">
                             <i class="bi bi-gear fs-1"></i>
@@ -1692,24 +2029,48 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        // Close navbar on mobile when clicking nav links
-        document.addEventListener('DOMContentLoaded', function() {
-            const navbarCollapse = document.getElementById('navbarNav');
-            if (navbarCollapse) {
-                navbarCollapse.addEventListener('click', function(e) {
-                    let target = e.target;
-                    while (target && target !== navbarCollapse) {
-                        if (target.classList && (target.classList.contains('nav-link') || target.type === 'submit')) {
-                            if (window.innerWidth < 992) {
-                                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
-                                bsCollapse.hide();
-                            }
-                            break;
-                        }
-                        target = target.parentElement;
-                    }
-                });
+        // Collapsible sections functionality
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const header = content.previousElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                header.classList.remove('collapsed');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.style.display = 'none';
+                header.classList.add('collapsed');
+                icon.style.transform = 'rotate(-90deg)';
             }
+        }
+
+        // Initialize sections - keep first section open, others closed
+        document.addEventListener('DOMContentLoaded', function() {
+            // Open first section by default
+            const firstSection = document.querySelector('.collapsible-section');
+            if (firstSection) {
+                const firstContent = firstSection.querySelector('.section-content');
+                const firstHeader = firstSection.querySelector('.section-header');
+                const firstIcon = firstHeader.querySelector('.toggle-icon');
+                
+                firstContent.style.display = 'block';
+                firstHeader.classList.remove('collapsed');
+                firstIcon.style.transform = 'rotate(0deg)';
+            }
+            
+            // Close other sections
+            const otherSections = document.querySelectorAll('.collapsible-section:not(:first-child)');
+            otherSections.forEach(section => {
+                const content = section.querySelector('.section-content');
+                const header = section.querySelector('.section-header');
+                const icon = header.querySelector('.toggle-icon');
+                
+                content.style.display = 'none';
+                header.classList.add('collapsed');
+                icon.style.transform = 'rotate(-90deg)';
+            });
 
             // Enhanced file input with preview and validation
             const fileInputs = document.querySelectorAll('input[type="file"]');
