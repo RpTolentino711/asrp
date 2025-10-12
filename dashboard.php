@@ -1837,6 +1837,57 @@ function formatDateToMonthLetters($date) {
             window.testPaymentNotifications = testPaymentNotifications;
         });
 
+
+
+
+
+        // Add this debug function to your dashboard
+function debugAjaxPaths() {
+    console.log('🔍 DEBUGGING AJAX PATHS');
+    console.log('Current page URL:', window.location.href);
+    
+    const testPaths = [
+        '../AJAX/check_payment_status.php',
+        'AJAX/check_payment_status.php', 
+        './AJAX/check_payment_status.php',
+        '/AJAX/check_payment_status.php',
+        'check_payment_status.php'
+    ];
+    
+    const clientId = <?= $client_id ?>;
+    
+    testPaths.forEach(path => {
+        const testUrl = path + '?client_id=' + clientId + '&test=debug';
+        console.log('Testing path:', path);
+        
+        // Test if the file exists by creating an image request (silent test)
+        const img = new Image();
+        img.onload = function() {
+            console.log('✅ IMAGE TEST: ' + path + ' - FILE EXISTS');
+        };
+        img.onerror = function() {
+            console.log('❌ IMAGE TEST: ' + path + ' - FILE NOT FOUND');
+        };
+        img.src = testUrl;
+        
+        // Also test with fetch
+        fetch(testUrl)
+            .then(res => {
+                console.log('✅ FETCH TEST: ' + path + ' - Status: ' + res.status);
+                if (res.ok) return res.text();
+                throw new Error('Status: ' + res.status);
+            })
+            .then(data => {
+                console.log('📄 RESPONSE: ' + path + ' - Data length: ' + data.length);
+            })
+            .catch(err => {
+                console.log('❌ FETCH TEST: ' + path + ' - ' + err.message);
+            });
+    });
+}
+
+// Run this once to see which path works
+// debugAjaxPaths();
         // Live poll unread admin messages for client (Payment nav badge)
         function pollClientUnreadAdminBadge() {
             // Only run if client is logged in
