@@ -1013,7 +1013,7 @@ if (isset($_SESSION['login_error'])) {
       if (!empty($rented_units_display)) {
         $rented_modal_counter = 0;
         
-        // Get all rented unit photos from photo_history table
+        // Get all ACTIVE rented unit photos from photo_history table
         $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
         $rented_unit_photos = $db->getActivePhotosForUnits($rented_unit_ids);
         
@@ -1021,12 +1021,13 @@ if (isset($_SESSION['login_error'])) {
           $rented_modal_counter++;
           $rented_modal_id = "rentedModal" . $rented_modal_counter;
           
-          // UPDATED: Get photos from photo_history table instead of BusinessPhoto
+          // Get ONLY ACTIVE photos from photo_history table
           $rented_photo_urls = [];
           $space_id = $rent['Space_ID'];
           
           if (!empty($rented_unit_photos[$space_id])) {
             foreach ($rented_unit_photos[$space_id] as $photo_record) {
+              // Only include photos that are ACTIVE
               if (!empty($photo_record['Photo_Path']) && $photo_record['Status'] === 'active') {
                 $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo_record['Photo_Path']);
               }
@@ -1050,7 +1051,6 @@ if (isset($_SESSION['login_error'])) {
               <?php endif; ?>
               <div class="card-body">
                 <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
-                <!-- <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p> -->
                 <p class="card-text text-muted">Currently occupied commercial space.</p>
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
@@ -1119,7 +1119,6 @@ if (isset($_SESSION['login_error'])) {
                     <i class="fa-solid fa-house-user"></i>
                   </div>
                   <ul class="list-group list-group-flush">
-                    <!-- <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li> -->
                     <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
                     <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
                     <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>

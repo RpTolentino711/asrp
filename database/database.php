@@ -2547,16 +2547,17 @@ public function getLatestMaintenanceRequests($limit = 5) {
 
 
 
-    public function getActivePhotosForUnits($unit_ids) {
+
+
+
+public function getActivePhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
     
-    // Prepare placeholders for array of unit IDs
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
     $sql = "SELECT Space_ID, Photo_Path, Status 
             FROM photo_history 
             WHERE Space_ID IN ($placeholders) 
             AND Status = 'active'
-            AND Action IN ('uploaded', 'updated')
             ORDER BY Action_Date DESC";
     
     try {
@@ -2576,8 +2577,6 @@ public function getLatestMaintenanceRequests($limit = 5) {
         return [];
     }
 }
-
-
 
 public function addPhotoToHistory($space_id, $filename, $action, $previous_filename = null, $admin_id = null, $description = null) {
     $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
