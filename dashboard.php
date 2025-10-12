@@ -369,6 +369,19 @@ try {
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }
     
+    // Get payment history for each unit
+    $payment_history = [];
+    if (!empty($rented_units)) {
+        foreach ($rented_units as $rent) {
+            $space_id = intval($rent['Space_ID']);
+            if (method_exists($db, 'getPaymentHistoryForUnit')) {
+                $payment_history[$space_id] = $db->getPaymentHistoryForUnit($client_id, $space_id);
+            } else {
+                $payment_history[$space_id] = [];
+            }
+        }
+    }
+    
 } catch (Exception $e) {
     // Log error and set defaults
     error_log("Dashboard data fetch error: " . $e->getMessage());
@@ -376,6 +389,7 @@ try {
     $rented_units = [];
     $maintenance_history = [];
     $unit_photos = [];
+    $payment_history = [];
 }
 
 // Function to format date in month letters
@@ -389,6 +403,21 @@ function formatDateToMonthLetters($date) {
         return $dateTime->format('F j, Y');
     } catch (Exception $e) {
         return $date; // Return original if parsing fails
+    }
+}
+
+// Function to get payment status badge
+function getPaymentStatusBadge($status) {
+    $status = strtolower($status);
+    switch ($status) {
+        case 'paid':
+            return '<span class="badge bg-success">Paid</span>';
+        case 'unpaid':
+            return '<span class="badge bg-warning">Pending</span>';
+        case 'overdue':
+            return '<span class="badge bg-danger">Overdue</span>';
+        default:
+            return '<span class="badge bg-secondary">' . ucfirst($status) . '</span>';
     }
 }
 ?>
@@ -406,7 +435,7 @@ function formatDateToMonthLetters($date) {
     <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome@6.5.2/css/all.min.css">
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -668,6 +697,76 @@ function formatDateToMonthLetters($date) {
         .unit-details {
             color: var(--gray);
             font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Payment History Section */
+        .payment-section {
+            background: var(--light);
+            border-radius: var(--border-radius-sm);
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+            border-left: 4px solid var(--success);
+        }
+
+        .payment-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .payment-header h6 {
+            font-weight: 700;
+            color: var(--success);
+            margin: 0;
+        }
+
+        .payment-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .payment-item {
+            background: white;
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius-sm);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--gray-light);
+        }
+
+        .payment-date {
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .payment-amount {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .no-payments {
+            text-align: center;
+            color: var(--gray);
+            font-style: italic;
+            padding: 1rem;
+        }
+
+        .next-payment {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: var(--border-radius-sm);
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .next-payment h6 {
+            color: var(--primary);
             margin-bottom: 0.5rem;
         }
 
@@ -939,12 +1038,14 @@ function formatDateToMonthLetters($date) {
                 font-size: 1.5rem;
             }
 
+            .payment-item,
             .maintenance-item {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 0.5rem;
             }
 
+            .payment-amount,
             .maintenance-status {
                 margin-left: 0;
             }
@@ -963,6 +1064,7 @@ function formatDateToMonthLetters($date) {
                 padding: 0.75rem;
             }
 
+            .payment-section,
             .maintenance-section {
                 padding: 1rem;
             }
@@ -1220,6 +1322,7 @@ function formatDateToMonthLetters($date) {
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
                     $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                    $payments = isset($payment_history[$space_id]) ? $payment_history[$space_id] : [];
                     
                     // Get dates safely and format them
                     $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
@@ -1274,6 +1377,72 @@ function formatDateToMonthLetters($date) {
                                         <div class="unit-details text-success">
                                             <i class="bi bi-check-circle me-1"></i>
                                             <strong>Status:</strong> Paid
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!-- Payment History Section -->
+                                <div class="payment-section">
+                                    <div class="payment-header">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-credit-card"></i>
+                                            <h6 class="mb-0 ms-2">Payment History</h6>
+                                        </div>
+                                    </div>
+                                    
+                                    <?php if (!empty($payments)): ?>
+                                        <ul class="payment-list">
+                                            <?php foreach (array_slice($payments, 0, 3) as $payment): ?>
+                                                <li class="payment-item">
+                                                    <div>
+                                                        <div class="payment-date">
+                                                            <?= formatDateToMonthLetters($payment['InvoiceDate'] ?? 'N/A') ?>
+                                                        </div>
+                                                        <small class="text-muted">
+                                                            <?= formatDateToMonthLetters($payment['InvoiceDate'] ?? 'N/A') ?> - <?= formatDateToMonthLetters($payment['EndDate'] ?? 'N/A') ?>
+                                                        </small>
+                                                    </div>
+                                                    <div class="text-end">
+                                                        <div class="payment-amount">
+                                                            ₱<?= number_format(floatval($payment['InvoiceTotal'] ?? 0), 0) ?>
+                                                        </div>
+                                                        <?= getPaymentStatusBadge($payment['Status'] ?? 'unpaid') ?>
+                                                    </div>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                        
+                                        <?php if (count($payments) > 3): ?>
+                                            <div class="text-center mt-2">
+                                                <small class="text-muted">
+                                                    <i class="bi bi-three-dots me-1"></i>
+                                                    +<?= count($payments) - 3 ?> more payments
+                                                </small>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <div class="no-payments">
+                                            <i class="bi bi-clock-history text-muted me-1"></i>
+                                            No payment history yet
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <!-- Next Payment Information -->
+                                    <?php if (isset($latest_invoice) && is_array($latest_invoice)): ?>
+                                        <div class="next-payment">
+                                            <h6>
+                                                <i class="bi bi-calendar-event me-1"></i>
+                                                Next Payment
+                                            </h6>
+                                            <div class="unit-details">
+                                                <strong>Due Date:</strong> <?= formatDateToMonthLetters($latest_invoice['EndDate'] ?? 'N/A') ?>
+                                            </div>
+                                            <div class="unit-details">
+                                                <strong>Amount:</strong> ₱<?= number_format(floatval($latest_invoice['InvoiceTotal'] ?? 0), 0) ?>
+                                            </div>
+                                            <div class="unit-details">
+                                                <strong>Status:</strong> <?= getPaymentStatusBadge($latest_invoice['Status'] ?? 'unpaid') ?>
+                                            </div>
                                         </div>
                                     <?php endif; ?>
                                 </div>
