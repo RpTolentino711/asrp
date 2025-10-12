@@ -997,7 +997,7 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </div>
 </section>
-  <!-- All rental modals rendered here -->
+<!-- All rental modals rendered here -->
 <?php if (!empty($modals)) echo $modals; ?>
 
 <!-- Rented Units Section -->
@@ -1015,11 +1015,19 @@ if (isset($_SESSION['login_error'])) {
         // Get all rented unit photos for the units being displayed
         $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
         $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
+        
+        // Get business photos for all clients in rented units
+        $rented_client_ids = array_column($rented_units_display, 'Client_ID');
+        $rented_business_photos = [];
+        foreach ($rented_client_ids as $client_id) {
+            $rented_business_photos[$client_id] = $db->getCurrentBusinessPhoto($client_id);
+        }
+        
         foreach ($rented_units_display as $rent) {
           $rented_modal_counter++;
           $rented_modal_id = "rentedModal" . $rented_modal_counter;
           
-          // UPDATED: Get photos from JSON array instead of multiple columns
+          // Get unit photos from JSON array
           $rented_photo_urls = [];
           if (!empty($rented_unit_photos[$rent['Space_ID']])) {
             foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
@@ -1028,56 +1036,136 @@ if (isset($_SESSION['login_error'])) {
               }
             }
           }
+          
+          // Get business photo for this client
+          $client_business_photo = $rented_business_photos[$rent['Client_ID']] ?? null;
+          $business_photo_url = $client_business_photo ? "uploads/business_photos/" . htmlspecialchars($client_business_photo) : null;
           ?>
           <div class="col-lg-4 col-md-6 animate-on-scroll">
             <div class="card unit-card">
               <div class="rented-badge">
                 <i class="bi bi-check-circle me-1"></i>Rented
               </div>
-              <?php if (!empty($rented_photo_urls)): ?>
+              
+              <!-- Business Photo or Unit Photo Display -->
+              <?php if ($business_photo_url && file_exists(__DIR__ . '/' . $business_photo_url)): ?>
+                <!-- Show Business Photo with badge -->
                 <div style="position:relative;">
-                  <img src="<?= $rented_photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
-                  <span class="badge bg-success position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($rented_photo_urls) ?>/6 </span>
+                  <img src="<?= $business_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Client_fn'] . ' ' . $rent['Client_ln']) ?> Business" style="cursor: pointer; height: 250px; object-fit: cover;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_business">
+                  <span class="badge bg-primary position-absolute top-0 start-0 m-2" style="z-index:2;">
+                    <i class="bi bi-building me-1"></i>Business
+                  </span>
+                  <?php if (!empty($rented_photo_urls)): ?>
+                    <span class="badge bg-success position-absolute top-0 end-0 m-2" style="z-index:2;">
+                      <i class="bi bi-images me-1"></i><?= count($rented_photo_urls) ?>
+                    </span>
+                  <?php endif; ?>
+                </div>
+              <?php elseif (!empty($rented_photo_urls)): ?>
+                <!-- Show Unit Photo if no business photo -->
+                <div style="position:relative;">
+                  <img src="<?= $rented_photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
+                  <span class="badge bg-success position-absolute top-0 end-0 m-2" style="z-index:2;">
+                    <i class="bi bi-images me-1"></i><?= count($rented_photo_urls) ?>
+                  </span>
                 </div>
               <?php else: ?>
+                <!-- Default placeholder -->
                 <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
                   <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
                 </div>
               <?php endif; ?>
+              
               <div class="card-body">
                 <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
-                <!-- <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p> -->
                 <p class="card-text text-muted">Currently occupied commercial space.</p>
+                
+                <!-- Client Business Info -->
+                <div class="client-business-info mb-3 p-3 bg-light rounded">
+                  <div class="d-flex align-items-center mb-2">
+                    <?php if ($business_photo_url && file_exists(__DIR__ . '/' . $business_photo_url)): ?>
+                      <img src="<?= $business_photo_url ?>" alt="Business Logo" class="rounded-circle me-3" style="width: 40px; height: 40px; object-fit: cover;">
+                    <?php else: ?>
+                      <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                        <i class="bi bi-building text-white"></i>
+                      </div>
+                    <?php endif; ?>
+                    <div>
+                      <strong class="d-block"><?= htmlspecialchars($rent['Client_fn'] . ' ' . $rent['Client_ln']) ?></strong>
+                      <small class="text-muted">Current Tenant</small>
+                    </div>
+                  </div>
+                </div>
+                
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
                   <small class="unit-location"><?= htmlspecialchars($rent['City']) ?></small>
                 </div>
-                <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
-                  <i class="bi bi-eye me-2"></i>View Details
-                </button>
+                
+                <div class="d-grid gap-2">
+                  <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
+                    <i class="bi bi-eye me-2"></i>View Details
+                  </button>
+                  <?php if ($business_photo_url): ?>
+                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_business">
+                      <i class="bi bi-building me-1"></i>Business Photo
+                    </button>
+                  <?php endif; ?>
+                  <?php if (!empty($rented_photo_urls)): ?>
+                    <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
+                      <i class="bi bi-images me-1"></i>Unit Photos (<?= count($rented_photo_urls) ?>)
+                    </button>
+                  <?php endif; ?>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Rented Unit Photo Modal -->
+          <!-- Business Photo Modal -->
+          <?php if ($business_photo_url && file_exists(__DIR__ . '/' . $business_photo_url)): ?>
+          <div class="modal fade" id="<?= $rented_modal_id ?>_business" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>_businessLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+              <div class="modal-content bg-dark">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title text-white" id="<?= $rented_modal_id ?>_businessLabel">
+                    <i class="bi bi-building me-2"></i>
+                    Business Photo: <?= htmlspecialchars($rent['Client_fn'] . ' ' . $rent['Client_ln']) ?>
+                  </h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                  <img src="<?= $business_photo_url ?>" alt="Business Photo" class="img-fluid rounded shadow" style="max-height:60vh;">
+                  <div class="mt-3 text-white">
+                    <p class="mb-1"><strong>Business Owner:</strong> <?= htmlspecialchars($rent['Client_fn'] . ' ' . $rent['Client_ln']) ?></p>
+                    <p class="mb-0"><strong>Unit:</strong> <?= htmlspecialchars($rent['Name']) ?></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <?php endif; ?>
+
+          <!-- Unit Photo Gallery Modal -->
+          <?php if (!empty($rented_photo_urls)): ?>
           <div class="modal fade" id="<?= $rented_modal_id ?>_photo" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>_photoLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-xl">
               <div class="modal-content bg-dark">
                 <div class="modal-header border-0">
                   <h5 class="modal-title text-white" id="<?= $rented_modal_id ?>_photoLabel">
+                    <i class="bi bi-images me-2"></i>
                     Photo Gallery: <?= htmlspecialchars($rent['Name']) ?>
                   </h5>
                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-center">
                   <?php if (count($rented_photo_urls) === 1): ?>
-                    <img src="<?= $rented_photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
-                  <?php elseif (count($rented_photo_urls) > 1): ?>
+                    <img src="<?= $rented_photo_urls[0] ?>" alt="Unit Photo" class="img-fluid rounded shadow" style="max-height:60vh;">
+                  <?php else: ?>
                     <div id="rentedZoomCarousel<?= $rented_modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
                       <div class="carousel-inner">
                         <?php foreach ($rented_photo_urls as $idx => $url): ?>
                           <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
-                            <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
+                            <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Unit Photo <?= $idx+1 ?>" style="max-height:60vh;">
                           </div>
                         <?php endforeach; ?>
                       </div>
@@ -1090,38 +1178,76 @@ if (isset($_SESSION['login_error'])) {
                           <span class="visually-hidden">Next</span>
                       </button>
                     </div>
-                  <?php else: ?>
-                    <div class="text-center mb-3" style="font-size:56px;color:#059669;">
-                      <i class="fa-solid fa-house-user"></i>
-                    </div>
                   <?php endif; ?>
                 </div>
               </div>
             </div>
           </div>
+          <?php endif; ?>
 
-          <!-- Rented Unit Modal -->
+          <!-- Rented Unit Details Modal -->
           <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
               <div class="modal-content">
                 <div class="modal-header bg-success text-white">
                   <h5 class="modal-title fw-bold" id="<?= $rented_modal_id ?>Label">
+                    <i class="bi bi-house-check me-2"></i>
                     <?= htmlspecialchars($rent['Name']) ?> - Rented Unit Details
                   </h5>
                   <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                  <div class="text-center mb-3" style="font-size:56px;color:#059669;">
-                    <i class="fa-solid fa-house-user"></i>
+                  <!-- Header with Business Photo -->
+                  <div class="text-center mb-4">
+                    <?php if ($business_photo_url && file_exists(__DIR__ . '/' . $business_photo_url)): ?>
+                      <img src="<?= $business_photo_url ?>" alt="Business Photo" class="rounded-circle mb-3" style="width: 80px; height: 80px; object-fit: cover; border: 3px solid #059669;">
+                    <?php else: ?>
+                      <div class="mb-3" style="font-size:56px;color:#059669;">
+                        <i class="fa-solid fa-house-user"></i>
+                      </div>
+                    <?php endif; ?>
+                    <h6 class="text-success mb-1">Currently Occupied By</h6>
+                    <h5 class="fw-bold"><?= htmlspecialchars($rent['Client_fn'] . ' ' . $rent['Client_ln']) ?></h5>
                   </div>
+                  
                   <ul class="list-group list-group-flush">
-                    <!-- <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li> -->
-                    <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
-                    <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
-                    <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <strong>Unit Type:</strong>
+                      <span class="badge bg-success"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
+                    </li>
+                    <li class="list-group-item">
+                      <strong>Location:</strong><br>
+                      <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <strong>Status:</strong>
+                      <span class="badge bg-success">Active Rental</span>
+                    </li>
+                    <?php if (!empty($rented_photo_urls)): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <strong>Photos Available:</strong>
+                      <span class="badge bg-info"><?= count($rented_photo_urls) ?> photos</span>
+                    </li>
+                    <?php endif; ?>
+                    <?php if ($business_photo_url): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      <strong>Business Photo:</strong>
+                      <span class="badge bg-primary">Available</span>
+                    </li>
+                    <?php endif; ?>
                   </ul>
                 </div>
                 <div class="modal-footer">
+                  <?php if ($business_photo_url): ?>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_business">
+                      <i class="bi bi-building me-1"></i>Business Photo
+                    </button>
+                  <?php endif; ?>
+                  <?php if (!empty($rented_photo_urls)): ?>
+                    <button type="button" class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
+                      <i class="bi bi-images me-1"></i>View Photos
+                    </button>
+                  <?php endif; ?>
                   <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
               </div>
@@ -1131,7 +1257,10 @@ if (isset($_SESSION['login_error'])) {
         }
       } else {
         echo '<div class="col-12 text-center">
-                <div class="alert alert-info">No units currently rented.</div>
+                <div class="alert alert-info">
+                  <i class="bi bi-info-circle me-2"></i>
+                  No units currently rented.
+                </div>
               </div>';
       }
       ?>

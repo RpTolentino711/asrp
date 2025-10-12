@@ -187,8 +187,91 @@ public function updateUnitPhotos($space_id, $client_id, $json_photos) {
     }
 }
 
+    public function getCurrentBusinessPhoto($client_id) {
+        try {
+            $sql = "SELECT businessPhoto FROM business_photo_history 
+                    WHERE Client_ID = ? AND Status = 'active' 
+                    ORDER BY Action_Date DESC LIMIT 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? $result['businessPhoto'] : null;
+        } catch (PDOException $e) {
+            error_log("getCurrentBusinessPhoto Error: " . $e->getMessage());
+            return null;
+        }
+    }
 
+     public function getBusinessPhotoHistory($client_id) {
+        try {
+            $sql = "SELECT * FROM business_photo_history 
+                    WHERE Client_ID = ? 
+                    ORDER BY Action_Date DESC";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("getBusinessPhotoHistory Error: " . $e->getMessage());
+            return [];
+        }
+    }
 
+     public function uploadBusinessPhoto($client_id, $photo_path, $description = null) {
+        try {
+            $this->pdo->beginTransaction();
+            
+            // Set all previous photos to inactive
+            $sql = "UPDATE business_photo_history SET Status = 'inactive' WHERE Client_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            
+            // Insert new active photo
+            $sql = "INSERT INTO business_photo_history 
+                    (Client_ID, businessPhoto, description, Action, Previous_businessPhoto, Action_By, Status) 
+                    VALUES (?, ?, ?, 'uploaded', NULL, ?, 'active')";
+            
+            $action_by = -$client_id; // Negative value indicates client action
+            $stmt = $this->pdo->prepare($sql);
+            $success = $stmt->execute([$client_id, $photo_path, $description, $action_by]);
+            
+            $this->pdo->commit();
+            return $success;
+            
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("uploadBusinessPhoto Error: " . $e->getMessage());
+            return false;
+        }
+    }
+     public function deleteBusinessPhoto($client_id, $photo_filename) {
+        try {
+            $sql = "UPDATE business_photo_history 
+                    SET Status = 'inactive', Action = 'deleted', Action_Date = NOW() 
+                    WHERE Client_ID = ? AND businessPhoto = ? AND Status = 'active'";
+            
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$client_id, $photo_filename]);
+            
+        } catch (PDOException $e) {
+            error_log("deleteBusinessPhoto Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+       public function validateBusinessPhotoOwnership($client_id, $photo_filename) {
+        try {
+            $sql = "SELECT COUNT(*) as count FROM business_photo_history 
+                    WHERE Client_ID = ? AND businessPhoto = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id, $photo_filename]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result['count'] > 0;
+        } catch (PDOException $e) {
+            error_log("validateBusinessPhotoOwnership Error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
 public function getUnitPhotosForClient($client_id) {
     try {
         $sql = "SELECT Space_ID, BusinessPhoto
