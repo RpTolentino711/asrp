@@ -126,6 +126,30 @@ if (isset($_SESSION['feedback_success'])) {
 $photo_upload_success = '';
 $photo_upload_error = '';
 
+// Function to add client photo to history (using negative client_id to distinguish from admin)
+function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
+    // Use negative client_id to distinguish client actions from admin actions
+    $client_id = -$_SESSION['client_id']; // Negative value indicates client action
+    
+    // For client actions, we'll use the addPhotoToHistory method but with negative client_id
+    if (method_exists($db, 'addPhotoToHistory')) {
+        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
+    }
+    
+    // Fallback: direct SQL if method doesn't exist
+    try {
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        
+        $status = ($action === 'deleted') ? 'inactive' : 'active';
+        $stmt = $db->pdo->prepare($sql);
+        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status, $description]);
+    } catch (PDOException $e) {
+        error_log("addClientPhotoToHistory Error: " . $e->getMessage());
+        return false;
+    }
+}
+
 // Photo Upload Processing
 if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {
     $space_id = intval($_POST['space_id']);
@@ -219,6 +243,9 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                                 
                                 // Save to database (UPDATED FOR JSON)
                                 if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                                    // ADD TO PHOTO HISTORY - Client uploaded photo
+                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
+                                    
                                     $photo_upload_success = "Photo uploaded successfully for this unit!";
                                     $_SESSION['photo_upload_success'] = $photo_upload_success;
                                     // Redirect to prevent resubmission
@@ -273,6 +300,9 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
                 
                 // Update database with new JSON array (UPDATED FOR JSON)
                 if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                    // ADD TO PHOTO HISTORY - Client deleted photo
+                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
+                    
                     // Delete file from filesystem
                     $upload_dir = __DIR__ . "/uploads/unit_photos/";
                     $file_to_delete = $upload_dir . basename($photo_filename);
@@ -362,6 +392,7 @@ function formatDateToMonthLetters($date) {
     }
 }
 ?>
+
 <!doctype html>
 <html lang="en">
 <head>
