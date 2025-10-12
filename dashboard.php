@@ -1506,7 +1506,7 @@ function formatDateToMonthLetters($date) {
             console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
             
             // FIXED: Use correct path to AJAX folder
-fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
             .then(res => {
                 console.log('📡 Response status:', res.status);
                 if (!res.ok) {
@@ -1883,29 +1883,7 @@ fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}
         });
 
 
-        // Debug function to check the actual file structure
-function debugFileStructure() {
-    console.log('🔍 Debugging file structure...');
-    console.log('Current URL:', window.location.href);
-    console.log('Current path:', window.location.pathname);
-    
-    // Test multiple possible paths
-    const testPaths = [
-        'AJAX/check_payment_status.php',
-        './AJAX/check_payment_status.php',
-        '/AJAX/check_payment_status.php',
-        '../AJAX/check_payment_status.php',
-        'check_payment_status.php'
-    ];
-    
-    testPaths.forEach(path => {
-        const testUrl = new URL(path, window.location.href);
-        console.log('Testing:', path, '->', testUrl.href);
-    });
-}
-
-// Call this function to see what's available
-// debugFileStructure();
+        
     </script>
     <?php endif; ?>
 </body>
