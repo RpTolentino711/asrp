@@ -1,6 +1,9 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// Start output buffering to prevent accidental output
+ob_start();
+
+ini_set('display_errors', 0); // Don't display errors to AJAX response
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 require '../database/database.php';
@@ -89,9 +92,11 @@ try {
             'upcoming_count' => count($upcoming_payments ?: [])
         ]
     ]);
-
+    ob_end_flush(); // End output buffering and send output
 } catch (Exception $e) {
     error_log("Payment status check error: " . $e->getMessage());
+    // Clean buffer and send only JSON error
+    if (ob_get_length()) ob_end_clean();
     echo json_encode([
         'success' => false, 
         'error' => 'Database error: ' . $e->getMessage()
