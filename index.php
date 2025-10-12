@@ -1019,7 +1019,7 @@ if (isset($_SESSION['login_error'])) {
           $rented_modal_counter++;
           $rented_modal_id = "rentedModal" . $rented_modal_counter;
           
-          // UPDATED: Get photos from photo_gallery table instead of JSON array
+          // UPDATED: Get photos from JSON array instead of multiple columns
           $rented_photo_urls = [];
           if (!empty($rented_unit_photos[$rent['Space_ID']])) {
             foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
