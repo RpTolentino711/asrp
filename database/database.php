@@ -188,25 +188,6 @@ public function updateUnitPhotos($space_id, $client_id, $json_photos) {
 }
 
 
-public function getClientSpacePhotoCount($client_id, $space_id) {
-    $sql = "SELECT COUNT(*) as photo_count FROM photo_gallery WHERE Client_ID = ? AND Space_ID = ?";
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$client_id, $space_id]);
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-    return $result ? $result['photo_count'] : 0;
-}
-
-public function addPhotoToGallery($space_id, $client_id, $filename) {
-    $sql = "INSERT INTO photo_gallery (Space_ID, Client_ID, Photo_Path, Uploaded_At) VALUES (?, ?, ?, NOW())";
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$space_id, $client_id, $filename]);
-}
-
-public function deletePhotoFromGallery($space_id, $client_id, $filename) {
-    $sql = "DELETE FROM photo_gallery WHERE Space_ID = ? AND Client_ID = ? AND Photo_Path = ?";
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([$space_id, $client_id, $filename]);
-}
 
 public function getUnitPhotosForClient($client_id) {
     try {
@@ -258,29 +239,24 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     
     // Prepare placeholders for array of unit IDs
     $placeholders = implode(',', array_fill(0, count($unit_ids), '?'));
-    $sql = "SELECT Space_ID, Photo_Path 
-            FROM photo_gallery 
-            WHERE Space_ID IN ($placeholders) 
-            AND Status = 'active'
-            ORDER BY Uploaded_At DESC";
+    $sql = "SELECT Space_ID, BusinessPhoto 
+            FROM clientspace 
+            WHERE Space_ID IN ($placeholders)";
     
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute($unit_ids);
     
     $photos = [];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $space_id = $row['Space_ID'];
-        $photo_path = $row['Photo_Path'];
+        // Decode the JSON array from BusinessPhoto column
+        $photo_array = !empty($row['BusinessPhoto']) ? json_decode($row['BusinessPhoto'], true) : [];
         
-        // Group photos by space_id
-        if (!isset($photos[$space_id])) {
-            $photos[$space_id] = [];
-        }
-        
-        $photos[$space_id][] = $photo_path;
+        // Ensure it's a valid array
+        $photos[$row['Space_ID']] = is_array($photo_array) ? $photo_array : [];
     }
     return $photos;
 }
+
 // In the client dashboard, replace the addClientPhotoToHistory function with:
 function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
     // Use negative client_id to distinguish client actions from admin actions
