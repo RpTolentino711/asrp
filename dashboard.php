@@ -351,9 +351,22 @@ try {
     $feedback_prompts = $db->getFeedbackPrompts($client_id);
     $rented_units = $db->getRentedUnits($client_id);
     
+    // Get payment history for all units
+    $payment_history = [];
+    if (!empty($rented_units)) {
+        foreach ($rented_units as $unit) {
+            $space_id = $unit['Space_ID'];
+            $invoices = $db->getClientInvoiceHistoryForUnit($client_id, $space_id);
+            if ($invoices && is_array($invoices)) {
+                $payment_history[$space_id] = $invoices;
+            }
+        }
+    }
+    
     // Ensure arrays are returned
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
+    $payment_history = is_array($payment_history) ? $payment_history : [];
     
     // Get maintenance history and photos only if there are rented units
     $maintenance_history = [];
@@ -374,6 +387,7 @@ try {
     error_log("Dashboard data fetch error: " . $e->getMessage());
     $feedback_prompts = [];
     $rented_units = [];
+    $payment_history = [];
     $maintenance_history = [];
     $unit_photos = [];
 }
@@ -389,6 +403,30 @@ function formatDateToMonthLetters($date) {
         return $dateTime->format('F j, Y');
     } catch (Exception $e) {
         return $date; // Return original if parsing fails
+    }
+}
+
+// Function to get payment status badge
+function getPaymentStatusBadge($status, $due_date = null) {
+    $status = strtolower($status);
+    $now = new DateTime();
+    
+    if ($status === 'paid') {
+        return '<span class="badge bg-success">PAID</span>';
+    } elseif ($status === 'pending' || $status === 'unpaid') {
+        if ($due_date && $due_date !== 'N/A') {
+            try {
+                $due = new DateTime($due_date);
+                if ($now > $due) {
+                    return '<span class="badge bg-danger">OVERDUE</span>';
+                }
+            } catch (Exception $e) {}
+        }
+        return '<span class="badge bg-warning">PENDING</span>';
+    } elseif ($status === 'kicked') {
+        return '<span class="badge bg-secondary">ARCHIVED</span>';
+    } else {
+        return '<span class="badge bg-info">' . strtoupper($status) . '</span>';
     }
 }
 ?>
@@ -613,6 +651,80 @@ function formatDateToMonthLetters($date) {
 
         .card-body {
             padding: 1.5rem;
+        }
+
+        /* Payment History Styles */
+        .payment-timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .payment-timeline::before {
+            content: '';
+            position: absolute;
+            left: 1rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--gray-light);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 2px solid var(--lighter);
+        }
+
+        .timeline-item.paid::before {
+            background: var(--success);
+        }
+
+        .timeline-item.pending::before {
+            background: var(--warning);
+        }
+
+        .timeline-item.overdue::before {
+            background: var(--danger);
+        }
+
+        .timeline-item.archived::before {
+            background: var(--gray);
+        }
+
+        .payment-period {
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .payment-details {
+            color: var(--gray);
+            font-size: 0.9rem;
+        }
+
+        .payment-amount {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .next-payment-card {
+            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+            border: 1px solid #fdba74;
+        }
+
+        .payment-alert {
+            border-left: 4px solid var(--warning);
         }
 
         /* Unit Cards */
@@ -948,6 +1060,14 @@ function formatDateToMonthLetters($date) {
             .maintenance-status {
                 margin-left: 0;
             }
+
+            .payment-timeline {
+                padding-left: 1.5rem;
+            }
+
+            .timeline-item::before {
+                left: -1.5rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -1204,6 +1324,159 @@ function formatDateToMonthLetters($date) {
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
+
+        <!-- Payment History Section -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold mb-0">
+                        <i class="bi bi-calendar-check me-2"></i>Payment History & Schedule
+                    </h2>
+                    <a href="invoice_history.php" class="btn btn-primary">
+                        <i class="bi bi-credit-card me-1"></i>View All Invoices
+                    </a>
+                </div>
+
+                <?php if (!empty($payment_history)): ?>
+                    <?php foreach ($payment_history as $space_id => $invoices): 
+                        $unit_name = '';
+                        foreach ($rented_units as $unit) {
+                            if ($unit['Space_ID'] == $space_id) {
+                                $unit_name = $unit['Name'];
+                                break;
+                            }
+                        }
+                        
+                        // Separate invoices by status
+                        $paid_invoices = array_filter($invoices, function($inv) {
+                            return strtolower($inv['Status'] ?? '') === 'paid';
+                        });
+                        $pending_invoices = array_filter($invoices, function($inv) {
+                            $status = strtolower($inv['Status'] ?? '');
+                            return $status === 'pending' || $status === 'unpaid';
+                        });
+                        $next_pending = !empty($pending_invoices) ? reset($pending_invoices) : null;
+                    ?>
+                        <div class="card mb-4 fade-in">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-building me-2"></i><?= htmlspecialchars($unit_name) ?>
+                                    </h5>
+                                    <div class="badge bg-primary">
+                                        <?= count($paid_invoices) ?> Paid • <?= count($pending_invoices) ?> Pending
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Next Pending Payment -->
+                                    <div class="col-lg-4 mb-4">
+                                        <?php if ($next_pending): ?>
+                                            <div class="card next-payment-card h-100">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">
+                                                        <i class="bi bi-clock-history me-2"></i>Next Payment Due
+                                                    </h6>
+                                                    <div class="payment-period fw-bold text-warning">
+                                                        <?= formatDateToMonthLetters($next_pending['InvoiceDate'] ?? '') ?>
+                                                    </div>
+                                                    <div class="payment-details">
+                                                        Amount: <span class="payment-amount">₱<?= number_format(floatval($next_pending['InvoiceTotal'] ?? 0), 2) ?></span>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <?= getPaymentStatusBadge($next_pending['Status'] ?? 'pending', $next_pending['EndDate'] ?? null) ?>
+                                                    </div>
+                                                    <div class="mt-3">
+                                                        <a href="invoice_history.php?invoice_id=<?= $next_pending['Invoice_ID'] ?>" class="btn btn-warning btn-sm">
+                                                            <i class="bi bi-arrow-right me-1"></i>Pay Now
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="card border-success h-100">
+                                                <div class="card-body text-center">
+                                                    <i class="bi bi-check-circle text-success fs-1 mb-3"></i>
+                                                    <h6 class="text-success">All Payments Complete</h6>
+                                                    <p class="text-muted small">No pending payments for this unit</p>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <!-- Payment Timeline -->
+                                    <div class="col-lg-8">
+                                        <h6 class="mb-3">
+                                            <i class="bi bi-list-check me-2"></i>Payment Timeline
+                                        </h6>
+                                        <?php if (!empty($invoices)): ?>
+                                            <div class="payment-timeline">
+                                                <?php 
+                                                // Sort invoices by date (newest first)
+                                                usort($invoices, function($a, $b) {
+                                                    return strtotime($b['InvoiceDate'] ?? '') <=> strtotime($a['InvoiceDate'] ?? '');
+                                                });
+                                                
+                                                foreach ($invoices as $invoice): 
+                                                    $status = strtolower($invoice['Status'] ?? '');
+                                                    $status_class = $status;
+                                                    if ($status === 'paid') {
+                                                        $status_class = 'paid';
+                                                    } elseif ($status === 'pending' || $status === 'unpaid') {
+                                                        $due_date = $invoice['EndDate'] ?? null;
+                                                        if ($due_date && $due_date !== 'N/A') {
+                                                            try {
+                                                                $due = new DateTime($due_date);
+                                                                $now = new DateTime();
+                                                                if ($now > $due) {
+                                                                    $status_class = 'overdue';
+                                                                }
+                                                            } catch (Exception $e) {}
+                                                        }
+                                                        $status_class = 'pending';
+                                                    } elseif ($status === 'kicked') {
+                                                        $status_class = 'archived';
+                                                    }
+                                                ?>
+                                                    <div class="timeline-item <?= $status_class ?>">
+                                                        <div class="payment-period">
+                                                            <?= formatDateToMonthLetters($invoice['InvoiceDate'] ?? '') ?>
+                                                        </div>
+                                                        <div class="payment-details">
+                                                            Amount: <span class="payment-amount">₱<?= number_format(floatval($invoice['InvoiceTotal'] ?? 0), 2) ?></span>
+                                                            • <?= getPaymentStatusBadge($invoice['Status'] ?? '', $invoice['EndDate'] ?? null) ?>
+                                                        </div>
+                                                        <?php if (!empty($invoice['PaymentDate']) && $invoice['PaymentDate'] !== 'N/A'): ?>
+                                                            <div class="payment-details small text-muted">
+                                                                Paid on: <?= formatDateToMonthLetters($invoice['PaymentDate']) ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="text-center text-muted py-4">
+                                                <i class="bi bi-receipt fs-1 mb-3 d-block"></i>
+                                                <p>No payment history available for this unit.</p>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="card fade-in">
+                        <div class="card-body text-center py-5">
+                            <i class="bi bi-credit-card-2-front fs-1 text-muted mb-3"></i>
+                            <h5 class="text-muted">No Payment History</h5>
+                            <p class="text-muted">Your payment history will appear here once you have invoices.</p>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
 
         <!-- Rented Units Section -->
         <div class="d-flex justify-content-between align-items-center mb-4">
