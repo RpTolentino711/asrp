@@ -1881,6 +1881,31 @@ fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}
             timer: 3000,
             timerProgressBar: true
         });
+
+
+        // Debug function to check the actual file structure
+function debugFileStructure() {
+    console.log('🔍 Debugging file structure...');
+    console.log('Current URL:', window.location.href);
+    console.log('Current path:', window.location.pathname);
+    
+    // Test multiple possible paths
+    const testPaths = [
+        'AJAX/check_payment_status.php',
+        './AJAX/check_payment_status.php',
+        '/AJAX/check_payment_status.php',
+        '../AJAX/check_payment_status.php',
+        'check_payment_status.php'
+    ];
+    
+    testPaths.forEach(path => {
+        const testUrl = new URL(path, window.location.href);
+        console.log('Testing:', path, '->', testUrl.href);
+    });
+}
+
+// Call this function to see what's available
+// debugFileStructure();
     </script>
     <?php endif; ?>
 </body>
