@@ -24,6 +24,16 @@ register_shutdown_function(function() {
 try {
     require '../database/database.php';
     $db = new Database();
+    // Add this connection check:
+    if (!isset($db->conn) || !$db->conn) {
+        if (ob_get_length()) ob_end_clean();
+        error_log("Database connection failed: conn is null");
+        echo json_encode([
+            'success' => false,
+            'error' => 'Database connection failed. Please check your database credentials and server.',
+        ]);
+        exit();
+    }
 } catch (Exception $e) {
     if (ob_get_length()) ob_end_clean();
     error_log("Database connection error: " . $e->getMessage());
