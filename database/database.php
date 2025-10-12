@@ -2573,23 +2573,6 @@ public function getActivePhotosForUnits($unit_ids) {
     }
 }
 
-public function getActiveClientPhotosCount($space_id, $client_id) {
-    $sql = "SELECT COUNT(*) as photo_count 
-            FROM photo_history 
-            WHERE Space_ID = ? 
-            AND Status = 'active'
-            AND Action_By = ?";
-    
-    try {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$space_id, -$client_id]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ? intval($result['photo_count']) : 0;
-    } catch (PDOException $e) {
-        error_log("getActiveClientPhotosCount Error: " . $e->getMessage());
-        return 0;
-    }
-}
 
 
 
