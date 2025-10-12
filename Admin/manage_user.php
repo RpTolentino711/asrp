@@ -11,40 +11,9 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 $msg = "";
 
-// --- Pagination Configuration ---
-$clients_per_page = 10; // Number of clients per page
-$units_per_page = 10;   // Number of units per page
-
-// Get current page for clients
-$client_page = isset($_GET['client_page']) ? max(1, intval($_GET['client_page'])) : 1;
-$client_offset = ($client_page - 1) * $clients_per_page;
-
-// Get current page for units
-$unit_page = isset($_GET['unit_page']) ? max(1, intval($_GET['unit_page'])) : 1;
-$unit_offset = ($unit_page - 1) * $units_per_page;
-
-// --- Fetch Data with Pagination ---
-$all_clients = $db->getAllClientsWithOrWithoutUnit();
-$all_units = $db->getAllUnitsWithRenterInfo();
-
-// Apply unit filter to clients
-$unit_filter = isset($_GET['unit_filter']) ? $_GET['unit_filter'] : 'all';
-$filtered_clients = array_filter($all_clients, function($c) use ($unit_filter) {
-    $has_unit = !empty($c['SpaceName']);
-    if ($unit_filter === 'with') return $has_unit;
-    if ($unit_filter === 'without') return !$has_unit;
-    return true;
-});
-
-// Paginate clients
-$total_clients = count($filtered_clients);
-$total_client_pages = ceil($total_clients / $clients_per_page);
-$paginated_clients = array_slice($filtered_clients, $client_offset, $clients_per_page);
-
-// Paginate units
-$total_units = count($all_units);
-$total_unit_pages = ceil($total_units / $units_per_page);
-$paginated_units = array_slice($all_units, $unit_offset, $units_per_page);
+// --- Fetch ALL Data for Display ---
+$clients = $db->getAllClientsWithOrWithoutUnit();
+$units = $db->getAllUnitsWithRenterInfo();
 
 // --- Handle POST Actions ---
 
@@ -78,7 +47,7 @@ if (isset($_POST['nuke_client']) && isset($_POST['client_id'])) {
     $cid = intval($_POST['client_id']);
     // Find ALL units assigned to this client (supporting multi-unit clients)
     $client_unit_ids = [];
-    foreach ($all_clients as $cl) {
+    foreach ($clients as $cl) {
         if ($cl['Client_ID'] == $cid && !empty($cl['Space_ID'])) {
             $client_unit_ids[] = $cl['Space_ID'];
         }
@@ -106,7 +75,7 @@ if (isset($_POST['nuke_client']) && isset($_POST['client_id'])) {
 if (isset($_POST['delete_client']) && isset($_POST['client_id'])) {
     $cid = intval($_POST['client_id']);
     $client_has_unit = false;
-    foreach ($all_clients as $cl) {
+    foreach ($clients as $cl) {
         if ($cl['Client_ID'] == $cid && !empty($cl['SpaceName'])) {
             $client_has_unit = true;
             break;
@@ -216,8 +185,8 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     }
     
     // Refresh data after deletion attempt
-    $all_clients = $db->getAllClientsWithOrWithoutUnit();
-    $all_units = $db->getAllUnitsWithRenterInfo();
+    $clients = $db->getAllClientsWithOrWithoutUnit();
+    $units = $db->getAllUnitsWithRenterInfo();
 }
 
 // FORCE DELETE UNIT - Ignores rental status and deletes everything
@@ -234,8 +203,8 @@ if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
                 </div>';
         
         // Refresh data after deletion
-        $all_clients = $db->getAllClientsWithOrWithoutUnit();
-        $all_units = $db->getAllUnitsWithRenterInfo();
+        $clients = $db->getAllClientsWithOrWithoutUnit();
+        $units = $db->getAllUnitsWithRenterInfo();
     } else {
         $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-exclamation-circle me-2"></i>
@@ -248,7 +217,7 @@ if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
 if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
     $cid = intval($_POST['client_id']);
     $client_has_unit = false;
-    foreach ($all_clients as $cl) {
+    foreach ($clients as $cl) {
         if ($cl['Client_ID'] == $cid && !empty($cl['SpaceName'])) {
             $client_has_unit = true;
             break;
@@ -276,23 +245,6 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
         }
     }
 }
-
-// Refresh paginated data after POST actions
-if ($_POST) {
-    $filtered_clients = array_filter($all_clients, function($c) use ($unit_filter) {
-        $has_unit = !empty($c['SpaceName']);
-        if ($unit_filter === 'with') return $has_unit;
-        if ($unit_filter === 'without') return !$has_unit;
-        return true;
-    });
-    $total_clients = count($filtered_clients);
-    $total_client_pages = ceil($total_clients / $clients_per_page);
-    $paginated_clients = array_slice($filtered_clients, $client_offset, $clients_per_page);
-    
-    $total_units = count($all_units);
-    $total_unit_pages = ceil($total_units / $units_per_page);
-    $paginated_units = array_slice($all_units, $unit_offset, $units_per_page);
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -304,68 +256,649 @@ if ($_POST) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ... (keep all existing CSS styles) ... */
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #06b6d4;
+            --dark: #1f2937;
+            --darker: #111827;
+            --light: #f3f4f6;
+            --sidebar-width: 280px;
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #f8fafc, #f1f5f9);
+            color: #374151;
+            min-height: 100vh;
+            position: relative;
+        }
 
-        /* Pagination Styles */
-        .pagination-container {
+        /* Mobile Menu Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .mobile-menu-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--dark);
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .mobile-menu-btn:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .mobile-brand {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--dark);
+        }
+        
+        /* Sidebar Styling */
+        .sidebar {
+            position: fixed;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, var(--dark), var(--darker));
+            color: white;
+            padding: 1.5rem 1rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: var(--transition);
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 0 0 1.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.35rem;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .sidebar-brand i {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+        
+        .nav-item {
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: rgba(255, 255, 255, 0.85);
+            border-radius: var(--border-radius);
+            text-decoration: none;
+            transition: var(--transition);
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .nav-link i {
+            width: 24px;
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+        }
+        
+        .badge-notification {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+        
+        /* Header */
+        .dashboard-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.5rem;
-            background: #f8f9fa;
-            border-top: 1px solid #e5e7eb;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .page-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .page-title h1 {
+            font-weight: 700;
+            font-size: 1.8rem;
+            color: var(--dark);
+            margin-bottom: 0;
         }
 
-        .pagination-info {
+        .page-title p {
+            font-size: 0.9rem;
+        }
+        
+        .title-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-size: 1.25rem;
+        }
+        
+        /* Dashboard Card */
+        .dashboard-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 1.25rem 1.5rem;
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .card-header i {
+            color: var(--primary);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Table Styling */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--border-radius);
+        }
+        
+        .custom-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 800px;
+        }
+        
+        .custom-table th {
+            background-color: #f9fafb;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            text-align: left;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+        }
+        
+        .custom-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+        
+        .custom-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .custom-table tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        /* Form Elements */
+        .form-control-sm {
+            padding: 0.35rem 0.75rem;
             font-size: 0.875rem;
+            border-radius: var(--border-radius);
+            border: 1px solid #d1d5db;
+            transition: var(--transition);
+        }
+        
+        .form-control-sm:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.25);
+        }
+        
+        /* Button Styling */
+        .btn-action {
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+        }
+        
+        .btn-action:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-deactivate {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        
+        .btn-deactivate:hover {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-activate {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-activate:hover {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-nuke {
+            background: rgba(55, 65, 81, 0.1);
+            color: #374151;
+            border: 1px solid rgba(55, 65, 81, 0.2);
+        }
+        
+        .btn-nuke:hover {
+            background: #374151;
+            color: white;
+        }
+        
+        .btn-update {
+            background: rgba(99, 102, 241, 0.1);
+            color: #6366f1;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        
+        .btn-update:hover {
+            background: #6366f1;
+            color: white;
+        }
+        
+        .btn-force-delete {
+            background: rgba(220, 38, 127, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(220, 38, 127, 0.2);
+        }
+        
+        .btn-force-delete:hover {
+            background: #dc2626;
+            color: white;
+        }
+        
+        /* Status Badges */
+        .badge {
+            padding: 0.35rem 0.65rem;
+            font-weight: 600;
+            border-radius: 20px;
+            font-size: 0.75rem;
+        }
+        
+        /* Action Group */
+        .action-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Price Update Form */
+        .price-form {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .price-input {
+            width: 100px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Mobile Card Layout */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-left: 4px solid var(--primary);
+        }
+
+        .mobile-card-header {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark);
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .mobile-card-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .mobile-card-detail .label {
+            font-weight: 500;
             color: #6b7280;
         }
 
-        .pagination {
-            margin: 0;
+        .mobile-card-detail .value {
+            color: var(--dark);
         }
 
-        .page-link {
-            padding: 0.5rem 0.75rem;
-            border: 1px solid #d1d5db;
-            color: #374151;
-            font-weight: 500;
-            border-radius: 6px;
-            margin: 0 0.15rem;
+        .mobile-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
         }
 
-        .page-link:hover {
-            background-color: #f3f4f6;
-            border-color: #9ca3af;
+        .mobile-form {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
-        .page-item.active .page-link {
-            background-color: #6366f1;
-            border-color: #6366f1;
-            color: white;
+        .mobile-form input {
+            flex: 1;
+            min-width: 120px;
         }
 
-        .page-item.disabled .page-link {
-            color: #9ca3af;
-            background-color: #f9fafb;
-            border-color: #d1d5db;
+        .filter-container {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
 
-        @media (max-width: 768px) {
-            .pagination-container {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
+        /* Hide desktop table on mobile */
+        .table-mobile {
+            display: none;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 992px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 280px;
+            }
+            
+            .sidebar.active {
+                transform: translateX(0);
             }
 
-            .pagination {
-                flex-wrap: wrap;
+            .mobile-header {
+                display: flex;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                margin-top: 60px;
+                padding: 1rem;
+            }
+
+            .dashboard-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .page-title h1 {
+                font-size: 1.5rem;
+            }
+
+            .title-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 1rem;
+            }
+
+            .custom-table {
+                display: none;
+            }
+
+            .table-mobile {
+                display: block;
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+                font-size: 1rem;
+            }
+
+            .btn-action {
+                width: 40px;
+                height: 40px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 0.75rem;
+            }
+
+            .action-group {
                 justify-content: center;
             }
 
-            .page-link {
-                padding: 0.4rem 0.6rem;
-                font-size: 0.875rem;
+            .form-control, .form-select {
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+
+            .mobile-actions {
+                justify-content: center;
+            }
+
+            .mobile-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .mobile-form input {
+                min-width: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-title h1 {
+                font-size: 1.3rem;
+            }
+
+            .dashboard-card {
+                border-radius: 8px;
+            }
+
+            .btn {
+                font-size: 0.9rem;
+                padding: 0.75rem 1.5rem;
+            }
+
+            .form-control, .form-select {
+                padding: 0.75rem;
+            }
+
+            .btn-action {
+                width: 36px;
+                height: 36px;
+            }
+        }
+
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-action, .nav-link, .mobile-menu-btn {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            .btn-action:hover {
+                transform: none;
+            }
+        }
+        
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Tooltip */
+        .tooltip-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .tooltip-wrapper .tooltip-text {
+            visibility: hidden;
+            width: 120px;
+            background-color: #374151;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -60px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.75rem;
+        }
+        
+        .tooltip-wrapper:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Hide tooltips on mobile */
+        @media (max-width: 992px) {
+            .tooltip-wrapper .tooltip-text {
+                display: none;
             }
         }
     </style>
@@ -480,8 +1013,6 @@ if ($_POST) {
         <!-- Filter Section -->
         <div class="filter-container">
             <form method="get" class="d-flex align-items-center gap-2 flex-wrap" id="clientUnitFilterForm">
-                <input type="hidden" name="client_page" value="1">
-                <input type="hidden" name="unit_page" value="1">
                 <label for="clientUnitFilter" class="form-label mb-0">Filter:</label>
                 <select name="unit_filter" id="clientUnitFilter" class="form-select form-select-sm w-auto">
                     <option value="all"<?= (!isset($_GET['unit_filter']) || $_GET['unit_filter']==='all') ? ' selected' : '' ?>>All Clients</option>
@@ -497,10 +1028,20 @@ if ($_POST) {
             <div class="card-header">
                 <i class="fas fa-users"></i>
                 <span>Clients</span>
-                <span class="badge bg-primary ms-2"><?= $total_clients ?></span>
+                <span class="badge bg-primary ms-2"><?= count($clients) ?></span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($paginated_clients)): ?>
+                <?php
+                // Filter logic for clients with/without unit
+                $unit_filter = isset($_GET['unit_filter']) ? $_GET['unit_filter'] : 'all';
+                $filtered_clients = array_filter($clients, function($c) use ($unit_filter) {
+                    $has_unit = !empty($c['SpaceName']);
+                    if ($unit_filter === 'with') return $has_unit;
+                    if ($unit_filter === 'without') return !$has_unit;
+                    return true;
+                });
+                ?>
+                <?php if (!empty($filtered_clients)): ?>
                     <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
@@ -516,7 +1057,7 @@ if ($_POST) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($paginated_clients as $c): ?>
+                                <?php foreach ($filtered_clients as $c): ?>
                                 <?php $client_has_unit = !empty($c['SpaceName']); ?>
                                 <tr>
                                     <td>
@@ -589,7 +1130,7 @@ if ($_POST) {
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach ($paginated_clients as $c): ?>
+                        <?php foreach ($filtered_clients as $c): ?>
                         <?php $client_has_unit = !empty($c['SpaceName']); ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
@@ -654,70 +1195,6 @@ if ($_POST) {
                             </div>
                         <?php endforeach; ?>
                     </div>
-
-                    <!-- Client Pagination -->
-                    <div class="pagination-container">
-                        <div class="pagination-info">
-                            Showing <?= count($paginated_clients) ?> of <?= $total_clients ?> clients
-                        </div>
-                        <nav>
-                            <ul class="pagination">
-                                <?php if ($client_page > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => 1])) ?>" title="First Page">
-                                            <i class="fas fa-angle-double-left"></i>
-                                        </a>
-                                    </li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $client_page - 1])) ?>" title="Previous Page">
-                                            <i class="fas fa-angle-left"></i>
-                                        </a>
-                                    </li>
-                                <?php else: ?>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
-                                    </li>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-left"></i></span>
-                                    </li>
-                                <?php endif; ?>
-
-                                <?php
-                                // Show page numbers
-                                $start_page = max(1, $client_page - 2);
-                                $end_page = min($total_client_pages, $client_page + 2);
-                                
-                                for ($i = $start_page; $i <= $end_page; $i++):
-                                ?>
-                                    <li class="page-item <?= $i == $client_page ? 'active' : '' ?>">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $i])) ?>">
-                                            <?= $i ?>
-                                        </a>
-                                    </li>
-                                <?php endfor; ?>
-
-                                <?php if ($client_page < $total_client_pages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $client_page + 1])) ?>" title="Next Page">
-                                            <i class="fas fa-angle-right"></i>
-                                        </a>
-                                    </li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $total_client_pages])) ?>" title="Last Page">
-                                            <i class="fas fa-angle-double-right"></i>
-                                        </a>
-                                    </li>
-                                <?php else: ?>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-right"></i></span>
-                                    </li>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
-                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-user-slash"></i>
@@ -733,10 +1210,10 @@ if ($_POST) {
             <div class="card-header">
                 <i class="fas fa-home"></i>
                 <span>Units</span>
-                <span class="badge bg-primary ms-2"><?= $total_units ?></span>
+                <span class="badge bg-primary ms-2"><?= count($units) ?></span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($paginated_units)): ?>
+                <?php if (!empty($units)): ?>
                     <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
@@ -751,7 +1228,7 @@ if ($_POST) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($paginated_units as $u): 
+                                <?php foreach ($units as $u): 
                                     $has_renter = !empty($u['Client_fn']);
                                     $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
                                 ?>
@@ -802,7 +1279,7 @@ if ($_POST) {
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach ($paginated_units as $u): 
+                        <?php foreach ($units as $u): 
                             $has_renter = !empty($u['Client_fn']);
                             $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
                         ?>
@@ -858,70 +1335,6 @@ if ($_POST) {
                                 </div>
                             </div>
                         <?php endforeach; ?>
-                    </div>
-
-                    <!-- Unit Pagination -->
-                    <div class="pagination-container">
-                        <div class="pagination-info">
-                            Showing <?= count($paginated_units) ?> of <?= $total_units ?> units
-                        </div>
-                        <nav>
-                            <ul class="pagination">
-                                <?php if ($unit_page > 1): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => 1])) ?>" title="First Page">
-                                            <i class="fas fa-angle-double-left"></i>
-                                        </a>
-                                    </li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $unit_page - 1])) ?>" title="Previous Page">
-                                            <i class="fas fa-angle-left"></i>
-                                        </a>
-                                    </li>
-                                <?php else: ?>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
-                                    </li>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-left"></i></span>
-                                    </li>
-                                <?php endif; ?>
-
-                                <?php
-                                // Show page numbers
-                                $start_page = max(1, $unit_page - 2);
-                                $end_page = min($total_unit_pages, $unit_page + 2);
-                                
-                                for ($i = $start_page; $i <= $end_page; $i++):
-                                ?>
-                                    <li class="page-item <?= $i == $unit_page ? 'active' : '' ?>">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $i])) ?>">
-                                            <?= $i ?>
-                                        </a>
-                                    </li>
-                                <?php endfor; ?>
-
-                                <?php if ($unit_page < $total_unit_pages): ?>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $unit_page + 1])) ?>" title="Next Page">
-                                            <i class="fas fa-angle-right"></i>
-                                        </a>
-                                    </li>
-                                    <li class="page-item">
-                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $total_unit_pages])) ?>" title="Last Page">
-                                            <i class="fas fa-angle-double-right"></i>
-                                        </a>
-                                    </li>
-                                <?php else: ?>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-right"></i></span>
-                                    </li>
-                                    <li class="page-item disabled">
-                                        <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
-                                    </li>
-                                <?php endif; ?>
-                            </ul>
-                        </nav>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
@@ -1032,12 +1445,6 @@ if ($_POST) {
                     isSubmitting = false;
                 }, 3000);
             });
-        });
-
-        // Reset to page 1 when filter changes
-        document.getElementById('clientUnitFilter').addEventListener('change', function() {
-            document.querySelector('input[name="client_page"]').value = 1;
-            document.querySelector('input[name="unit_page"]').value = 1;
         });
     </script>
 </body>
