@@ -1497,7 +1497,7 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        // Payment Status Notification System - PUBLIC AJAX VERSION
+        // Payment Status Notification System - FIXED AJAX PATH
         let shownPaymentNotifications = new Set();
         let shownReminderNotifications = new Set();
 
@@ -1505,8 +1505,8 @@ function formatDateToMonthLetters($date) {
             <?php if (!empty($rented_units) && isset($client_id)): ?>
             console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
             
-            // Use GET request for public access
-            fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+            // FIXED: Use correct path to AJAX folder
+            fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
             .then(res => {
                 console.log('📡 Response status:', res.status);
                 if (!res.ok) {
@@ -1841,7 +1841,7 @@ function formatDateToMonthLetters($date) {
         function pollClientUnreadAdminBadge() {
             // Only run if client is logged in
             <?php if (isset($_SESSION['client_id'])): ?>
-            fetch('AJAX/get_unread_admin_chat_counts.php', {
+            fetch('../AJAX/get_unread_admin_chat_counts.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
