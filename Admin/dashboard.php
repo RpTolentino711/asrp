@@ -47,6 +47,50 @@ $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 $new_maintenance_requests = $counts['new_maintenance_requests'] ?? 0;
 $unseen_rentals = $counts['unseen_rentals'] ?? 0;
 
+// Get payment days data
+$paymentDaysQuery = "
+    SELECT 
+        cs.CS_ID,
+        c.Client_ID,
+        CONCAT(c.Client_fn, ' ', c.Client_ln) AS client_name,
+        s.Name AS unit_name,
+        s.Space_ID,
+        i.InvoiceDate,
+        i.EndDate,
+        i.Status,
+        i.InvoiceTotal,
+        DAY(i.InvoiceDate) AS payment_day,
+        DATEDIFF(CURDATE(), i.InvoiceDate) AS days_since_payment,
+        CASE 
+            WHEN i.Status = 'paid' THEN 'success'
+            WHEN i.Status = 'unpaid' AND i.EndDate < CURDATE() THEN 'danger'
+            WHEN i.Status = 'unpaid' THEN 'warning'
+            ELSE 'secondary'
+        END AS status_badge
+    FROM clientspace cs
+    INNER JOIN client c ON cs.Client_ID = c.Client_ID
+    INNER JOIN space s ON cs.Space_ID = s.Space_ID
+    LEFT JOIN invoice i ON cs.Client_ID = i.Client_ID AND cs.Space_ID = i.Space_ID
+    WHERE cs.active = 1 
+    AND i.Flow_Status = 'new'
+    ORDER BY i.InvoiceDate DESC
+";
+
+$paymentDays = $db->executeQuery($paymentDaysQuery);
+
+// Helper function for ordinal suffixes
+function getOrdinalSuffix($number) {
+    if ($number % 100 >= 11 && $number % 100 <= 13) {
+        return 'th';
+    }
+    switch ($number % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+    }
+}
+
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
     $msg_id = intval($_POST['soft_delete_msg_id']);
@@ -303,33 +347,6 @@ function timeAgo($datetime) {
             font-size: 0.9rem;
         }
 
-        <!-- Export Report Card -->
-        <div class="dashboard-card animate-fade-in">
-            <div class="card-header">
-                <i class="fas fa-file-export"></i>
-                <span>Export Monthly Report</span>
-            </div>
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <p class="mb-3">Generate detailed monthly reports in Excel or PDF format for <?= $monthName ?></p>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
-                               class="btn btn-success">
-                                <i class="fas fa-file-excel me-2"></i>Export Excel
-                            </a>
-                        </div>
-                    </div>
-                    <div class="col-md-4 text-md-end">
-                        <div class="text-muted small">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Includes: Financial, Rental, Maintenance & Occupancy data
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
         /* Stats Grid */
         .stats-grid {
             display: grid;
@@ -1185,7 +1202,7 @@ function timeAgo($datetime) {
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                        <p class="mb-3">Generate detailed monthly reports in Excel<?= $monthName ?></p>
+                        <p class="mb-3">Generate detailed monthly reports in Excel for <?= $monthName ?></p>
                         <div class="d-flex gap-2 flex-wrap">
                             <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
                                class="btn btn-success">
@@ -1197,6 +1214,136 @@ function timeAgo($datetime) {
                         <div class="text-muted small">
                             <i class="fas fa-info-circle me-1"></i>
                             Includes: Financial, Rental, Maintenance & Occupancy data
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Days Tracking Section -->
+        <div class="dashboard-card animate-fade-in">
+            <div class="card-header">
+                <i class="fas fa-calendar-check"></i>
+                <span>Client Payment Days Tracking</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Client</th>
+                                <th>Unit</th>
+                                <th>Payment Day</th>
+                                <th>Last Payment</th>
+                                <th>Next Due</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Days Since</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($paymentDays)): ?>
+                                <?php foreach ($paymentDays as $payment): ?>
+                                    <?php
+                                    $paymentDate = new DateTime($payment['InvoiceDate']);
+                                    $endDate = new DateTime($payment['EndDate']);
+                                    $now = new DateTime();
+                                    $daysSince = $payment['days_since_payment'];
+                                    
+                                    // Determine status text and color
+                                    $statusText = ucfirst($payment['Status']);
+                                    $statusColor = $payment['status_badge'];
+                                    
+                                    // Calculate next due date (next month same day)
+                                    $nextDue = clone $paymentDate;
+                                    $nextDue->modify('+1 month');
+                                    
+                                    // Check if payment is upcoming (within 7 days)
+                                    $daysUntilDue = $now->diff($endDate)->days;
+                                    $isUpcoming = $daysUntilDue <= 7 && $payment['Status'] === 'unpaid';
+                                    ?>
+                                    
+                                    <tr class="<?= $isUpcoming ? 'table-warning' : '' ?>">
+                                        <td>
+                                            <strong><?= htmlspecialchars($payment['client_name']) ?></strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark"><?= htmlspecialchars($payment['unit_name']) ?></span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">
+                                                <i class="fas fa-calendar-day me-1"></i>
+                                                <?= $payment['payment_day'] ?><?= getOrdinalSuffix($payment['payment_day']) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?= $paymentDate->format('M j, Y') ?>
+                                        </td>
+                                        <td>
+                                            <?= $endDate->format('M j, Y') ?>
+                                            <?php if ($isUpcoming): ?>
+                                                <br><small class="text-warning">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    Due in <?= $daysUntilDue ?> day<?= $daysUntilDue !== 1 ? 's' : '' ?>
+                                                </small>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <strong>₱<?= number_format($payment['InvoiceTotal'], 2) ?></strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-<?= $statusColor ?>">
+                                                <?= $statusText ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($payment['Status'] === 'paid'): ?>
+                                                <span class="text-success">
+                                                    <i class="fas fa-check-circle me-1"></i>
+                                                    <?= $daysSince ?> day<?= $daysSince !== 1 ? 's' : '' ?> ago
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-danger">
+                                                    <i class="fas fa-clock me-1"></i>
+                                                    <?= $daysSince ?> day<?= $daysSince !== 1 ? 's' : '' ?> overdue
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-4">
+                                        <i class="fas fa-calendar-times fa-2x mb-3"></i>
+                                        <p>No payment data available</p>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="border rounded p-2">
+                                <small class="text-muted">Payment Day Legend</small>
+                                <div class="mt-1">
+                                    <span class="badge bg-primary me-1">1st-10th</span>
+                                    <span class="badge bg-info me-1">11th-20th</span>
+                                    <span class="badge bg-warning">21st-31st</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="border rounded p-2">
+                                <small class="text-muted">Status Legend</small>
+                                <div class="mt-1">
+                                    <span class="badge bg-success me-2">Paid</span>
+                                    <span class="badge bg-warning me-2">Unpaid (Current)</span>
+                                    <span class="badge bg-danger me-2">Overdue</span>
+                                    <span class="badge bg-secondary">Other</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
