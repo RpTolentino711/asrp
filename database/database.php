@@ -235,17 +235,17 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     return $photos;
 }
 
-// In the client dashboard, replace the addClientPhotoToHistory function with:
-function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
-    // Use negative client_id to distinguish client actions from admin actions
+
+// Replace your current addClientPhotoToHistory function with this:
+function addClientPhotoToHistory($db, $space_id, $photo_path, $action) {
     $client_id = -$_SESSION['client_id'];
     
+    // Try using the Database class method first
     if (method_exists($db, 'addPhotoToHistory')) {
-        // Remove the description parameter since your method doesn't accept it
         return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
     }
     
-    // Fallback: direct SQL if method doesn't exist
+    // Fallback: direct SQL using PDO
     try {
         $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
                 VALUES (?, ?, ?, ?, ?, ?)";
@@ -258,7 +258,6 @@ function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $descript
         return false;
     }
 }
-
 
 
 public function getInvoiceChatMessagesForClient($invoice_id) {
@@ -2640,22 +2639,7 @@ public function addPhotoToHistory($space_id, $filename, $action, $previous_filen
     }
 }
 
-// Function to add client photo to history
-function addClientPhotoToHistory($db, $space_id, $photo_path, $action) {
-    $client_id = -$_SESSION['client_id'];
-    
-    try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
-                VALUES (?, ?, ?, ?, ?, ?)";
-        
-        $status = ($action === 'deleted') ? 'inactive' : 'active';
-        $stmt = $db->conn->prepare($sql);
-        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status]);
-    } catch (PDOException $e) {
-        error_log("addClientPhotoToHistory Error: " . $e->getMessage());
-        return false;
-    }
-}
+
 
 public function deactivatePhoto($space_id, $filename) {
     $sql = "UPDATE photo_history SET Status = 'inactive' 
