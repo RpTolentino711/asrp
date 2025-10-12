@@ -149,6 +149,7 @@ function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $descript
         return false;
     }
 }
+
 // Photo Upload Processing
 if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {
     $space_id = intval($_POST['space_id']);
@@ -160,22 +161,47 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
     
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
+    } else if ($file['error'] !== UPLOAD_ERR_OK) {
+        // Handle upload errors
+        switch($file['error']) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+                break;
+            case UPLOAD_ERR_PARTIAL:
+                $photo_upload_error = "File upload was interrupted. Please try again.";
+                break;
+            case UPLOAD_ERR_NO_FILE:
+                $photo_upload_error = "No file selected. Please choose an image to upload.";
+                break;
+            case UPLOAD_ERR_NO_TMP_DIR:
+                $photo_upload_error = "Server configuration error. Please contact support.";
+                break;
+            case UPLOAD_ERR_CANT_WRITE:
+                $photo_upload_error = "Failed to save file. Please try again.";
+                break;
+            default:
+                $photo_upload_error = "Unknown upload error occurred.";
+        }
     } else {
-        // Get current active CLIENT photos count using the new method
-        $current_photos_count = $db->getActiveClientPhotosCount($space_id, $client_id);
+        // Get current photos from JSON column
+        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+        $used_slots = count($current_photos);
         
-        if ($current_photos_count >= 6) {
+        if ($used_slots >= 6) {
             $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
         } else {
-            // Validate file
+            // Validate file type and size
             $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-            $max_size = 2 * 1024 * 1024;
+            $max_size = 2 * 1024 * 1024; // 2MB
             
+            // Get actual file type using finfo
             if (function_exists('finfo_open')) {
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
                 $actual_type = $finfo->file($file['tmp_name']);
             } else {
-                $actual_type = $file['type'];
+                $actual_type = $file['type']; // Fallback
             }
             
             if (!in_array($actual_type, $allowed_types)) {
@@ -183,18 +209,21 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
             } else if ($file['size'] > $max_size) {
                 $photo_upload_error = "File size too large. Maximum 2MB allowed.";
             } else {
+                // Validate image dimensions
                 $image_info = getimagesize($file['tmp_name']);
                 if ($image_info === false) {
                     $photo_upload_error = "Invalid image file. File appears to be corrupted.";
                 } else if ($image_info[0] > 2048 || $image_info[1] > 2048) {
                     $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels allowed.";
                 } else {
+                    // Generate secure filename
                     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                     $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
                     
                     if (!in_array($ext, $allowed_extensions)) {
                         $photo_upload_error = "Invalid file extension. Only .jpg, .jpeg, .png, and .gif files are allowed.";
                     } else {
+                        // Create upload directory if it doesn't exist
                         $upload_dir = __DIR__ . "/uploads/unit_photos/";
                         if (!is_dir($upload_dir)) {
                             if (!mkdir($upload_dir, 0755, true)) {
@@ -203,17 +232,27 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                         }
                         
                         if (empty($photo_upload_error)) {
+                            // Generate unique filename
                             $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
                             $filepath = $upload_dir . $filename;
                             
                             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                                // Add to photo history with status 'active' - THIS IS THE KEY CHANGE
-                                if (addClientPhotoToHistory($db, $space_id, $filename, 'uploaded')) {
+                                // Add to existing photos array and save as JSON
+                                $current_photos[] = $filename;
+                                $json_photos = json_encode($current_photos);
+                                
+                                // Save to database (UPDATED FOR JSON)
+                                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                                    // ADD TO PHOTO HISTORY - Client uploaded photo
+                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
+                                    
                                     $photo_upload_success = "Photo uploaded successfully for this unit!";
                                     $_SESSION['photo_upload_success'] = $photo_upload_success;
+                                    // Redirect to prevent resubmission
                                     header("Location: " . $_SERVER['PHP_SELF']);
                                     exit();
                                 } else {
+                                    // Delete uploaded file if database insert failed
                                     if (file_exists($filepath)) {
                                         unlink($filepath);
                                     }
