@@ -235,21 +235,30 @@ public function getAllUnitPhotosForUnits($unit_ids) {
     return $photos;
 }
 
-
-function addClientPhotoToHistory($db, $space_id, $photo_path, $action) {
+// In the client dashboard, replace the addClientPhotoToHistory function with:
+function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
+    // Use negative client_id to distinguish client actions from admin actions
     $client_id = -$_SESSION['client_id'];
-    $status = ($action === 'deleted') ? 'inactive' : 'active';
     
+    if (method_exists($db, 'addPhotoToHistory')) {
+        // Remove the description parameter since your method doesn't accept it
+        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
+    }
+    
+    // Fallback: direct SQL if method doesn't exist
     try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Action_By, Status) 
-                VALUES (?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
+                VALUES (?, ?, ?, ?, ?, ?)";
+        
+        $status = ($action === 'deleted') ? 'inactive' : 'active';
         $stmt = $db->pdo->prepare($sql);
-        return $stmt->execute([$space_id, $photo_path, $action, $client_id, $status]);
+        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status]);
     } catch (PDOException $e) {
         error_log("addClientPhotoToHistory Error: " . $e->getMessage());
         return false;
     }
 }
+
 
 
 public function getInvoiceChatMessagesForClient($invoice_id) {
