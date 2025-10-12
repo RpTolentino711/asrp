@@ -122,7 +122,7 @@ if (isset($_SESSION['feedback_success'])) {
     unset($_SESSION['feedback_success']);
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
+// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR PHOTO_GALLERY TABLE) ---
 $photo_upload_success = '';
 $photo_upload_error = '';
 
@@ -184,12 +184,10 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                 $photo_upload_error = "Unknown upload error occurred.";
         }
     } else {
-        // Get current photos from JSON column
-        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-        $used_slots = count($current_photos);
+        // Get current photo count from photo_gallery table
+        $current_photo_count = $db->getClientSpacePhotoCount($client_id, $space_id);
         
-        if ($used_slots >= 6) {
+        if ($current_photo_count >= 6) {
             $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
         } else {
             // Validate file type and size
@@ -237,12 +235,8 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                             $filepath = $upload_dir . $filename;
                             
                             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                                // Add to existing photos array and save as JSON
-                                $current_photos[] = $filename;
-                                $json_photos = json_encode($current_photos);
-                                
-                                // Save to database (UPDATED FOR JSON)
-                                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                                // Save to photo_gallery table
+                                if ($db->addPhotoToGallery($space_id, $client_id, $filename)) {
                                     // ADD TO PHOTO HISTORY - Client uploaded photo
                                     addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
                                     
@@ -269,7 +263,7 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
     }
 }
 
-// Photo Delete Processing (UPDATED FOR JSON)
+// Photo Delete Processing (UPDATED FOR PHOTO_GALLERY TABLE)
 if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
@@ -287,41 +281,29 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
         if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
             $photo_upload_error = "Invalid photo filename format.";
         } else {
-            // Get current photos and remove the specified one
-            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-            
-            if (!in_array($photo_filename, $current_photos)) {
-                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
-            } else {
-                // Remove photo from array
-                $updated_photos = array_values(array_diff($current_photos, [$photo_filename]));
-                $json_photos = json_encode($updated_photos);
+            // Delete photo from photo_gallery table
+            if ($db->deletePhotoFromGallery($space_id, $client_id, $photo_filename)) {
+                // ADD TO PHOTO HISTORY - Client deleted photo
+                addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
                 
-                // Update database with new JSON array (UPDATED FOR JSON)
-                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                    // ADD TO PHOTO HISTORY - Client deleted photo
-                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
-                    
-                    // Delete file from filesystem
-                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                    $file_to_delete = $upload_dir . basename($photo_filename);
-                    if (file_exists($file_to_delete)) {
-                        if (unlink($file_to_delete)) {
-                            $photo_upload_success = "Photo deleted successfully!";
-                        } else {
-                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
-                        }
-                    } else {
+                // Delete file from filesystem
+                $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                $file_to_delete = $upload_dir . basename($photo_filename);
+                if (file_exists($file_to_delete)) {
+                    if (unlink($file_to_delete)) {
                         $photo_upload_success = "Photo deleted successfully!";
+                    } else {
+                        $photo_upload_success = "Photo deleted from database, but file removal failed.";
                     }
-                    $_SESSION['photo_upload_success'] = $photo_upload_success;
-                    // Redirect to prevent resubmission
-                    header("Location: " . $_SERVER['PHP_SELF']);
-                    exit();
                 } else {
-                    $photo_upload_error = "Failed to delete photo from database.";
+                    $photo_upload_success = "Photo deleted successfully!";
                 }
+                $_SESSION['photo_upload_success'] = $photo_upload_success;
+                // Redirect to prevent resubmission
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            } else {
+                $photo_upload_error = "Failed to delete photo from database.";
             }
         }
     }
@@ -362,7 +344,7 @@ try {
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
+        $unit_photos = $db->getUnitPhotosForClient($client_id); // This now queries photo_gallery table
         
         // Ensure arrays are returned
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
@@ -1220,6 +1202,7 @@ function formatDateToMonthLetters($date) {
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
                     $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                    $photo_count = count($photos);
                     
                     // Get dates safely and format them
                     $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
@@ -1284,7 +1267,7 @@ function formatDateToMonthLetters($date) {
                                         <h6 class="mb-0">
                                             <i class="bi bi-images me-1"></i>Unit Photos
                                         </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/6</small>
+                                        <small class="text-muted"><?= $photo_count ?>/6</small>
                                     </div>
 
                                     <?php if (!empty($photos)): ?>
@@ -1316,7 +1299,7 @@ function formatDateToMonthLetters($date) {
                                     <?php endif; ?>
 
                                     <!-- Upload Form -->
-                                    <?php if (count($photos) < 6): ?>
+                                    <?php if ($photo_count < 6): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">
