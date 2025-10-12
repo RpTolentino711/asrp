@@ -1528,48 +1528,6 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        // Function to check and show payment status popup
-        function checkPaymentStatus() {
-            fetch('AJAX/check_payment_status.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success && data.show_popup) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Payment Successful!',
-                        html: `
-                            <div class="text-center">
-                                <div class="mb-3">
-                                    <i class="bi bi-check-circle-fill text-success fs-1"></i>
-                                </div>
-                                <p class="mb-2"><strong>Last Month Paid:</strong> ${data.paid_month}</p>
-                                <p class="mb-3"><strong>Next Due Date:</strong> ${data.next_due_date}</p>
-                                <small class="text-muted">Page will refresh automatically...</small>
-                            </div>
-                        `,
-                        confirmButtonColor: '#10b981',
-                        allowOutsideClick: false,
-                        allowEscapeKey: false,
-                        timer: 5000,
-                        timerProgressBar: true,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    }).then(() => {
-                        // Refresh page when alert is closed
-                        window.location.reload();
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error checking payment status:', error);
-            });
-        }
-
         // Close navbar on mobile when clicking nav links
         document.addEventListener('DOMContentLoaded', function() {
             const navbarCollapse = document.getElementById('navbarNav');
@@ -1588,9 +1546,6 @@ function formatDateToMonthLetters($date) {
                     }
                 });
             }
-
-            // Check payment status on page load
-            checkPaymentStatus();
 
             // Enhanced file input with preview and validation
             const fileInputs = document.querySelectorAll('input[type="file"]');
@@ -1779,11 +1734,6 @@ function formatDateToMonthLetters($date) {
             timerProgressBar: true
         });
     </script>
-
-    <script>
-window.addEventListener('load', checkPaymentStatus);
-</script>
-
     <?php endif; ?>
 </body>
 </html>
