@@ -234,7 +234,7 @@ public function getUnitPhotosForClient($client_id) {
     
 
 
-ublic function getAllUnitPhotosForUnits($unit_ids) {
+public function getAllUnitPhotosForUnits($unit_ids) {
     if (empty($unit_ids)) return [];
     
     // Prepare placeholders for array of unit IDs
