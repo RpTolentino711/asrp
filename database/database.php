@@ -90,7 +90,17 @@ public function executeQuery($sql, $params = []) {
 }
 
 
-
+public function getClientInvoiceHistoryForUnit($client_id, $space_id) {
+    $sql = "SELECT i.*, s.Name as SpaceName 
+            FROM invoices i 
+            JOIN spaces s ON i.Space_ID = s.Space_ID 
+            WHERE i.Client_ID = ? AND i.Space_ID = ? 
+            ORDER BY i.InvoiceDate DESC";
+    
+    $stmt = $this->pdo->prepare($sql);
+    $stmt->execute([$client_id, $space_id]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 
 public function getOccupancyData($startDate, $endDate) {
