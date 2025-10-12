@@ -11,9 +11,40 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 $msg = "";
 
-// --- Fetch ALL Data for Display ---
-$clients = $db->getAllClientsWithOrWithoutUnit();
-$units = $db->getAllUnitsWithRenterInfo();
+// --- Pagination Configuration ---
+$clients_per_page = 10; // Number of clients per page
+$units_per_page = 10;   // Number of units per page
+
+// Get current page for clients
+$client_page = isset($_GET['client_page']) ? max(1, intval($_GET['client_page'])) : 1;
+$client_offset = ($client_page - 1) * $clients_per_page;
+
+// Get current page for units
+$unit_page = isset($_GET['unit_page']) ? max(1, intval($_GET['unit_page'])) : 1;
+$unit_offset = ($unit_page - 1) * $units_per_page;
+
+// --- Fetch Data with Pagination ---
+$all_clients = $db->getAllClientsWithOrWithoutUnit();
+$all_units = $db->getAllUnitsWithRenterInfo();
+
+// Apply unit filter to clients
+$unit_filter = isset($_GET['unit_filter']) ? $_GET['unit_filter'] : 'all';
+$filtered_clients = array_filter($all_clients, function($c) use ($unit_filter) {
+    $has_unit = !empty($c['SpaceName']);
+    if ($unit_filter === 'with') return $has_unit;
+    if ($unit_filter === 'without') return !$has_unit;
+    return true;
+});
+
+// Paginate clients
+$total_clients = count($filtered_clients);
+$total_client_pages = ceil($total_clients / $clients_per_page);
+$paginated_clients = array_slice($filtered_clients, $client_offset, $clients_per_page);
+
+// Paginate units
+$total_units = count($all_units);
+$total_unit_pages = ceil($total_units / $units_per_page);
+$paginated_units = array_slice($all_units, $unit_offset, $units_per_page);
 
 // --- Handle POST Actions ---
 
@@ -47,7 +78,7 @@ if (isset($_POST['nuke_client']) && isset($_POST['client_id'])) {
     $cid = intval($_POST['client_id']);
     // Find ALL units assigned to this client (supporting multi-unit clients)
     $client_unit_ids = [];
-    foreach ($clients as $cl) {
+    foreach ($all_clients as $cl) {
         if ($cl['Client_ID'] == $cid && !empty($cl['Space_ID'])) {
             $client_unit_ids[] = $cl['Space_ID'];
         }
@@ -75,7 +106,7 @@ if (isset($_POST['nuke_client']) && isset($_POST['client_id'])) {
 if (isset($_POST['delete_client']) && isset($_POST['client_id'])) {
     $cid = intval($_POST['client_id']);
     $client_has_unit = false;
-    foreach ($clients as $cl) {
+    foreach ($all_clients as $cl) {
         if ($cl['Client_ID'] == $cid && !empty($cl['SpaceName'])) {
             $client_has_unit = true;
             break;
@@ -185,8 +216,8 @@ if (isset($_POST['delete_unit']) && isset($_POST['space_id'])) {
     }
     
     // Refresh data after deletion attempt
-    $clients = $db->getAllClientsWithOrWithoutUnit();
-    $units = $db->getAllUnitsWithRenterInfo();
+    $all_clients = $db->getAllClientsWithOrWithoutUnit();
+    $all_units = $db->getAllUnitsWithRenterInfo();
 }
 
 // FORCE DELETE UNIT - Ignores rental status and deletes everything
@@ -203,8 +234,8 @@ if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
                 </div>';
         
         // Refresh data after deletion
-        $clients = $db->getAllClientsWithOrWithoutUnit();
-        $units = $db->getAllUnitsWithRenterInfo();
+        $all_clients = $db->getAllClientsWithOrWithoutUnit();
+        $all_units = $db->getAllUnitsWithRenterInfo();
     } else {
         $msg = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                 <i class="fas fa-exclamation-circle me-2"></i>
@@ -217,7 +248,7 @@ if (isset($_POST['force_delete_unit']) && isset($_POST['space_id'])) {
 if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
     $cid = intval($_POST['client_id']);
     $client_has_unit = false;
-    foreach ($clients as $cl) {
+    foreach ($all_clients as $cl) {
         if ($cl['Client_ID'] == $cid && !empty($cl['SpaceName'])) {
             $client_has_unit = true;
             break;
@@ -244,6 +275,23 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                     </div>';
         }
     }
+}
+
+// Refresh paginated data after POST actions
+if ($_POST) {
+    $filtered_clients = array_filter($all_clients, function($c) use ($unit_filter) {
+        $has_unit = !empty($c['SpaceName']);
+        if ($unit_filter === 'with') return $has_unit;
+        if ($unit_filter === 'without') return !$has_unit;
+        return true;
+    });
+    $total_clients = count($filtered_clients);
+    $total_client_pages = ceil($total_clients / $clients_per_page);
+    $paginated_clients = array_slice($filtered_clients, $client_offset, $clients_per_page);
+    
+    $total_units = count($all_units);
+    $total_unit_pages = ceil($total_units / $units_per_page);
+    $paginated_units = array_slice($all_units, $unit_offset, $units_per_page);
 }
 ?>
 <!DOCTYPE html>
@@ -732,6 +780,51 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             display: none;
         }
         
+        /* Pagination Styles */
+        .pagination-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: #f8f9fa;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .pagination-info {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .pagination {
+            margin: 0;
+        }
+
+        .page-link {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            color: #374151;
+            font-weight: 500;
+            border-radius: 6px;
+            margin: 0 0.15rem;
+        }
+
+        .page-link:hover {
+            background-color: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .page-item.active .page-link {
+            background-color: #6366f1;
+            border-color: #6366f1;
+            color: white;
+        }
+
+        .page-item.disabled .page-link {
+            color: #9ca3af;
+            background-color: #f9fafb;
+            border-color: #d1d5db;
+        }
+        
         /* Mobile Responsive */
         @media (max-width: 992px) {
             .sidebar {
@@ -790,6 +883,22 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             .btn-action {
                 width: 40px;
                 height: 40px;
+            }
+
+            .pagination-container {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .pagination {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .page-link {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.875rem;
             }
         }
         
@@ -1013,6 +1122,8 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
         <!-- Filter Section -->
         <div class="filter-container">
             <form method="get" class="d-flex align-items-center gap-2 flex-wrap" id="clientUnitFilterForm">
+                <input type="hidden" name="client_page" value="1">
+                <input type="hidden" name="unit_page" value="1">
                 <label for="clientUnitFilter" class="form-label mb-0">Filter:</label>
                 <select name="unit_filter" id="clientUnitFilter" class="form-select form-select-sm w-auto">
                     <option value="all"<?= (!isset($_GET['unit_filter']) || $_GET['unit_filter']==='all') ? ' selected' : '' ?>>All Clients</option>
@@ -1028,20 +1139,10 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             <div class="card-header">
                 <i class="fas fa-users"></i>
                 <span>Clients</span>
-                <span class="badge bg-primary ms-2"><?= count($clients) ?></span>
+                <span class="badge bg-primary ms-2"><?= $total_clients ?></span>
             </div>
             <div class="card-body p-0">
-                <?php
-                // Filter logic for clients with/without unit
-                $unit_filter = isset($_GET['unit_filter']) ? $_GET['unit_filter'] : 'all';
-                $filtered_clients = array_filter($clients, function($c) use ($unit_filter) {
-                    $has_unit = !empty($c['SpaceName']);
-                    if ($unit_filter === 'with') return $has_unit;
-                    if ($unit_filter === 'without') return !$has_unit;
-                    return true;
-                });
-                ?>
-                <?php if (!empty($filtered_clients)): ?>
+                <?php if (!empty($paginated_clients)): ?>
                     <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
@@ -1057,7 +1158,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($filtered_clients as $c): ?>
+                                <?php foreach ($paginated_clients as $c): ?>
                                 <?php $client_has_unit = !empty($c['SpaceName']); ?>
                                 <tr>
                                     <td>
@@ -1130,7 +1231,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach ($filtered_clients as $c): ?>
+                        <?php foreach ($paginated_clients as $c): ?>
                         <?php $client_has_unit = !empty($c['SpaceName']); ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
@@ -1195,6 +1296,70 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                             </div>
                         <?php endforeach; ?>
                     </div>
+
+                    <!-- Client Pagination -->
+                    <div class="pagination-container">
+                        <div class="pagination-info">
+                            Showing <?= count($paginated_clients) ?> of <?= $total_clients ?> clients
+                        </div>
+                        <nav>
+                            <ul class="pagination">
+                                <?php if ($client_page > 1): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => 1])) ?>" title="First Page">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $client_page - 1])) ?>" title="Previous Page">
+                                            <i class="fas fa-angle-left"></i>
+                                        </a>
+                                    </li>
+                                <?php else: ?>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                                    </li>
+                                <?php endif; ?>
+
+                                <?php
+                                // Show page numbers
+                                $start_page = max(1, $client_page - 2);
+                                $end_page = min($total_client_pages, $client_page + 2);
+                                
+                                for ($i = $start_page; $i <= $end_page; $i++):
+                                ?>
+                                    <li class="page-item <?= $i == $client_page ? 'active' : '' ?>">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $i])) ?>">
+                                            <?= $i ?>
+                                        </a>
+                                    </li>
+                                <?php endfor; ?>
+
+                                <?php if ($client_page < $total_client_pages): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $client_page + 1])) ?>" title="Next Page">
+                                            <i class="fas fa-angle-right"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['client_page' => $total_client_pages])) ?>" title="Last Page">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                <?php else: ?>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                                    </li>
+                                <?php endif; ?>
+                            </ul>
+                        </nav>
+                    </div>
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-user-slash"></i>
@@ -1210,10 +1375,10 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
             <div class="card-header">
                 <i class="fas fa-home"></i>
                 <span>Units</span>
-                <span class="badge bg-primary ms-2"><?= count($units) ?></span>
+                <span class="badge bg-primary ms-2"><?= $total_units ?></span>
             </div>
             <div class="card-body p-0">
-                <?php if (!empty($units)): ?>
+                <?php if (!empty($paginated_units)): ?>
                     <!-- Desktop Table -->
                     <div class="table-container">
                         <table class="custom-table">
@@ -1228,7 +1393,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($units as $u): 
+                                <?php foreach ($paginated_units as $u): 
                                     $has_renter = !empty($u['Client_fn']);
                                     $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
                                 ?>
@@ -1279,7 +1444,7 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
 
                     <!-- Mobile Card Layout -->
                     <div class="table-mobile">
-                        <?php foreach ($units as $u): 
+                        <?php foreach ($paginated_units as $u): 
                             $has_renter = !empty($u['Client_fn']);
                             $renter_name = $has_renter ? htmlspecialchars($u['Client_fn'] . ' ' . $u['Client_ln']) : '';
                         ?>
@@ -1335,6 +1500,70 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                                 </div>
                             </div>
                         <?php endforeach; ?>
+                    </div>
+
+                    <!-- Unit Pagination -->
+                    <div class="pagination-container">
+                        <div class="pagination-info">
+                            Showing <?= count($paginated_units) ?> of <?= $total_units ?> units
+                        </div>
+                        <nav>
+                            <ul class="pagination">
+                                <?php if ($unit_page > 1): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => 1])) ?>" title="First Page">
+                                            <i class="fas fa-angle-double-left"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $unit_page - 1])) ?>" title="Previous Page">
+                                            <i class="fas fa-angle-left"></i>
+                                        </a>
+                                    </li>
+                                <?php else: ?>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                                    </li>
+                                <?php endif; ?>
+
+                                <?php
+                                // Show page numbers
+                                $start_page = max(1, $unit_page - 2);
+                                $end_page = min($total_unit_pages, $unit_page + 2);
+                                
+                                for ($i = $start_page; $i <= $end_page; $i++):
+                                ?>
+                                    <li class="page-item <?= $i == $unit_page ? 'active' : '' ?>">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $i])) ?>">
+                                            <?= $i ?>
+                                        </a>
+                                    </li>
+                                <?php endfor; ?>
+
+                                <?php if ($unit_page < $total_unit_pages): ?>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $unit_page + 1])) ?>" title="Next Page">
+                                            <i class="fas fa-angle-right"></i>
+                                        </a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['unit_page' => $total_unit_pages])) ?>" title="Last Page">
+                                            <i class="fas fa-angle-double-right"></i>
+                                        </a>
+                                    </li>
+                                <?php else: ?>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                                    </li>
+                                <?php endif; ?>
+                            </ul>
+                        </nav>
                     </div>
                 <?php else: ?>
                     <div class="empty-state">
@@ -1445,6 +1674,12 @@ if (isset($_POST['hard_delete_client']) && isset($_POST['client_id'])) {
                     isSubmitting = false;
                 }, 3000);
             });
+        });
+
+        // Reset to page 1 when filter changes
+        document.getElementById('clientUnitFilter').addEventListener('change', function() {
+            document.querySelector('input[name="client_page"]').value = 1;
+            document.querySelector('input[name="unit_page"]').value = 1;
         });
     </script>
 </body>
