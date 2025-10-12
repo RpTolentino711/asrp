@@ -4,6 +4,7 @@ session_start();
 
 header('Content-Type: application/json');
 
+// Check if client is authenticated
 if (!isset($_SESSION['client_id']) && !isset($_POST['client_id'])) {
     echo json_encode(['success' => false, 'error' => 'Not authenticated']);
     exit();
@@ -60,11 +61,17 @@ try {
         ]);
     }
     
+} catch (PDOException $e) {
+    error_log("Payment status check PDO error: " . $e->getMessage());
+    echo json_encode([
+        'success' => false,
+        'error' => 'Database error occurred'
+    ]);
 } catch (Exception $e) {
     error_log("Payment status check error: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Database error occurred'
+        'error' => 'System error occurred'
     ]);
 }
 ?>
