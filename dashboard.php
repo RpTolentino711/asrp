@@ -351,9 +351,22 @@ try {
     $feedback_prompts = $db->getFeedbackPrompts($client_id);
     $rented_units = $db->getRentedUnits($client_id);
     
+    // Get payment history for all units
+    $payment_history = [];
+    if (!empty($rented_units)) {
+        foreach ($rented_units as $unit) {
+            $space_id = $unit['Space_ID'];
+            $invoices = $db->getClientInvoiceHistoryForUnit($client_id, $space_id);
+            if ($invoices && is_array($invoices)) {
+                $payment_history[$space_id] = $invoices;
+            }
+        }
+    }
+    
     // Ensure arrays are returned
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
+    $payment_history = is_array($payment_history) ? $payment_history : [];
     
     // Get maintenance history and photos only if there are rented units
     $maintenance_history = [];
@@ -369,18 +382,14 @@ try {
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }
     
-    // Get payment history for the client
-    $payment_history = $db->getClientInvoiceHistory($client_id);
-    $payment_history = is_array($payment_history) ? $payment_history : [];
-    
 } catch (Exception $e) {
     // Log error and set defaults
     error_log("Dashboard data fetch error: " . $e->getMessage());
     $feedback_prompts = [];
     $rented_units = [];
+    $payment_history = [];
     $maintenance_history = [];
     $unit_photos = [];
-    $payment_history = [];
 }
 
 // Function to format date in month letters
@@ -391,9 +400,33 @@ function formatDateToMonthLetters($date) {
     
     try {
         $dateTime = new DateTime($date);
-        return $dateTime->format('M j, Y');
+        return $dateTime->format('F j, Y');
     } catch (Exception $e) {
         return $date; // Return original if parsing fails
+    }
+}
+
+// Function to get payment status badge
+function getPaymentStatusBadge($status, $due_date = null) {
+    $status = strtolower($status);
+    $now = new DateTime();
+    
+    if ($status === 'paid') {
+        return '<span class="badge bg-success">PAID</span>';
+    } elseif ($status === 'pending' || $status === 'unpaid') {
+        if ($due_date && $due_date !== 'N/A') {
+            try {
+                $due = new DateTime($due_date);
+                if ($now > $due) {
+                    return '<span class="badge bg-danger">OVERDUE</span>';
+                }
+            } catch (Exception $e) {}
+        }
+        return '<span class="badge bg-warning">PENDING</span>';
+    } elseif ($status === 'kicked') {
+        return '<span class="badge bg-secondary">ARCHIVED</span>';
+    } else {
+        return '<span class="badge bg-info">' . strtoupper($status) . '</span>';
     }
 }
 ?>
@@ -430,11 +463,12 @@ function formatDateToMonthLetters($date) {
             --gray: #64748b;
             --gray-light: #e2e8f0;
             --gray-dark: #334155;
-            --border-radius: 12px;
+            --border-radius: 16px;
             --border-radius-sm: 8px;
             --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.02);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05);
             --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+            --shadow-xl: 0 16px 40px rgba(0, 0, 0, 0.12);
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -473,6 +507,13 @@ function formatDateToMonthLetters($date) {
             transition: all 0.2s;
             pointer-events: none;
             border: 2px solid #fff;
+            animation: pulse-badge 1.2s infinite;
+        }
+        
+        @keyframes pulse-badge {
+            0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+            70% { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+            100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
         }
 
         /* Modern Navigation */
@@ -525,7 +566,7 @@ function formatDateToMonthLetters($date) {
         .dashboard-header {
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
             color: white;
-            padding: 2rem 0;
+            padding: 3rem 0 2rem;
             margin-bottom: 2rem;
             position: relative;
             overflow: hidden;
@@ -548,7 +589,7 @@ function formatDateToMonthLetters($date) {
 
         .welcome-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
         }
@@ -591,79 +632,99 @@ function formatDateToMonthLetters($date) {
             box-shadow: var(--shadow-md);
             background: var(--lighter);
             transition: var(--transition);
-            margin-bottom: 1rem;
+            height: 100%;
+            overflow: hidden;
         }
 
         .card:hover {
-            transform: translateY(-2px);
+            transform: translateY(-4px);
             box-shadow: var(--shadow-lg);
         }
 
         .card-header {
             background: var(--light);
             border-bottom: 1px solid var(--gray-light);
-            padding: 1rem 1.25rem;
+            padding: 1.25rem;
             font-weight: 600;
             color: var(--secondary);
         }
 
         .card-body {
-            padding: 1.25rem;
+            padding: 1.5rem;
         }
 
-        /* Simplified Invoice History */
-        .invoice-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--gray-light);
+        /* Payment History Styles */
+        .payment-timeline {
+            position: relative;
+            padding-left: 2rem;
         }
 
-        .invoice-item:last-child {
-            border-bottom: none;
+        .payment-timeline::before {
+            content: '';
+            position: absolute;
+            left: 1rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--gray-light);
         }
 
-        .invoice-info {
-            flex: 1;
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
         }
 
-        .invoice-unit {
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -2rem;
+            top: 0.5rem;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: 2px solid var(--lighter);
+        }
+
+        .timeline-item.paid::before {
+            background: var(--success);
+        }
+
+        .timeline-item.pending::before {
+            background: var(--warning);
+        }
+
+        .timeline-item.overdue::before {
+            background: var(--danger);
+        }
+
+        .timeline-item.archived::before {
+            background: var(--gray);
+        }
+
+        .payment-period {
             font-weight: 600;
             color: var(--secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .payment-details {
+            color: var(--gray);
             font-size: 0.9rem;
         }
 
-        .invoice-dates {
-            font-size: 0.8rem;
-            color: var(--gray);
-        }
-
-        .invoice-status {
-            padding: 0.3rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
+        .payment-amount {
             font-weight: 600;
-            text-transform: uppercase;
+            color: var(--primary);
         }
 
-        .status-paid {
-            background: rgba(16, 185, 129, 0.1);
-            color: #065f46;
-            border: 1px solid rgba(16, 185, 129, 0.2);
+        .next-payment-card {
+            background: linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%);
+            border: 1px solid #fdba74;
         }
 
-        .status-unpaid {
-            background: rgba(239, 68, 68, 0.1);
-            color: #991b1b;
-            border: 1px solid rgba(239, 68, 68, 0.2);
-        }
-
-        .no-invoices {
-            text-align: center;
-            color: var(--gray);
-            font-style: italic;
-            padding: 2rem;
+        .payment-alert {
+            border-left: 4px solid var(--warning);
         }
 
         /* Unit Cards */
@@ -675,31 +736,31 @@ function formatDateToMonthLetters($date) {
 
         .unit-card:hover {
             border-color: var(--primary);
-            box-shadow: var(--shadow-lg);
+            box-shadow: var(--shadow-xl);
         }
 
         .unit-icon {
-            width: 60px;
-            height: 60px;
+            width: 80px;
+            height: 80px;
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 1.5rem;
+            font-size: 2rem;
             margin: 0 auto 1rem;
         }
 
         .unit-title {
-            font-size: 1.1rem;
+            font-size: 1.25rem;
             font-weight: 700;
             color: var(--secondary);
             margin-bottom: 0.5rem;
         }
 
         .unit-price {
-            font-size: 1rem;
+            font-size: 1.1rem;
             font-weight: 600;
             color: var(--primary);
             margin-bottom: 1rem;
@@ -708,9 +769,9 @@ function formatDateToMonthLetters($date) {
         .unit-badge {
             background: linear-gradient(135deg, var(--primary), var(--primary-light));
             color: white;
-            padding: 0.3rem 0.7rem;
+            padding: 0.4rem 0.8rem;
             border-radius: var(--border-radius-sm);
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: 500;
             display: inline-block;
             margin-bottom: 1rem;
@@ -718,15 +779,15 @@ function formatDateToMonthLetters($date) {
 
         .unit-details {
             color: var(--gray);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             margin-bottom: 0.5rem;
         }
 
         /* Photo Gallery */
         .photo-gallery {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 0.75rem;
             margin: 1rem 0;
         }
 
@@ -751,18 +812,18 @@ function formatDateToMonthLetters($date) {
 
         .delete-photo-btn {
             position: absolute;
-            top: 0.3rem;
-            right: 0.3rem;
+            top: 0.5rem;
+            right: 0.5rem;
             background: var(--danger);
             color: white;
             border: none;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             cursor: pointer;
             opacity: 0;
             transition: var(--transition);
@@ -777,7 +838,7 @@ function formatDateToMonthLetters($date) {
             text-align: center;
             color: var(--gray);
             font-style: italic;
-            padding: 1.5rem;
+            padding: 2rem;
             background: var(--light);
             border-radius: var(--border-radius-sm);
             margin: 1rem 0;
@@ -787,30 +848,37 @@ function formatDateToMonthLetters($date) {
         .upload-form {
             background: var(--light);
             border-radius: var(--border-radius-sm);
-            padding: 0.75rem;
+            padding: 1rem;
             margin-top: 1rem;
         }
 
         .upload-form input[type="file"] {
             border: 2px dashed var(--gray-light);
             border-radius: var(--border-radius-sm);
-            padding: 0.75rem;
+            padding: 1rem;
             text-align: center;
             transition: var(--transition);
             background: white;
-            font-size: 0.9rem;
         }
 
         .upload-form input[type="file"]:hover {
             border-color: var(--primary);
         }
 
+        /* Image Preview */
+        .image-preview {
+            display: block;
+            margin-top: 10px;
+            border-radius: var(--border-radius-sm);
+            box-shadow: var(--shadow-sm);
+        }
+
         /* Maintenance History */
         .maintenance-section {
             background: var(--light);
             border-radius: var(--border-radius-sm);
-            padding: 1rem;
-            margin-top: 1rem;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
             border-left: 4px solid var(--primary);
         }
 
@@ -819,14 +887,13 @@ function formatDateToMonthLetters($date) {
             align-items: center;
             justify-content: space-between;
             gap: 0.75rem;
-            margin-bottom: 0.75rem;
+            margin-bottom: 1rem;
         }
 
         .maintenance-header h6 {
             font-weight: 700;
             color: var(--primary);
             margin: 0;
-            font-size: 0.9rem;
         }
 
         .maintenance-list {
@@ -837,14 +904,13 @@ function formatDateToMonthLetters($date) {
 
         .maintenance-item {
             background: white;
-            padding: 0.6rem 0.8rem;
+            padding: 0.75rem 1rem;
             border-radius: var(--border-radius-sm);
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.5rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 1px solid var(--gray-light);
-            font-size: 0.85rem;
         }
 
         .maintenance-date {
@@ -853,10 +919,11 @@ function formatDateToMonthLetters($date) {
         }
 
         .maintenance-status {
-            padding: 0.2rem 0.6rem;
+            padding: 0.25rem 0.75rem;
             border-radius: var(--border-radius-sm);
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             font-weight: 500;
+            margin-left: auto;
         }
 
         .maintenance-status.completed {
@@ -879,17 +946,15 @@ function formatDateToMonthLetters($date) {
             color: var(--gray);
             font-style: italic;
             padding: 1rem;
-            font-size: 0.9rem;
         }
 
         /* Buttons */
         .btn {
             border-radius: var(--border-radius-sm);
             font-weight: 500;
-            padding: 0.5rem 1rem;
+            padding: 0.6rem 1.2rem;
             transition: var(--transition);
             border: none;
-            font-size: 0.9rem;
         }
 
         .btn-primary {
@@ -928,20 +993,14 @@ function formatDateToMonthLetters($date) {
             color: white;
         }
 
-        .btn-sm {
-            padding: 0.4rem 0.8rem;
-            font-size: 0.8rem;
-        }
-
         /* Form Elements */
         .form-control,
         .form-select {
             border: 1px solid var(--gray-light);
             border-radius: var(--border-radius-sm);
-            padding: 0.6rem 0.8rem;
+            padding: 0.75rem 1rem;
             transition: var(--transition);
             background: white;
-            font-size: 0.9rem;
         }
 
         .form-control:focus,
@@ -955,7 +1014,6 @@ function formatDateToMonthLetters($date) {
             font-weight: 600;
             color: var(--secondary);
             margin-bottom: 0.5rem;
-            font-size: 0.9rem;
         }
 
         /* Feedback Section */
@@ -971,12 +1029,11 @@ function formatDateToMonthLetters($date) {
         /* Responsive Design */
         @media (max-width: 768px) {
             .welcome-title {
-                font-size: 1.75rem;
+                font-size: 2rem;
             }
 
             .dashboard-header {
-                padding: 1.5rem 0;
-                margin-bottom: 1.5rem;
+                padding: 2rem 0 1.5rem;
             }
 
             .card-body {
@@ -984,40 +1041,38 @@ function formatDateToMonthLetters($date) {
             }
 
             .photo-gallery {
-                grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
-                gap: 0.4rem;
+                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+                gap: 0.5rem;
             }
 
             .unit-icon {
-                width: 50px;
-                height: 50px;
-                font-size: 1.25rem;
-            }
-
-            .invoice-item {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 0.4rem;
-            }
-
-            .invoice-status {
-                align-self: flex-start;
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
             }
 
             .maintenance-item {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 0.4rem;
+                gap: 0.5rem;
             }
 
             .maintenance-status {
                 margin-left: 0;
             }
+
+            .payment-timeline {
+                padding-left: 1.5rem;
+            }
+
+            .timeline-item::before {
+                left: -1.5rem;
+            }
         }
 
         @media (max-width: 576px) {
             .welcome-title {
-                font-size: 1.5rem;
+                font-size: 1.75rem;
             }
 
             .navbar-brand {
@@ -1025,23 +1080,45 @@ function formatDateToMonthLetters($date) {
             }
 
             .upload-form {
-                padding: 0.6rem;
+                padding: 0.75rem;
             }
 
             .maintenance-section {
-                padding: 0.75rem;
+                padding: 1rem;
+            }
+        }
+
+        /* Loading States */
+        .loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
             }
         }
 
         /* Empty States */
         .empty-state {
             text-align: center;
-            padding: 2rem 1rem;
+            padding: 3rem 2rem;
             color: var(--gray);
         }
 
         .empty-state i {
-            font-size: 3rem;
+            font-size: 4rem;
             margin-bottom: 1rem;
             opacity: 0.5;
         }
@@ -1049,7 +1126,6 @@ function formatDateToMonthLetters($date) {
         .empty-state h5 {
             color: var(--gray-dark);
             margin-bottom: 0.5rem;
-            font-size: 1.1rem;
         }
 
         /* Animations */
@@ -1060,12 +1136,49 @@ function formatDateToMonthLetters($date) {
         @keyframes fadeIn {
             from {
                 opacity: 0;
-                transform: translateY(10px);
+                transform: translateY(20px);
             }
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        /* Maintenance History Dropdown */
+        .maintenance-dropdown {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--gray-light);
+            border-radius: var(--border-radius-sm);
+            background: white;
+            margin-top: 0.5rem;
+        }
+        .maintenance-dropdown::-webkit-scrollbar {
+            width: 6px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        .maintenance-dropdown::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+        .toggle-maintenance {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--border-radius-sm);
+            transition: var(--transition);
+        }
+        .toggle-maintenance:hover {
+            background: rgba(37, 99, 235, 0.1);
         }
     </style>
 </head>
@@ -1084,13 +1197,14 @@ function formatDateToMonthLetters($date) {
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item">
-                        <a class="nav-link active" href="dashboard.php">
-                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        <a class="nav-link" href="index.php">
+                            <i class="bi bi-house me-1"></i>Home
                         </a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="invoice_history.php">
                             <i class="bi bi-credit-card me-1"></i>Payment
+                            <span class="notification-badge d-none" id="client-unread-admin-badge"></span>
                         </a>
                     </li>
                     <li class="nav-item">
@@ -1103,9 +1217,9 @@ function formatDateToMonthLetters($date) {
                             <i class="bi bi-gear me-1"></i>Maintenance
                         </a>
                     </li>
-                    <li class="nav-item ms-lg-2">
+                    <li class="nav-item ms-lg-3">
                         <form action="logout.php" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-danger btn-sm">
+                            <button type="submit" class="btn btn-danger">
                                 <i class="bi bi-box-arrow-right me-1"></i>Logout
                             </button>
                         </form>
@@ -1128,7 +1242,7 @@ function formatDateToMonthLetters($date) {
                         <div class="d-flex align-items-center justify-content-md-end">
                             <i class="bi bi-speedometer2 fs-1 me-3"></i>
                             <div>
-                                <div class="fw-bold">Dashboard</div>
+                                <div class="fw-bold fs-5">Dashboard</div>
                                 <small class="opacity-75">Your Control Center</small>
                             </div>
                         </div>
@@ -1164,55 +1278,9 @@ function formatDateToMonthLetters($date) {
             </div>
         <?php endif; ?>
 
-        <!-- Simplified Invoice History Section -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center py-2">
-                        <h6 class="mb-0">
-                            <i class="bi bi-receipt me-2"></i>Invoice History
-                        </h6>
-                        <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#invoiceHistory">
-                            <i class="bi bi-chevron-down"></i>
-                        </button>
-                    </div>
-                    <div class="collapse show" id="invoiceHistory">
-                        <div class="card-body py-2">
-                            <?php if (!empty($payment_history)): ?>
-                                <?php foreach ($payment_history as $invoice): 
-                                    $status = strtolower($invoice['Status'] ?? '');
-                                    $due_date = $invoice['EndDate'] ?? '';
-                                    $invoice_date = $invoice['InvoiceDate'] ?? '';
-                                ?>
-                                    <div class="invoice-item">
-                                        <div class="invoice-info">
-                                            <div class="invoice-unit">
-                                                <?= htmlspecialchars($invoice['SpaceName'] ?? 'Unit') ?>
-                                            </div>
-                                            <div class="invoice-dates">
-                                                <?= formatDateToMonthLetters($invoice_date) ?> • Due: <?= formatDateToMonthLetters($due_date) ?>
-                                            </div>
-                                        </div>
-                                        <div class="invoice-status <?= $status === 'paid' ? 'status-paid' : 'status-unpaid' ?>">
-                                            <?= $status === 'paid' ? 'Paid' : 'Unpaid' ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <div class="no-invoices py-3">
-                                    <i class="bi bi-receipt d-block fs-4 mb-2"></i>
-                                    No invoices found
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Feedback Section -->
         <?php if (!empty($feedback_prompts)): ?>
-            <div class="alert alert-warning fade-in mt-3">
+            <div class="alert alert-warning fade-in">
                 <i class="bi bi-chat-heart me-2"></i>
                 We value your experience! Please provide feedback for your recently ended rental(s).
             </div>
@@ -1248,7 +1316,7 @@ function formatDateToMonthLetters($date) {
                                     <textarea name="comments" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
                                 </div>
                             </div>
-                            <button class="btn btn-primary btn-sm" type="submit" name="submit_feedback" value="1">
+                            <button class="btn btn-primary" type="submit" name="submit_feedback" value="1">
                                 <i class="bi bi-send me-1"></i>Submit Feedback
                             </button>
                         </form>
@@ -1257,18 +1325,171 @@ function formatDateToMonthLetters($date) {
             <?php endforeach; ?>
         <?php endif; ?>
 
+        <!-- Payment History Section -->
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold mb-0">
+                        <i class="bi bi-calendar-check me-2"></i>Payment History & Schedule
+                    </h2>
+                    <a href="invoice_history.php" class="btn btn-primary">
+                        <i class="bi bi-credit-card me-1"></i>View All Invoices
+                    </a>
+                </div>
+
+                <?php if (!empty($payment_history)): ?>
+                    <?php foreach ($payment_history as $space_id => $invoices): 
+                        $unit_name = '';
+                        foreach ($rented_units as $unit) {
+                            if ($unit['Space_ID'] == $space_id) {
+                                $unit_name = $unit['Name'];
+                                break;
+                            }
+                        }
+                        
+                        // Separate invoices by status
+                        $paid_invoices = array_filter($invoices, function($inv) {
+                            return strtolower($inv['Status'] ?? '') === 'paid';
+                        });
+                        $pending_invoices = array_filter($invoices, function($inv) {
+                            $status = strtolower($inv['Status'] ?? '');
+                            return $status === 'pending' || $status === 'unpaid';
+                        });
+                        $next_pending = !empty($pending_invoices) ? reset($pending_invoices) : null;
+                    ?>
+                        <div class="card mb-4 fade-in">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-building me-2"></i><?= htmlspecialchars($unit_name) ?>
+                                    </h5>
+                                    <div class="badge bg-primary">
+                                        <?= count($paid_invoices) ?> Paid • <?= count($pending_invoices) ?> Pending
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <!-- Next Pending Payment -->
+                                    <div class="col-lg-4 mb-4">
+                                        <?php if ($next_pending): ?>
+                                            <div class="card next-payment-card h-100">
+                                                <div class="card-body">
+                                                    <h6 class="card-title">
+                                                        <i class="bi bi-clock-history me-2"></i>Next Payment Due
+                                                    </h6>
+                                                    <div class="payment-period fw-bold text-warning">
+                                                        <?= formatDateToMonthLetters($next_pending['InvoiceDate'] ?? '') ?>
+                                                    </div>
+                                                    <div class="payment-details">
+                                                        Amount: <span class="payment-amount">₱<?= number_format(floatval($next_pending['InvoiceTotal'] ?? 0), 2) ?></span>
+                                                    </div>
+                                                    <div class="mt-2">
+                                                        <?= getPaymentStatusBadge($next_pending['Status'] ?? 'pending', $next_pending['EndDate'] ?? null) ?>
+                                                    </div>
+                                                    <div class="mt-3">
+                                                        <a href="invoice_history.php?invoice_id=<?= $next_pending['Invoice_ID'] ?>" class="btn btn-warning btn-sm">
+                                                            <i class="bi bi-arrow-right me-1"></i>Pay Now
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="card border-success h-100">
+                                                <div class="card-body text-center">
+                                                    <i class="bi bi-check-circle text-success fs-1 mb-3"></i>
+                                                    <h6 class="text-success">All Payments Complete</h6>
+                                                    <p class="text-muted small">No pending payments for this unit</p>
+                                                </div>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <!-- Payment Timeline -->
+                                    <div class="col-lg-8">
+                                        <h6 class="mb-3">
+                                            <i class="bi bi-list-check me-2"></i>Payment Timeline
+                                        </h6>
+                                        <?php if (!empty($invoices)): ?>
+                                            <div class="payment-timeline">
+                                                <?php 
+                                                // Sort invoices by date (newest first)
+                                                usort($invoices, function($a, $b) {
+                                                    return strtotime($b['InvoiceDate'] ?? '') <=> strtotime($a['InvoiceDate'] ?? '');
+                                                });
+                                                
+                                                foreach ($invoices as $invoice): 
+                                                    $status = strtolower($invoice['Status'] ?? '');
+                                                    $status_class = $status;
+                                                    if ($status === 'paid') {
+                                                        $status_class = 'paid';
+                                                    } elseif ($status === 'pending' || $status === 'unpaid') {
+                                                        $due_date = $invoice['EndDate'] ?? null;
+                                                        if ($due_date && $due_date !== 'N/A') {
+                                                            try {
+                                                                $due = new DateTime($due_date);
+                                                                $now = new DateTime();
+                                                                if ($now > $due) {
+                                                                    $status_class = 'overdue';
+                                                                }
+                                                            } catch (Exception $e) {}
+                                                        }
+                                                        $status_class = 'pending';
+                                                    } elseif ($status === 'kicked') {
+                                                        $status_class = 'archived';
+                                                    }
+                                                ?>
+                                                    <div class="timeline-item <?= $status_class ?>">
+                                                        <div class="payment-period">
+                                                            <?= formatDateToMonthLetters($invoice['InvoiceDate'] ?? '') ?>
+                                                        </div>
+                                                        <div class="payment-details">
+                                                            Amount: <span class="payment-amount">₱<?= number_format(floatval($invoice['InvoiceTotal'] ?? 0), 2) ?></span>
+                                                            • <?= getPaymentStatusBadge($invoice['Status'] ?? '', $invoice['EndDate'] ?? null) ?>
+                                                        </div>
+                                                        <?php if (!empty($invoice['PaymentDate']) && $invoice['PaymentDate'] !== 'N/A'): ?>
+                                                            <div class="payment-details small text-muted">
+                                                                Paid on: <?= formatDateToMonthLetters($invoice['PaymentDate']) ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="text-center text-muted py-4">
+                                                <i class="bi bi-receipt fs-1 mb-3 d-block"></i>
+                                                <p>No payment history available for this unit.</p>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <div class="card fade-in">
+                        <div class="card-body text-center py-5">
+                            <i class="bi bi-credit-card-2-front fs-1 text-muted mb-3"></i>
+                            <h5 class="text-muted">No Payment History</h5>
+                            <p class="text-muted">Your payment history will appear here once you have invoices.</p>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- Rented Units Section -->
-        <div class="d-flex justify-content-between align-items-center mb-3 mt-4">
-            <h5 class="fw-bold mb-0">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold mb-0">
                 <i class="bi bi-buildings me-2"></i>Your Rental Portfolio
-            </h5>
-            <div class="badge bg-primary">
-                <?= count($rented_units) ?> Unit<?= count($rented_units) !== 1 ? 's' : '' ?>
+            </h2>
+            <div class="badge bg-primary fs-6">
+                <?= count($rented_units) ?> Active Unit<?= count($rented_units) !== 1 ? 's' : '' ?>
             </div>
         </div>
 
         <?php if (!empty($rented_units)): ?>
-            <div class="row g-3">
+            <div class="row g-4">
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
                     $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
@@ -1277,6 +1498,21 @@ function formatDateToMonthLetters($date) {
                     $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
                     $rental_end = isset($rent['EndDate']) ? formatDateToMonthLetters($rent['EndDate']) : 'N/A';
                     $due_date = formatDateToMonthLetters($rental_end);
+
+                    // Use InvoiceDate from the latest invoice with Flow_Status 'new'
+                    if (method_exists($db, 'getLatestNewInvoiceForUnit')) {
+                        try {
+                            $latest_invoice = $db->getLatestNewInvoiceForUnit($client_id, $space_id);
+                            if ($latest_invoice && is_array($latest_invoice) && isset($latest_invoice['Flow_Status']) && strtolower($latest_invoice['Flow_Status']) === 'new') {
+                                $rental_start = isset($latest_invoice['InvoiceDate']) ? formatDateToMonthLetters($latest_invoice['InvoiceDate']) : $rental_start;
+                                $rental_end = isset($latest_invoice['EndDate']) ? formatDateToMonthLetters($latest_invoice['EndDate']) : $rental_end;
+                                $due_date = formatDateToMonthLetters($rental_end);
+                            }
+                        } catch (Exception $e) {
+                            // Use default values if method fails
+                            error_log("Failed to get latest invoice: " . $e->getMessage());
+                        }
+                    }
                 ?>
                     <div class="col-12 col-lg-6 col-xl-4">
                         <div class="card unit-card fade-in h-100">
@@ -1307,12 +1543,18 @@ function formatDateToMonthLetters($date) {
                                         <i class="bi bi-calendar-check me-1"></i>
                                         <strong>Due:</strong> <?= $due_date ?>
                                     </div>
+                                    <?php if (isset($latest_invoice['Status']) && strtolower($latest_invoice['Status']) === 'paid'): ?>
+                                        <div class="unit-details text-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <strong>Status:</strong> Paid
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <!-- Photo Gallery -->
                                 <div class="flex-grow-1">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="mb-0" style="font-size: 0.9rem;">
+                                        <h6 class="mb-0">
                                             <i class="bi bi-images me-1"></i>Unit Photos
                                         </h6>
                                         <small class="text-muted"><?= count($photos) ?>/6</small>
@@ -1341,7 +1583,7 @@ function formatDateToMonthLetters($date) {
                                         </div>
                                     <?php else: ?>
                                         <div class="no-photos">
-                                            <i class="bi bi-camera mb-2 d-block fs-4"></i>
+                                            <i class="bi bi-camera mb-2 d-block fs-3"></i>
                                             No photos uploaded yet
                                         </div>
                                     <?php endif; ?>
@@ -1358,7 +1600,7 @@ function formatDateToMonthLetters($date) {
                                                            class="form-control" 
                                                            id="fileInput_<?= $space_id ?>"
                                                            required>
-                                                    <small class="text-muted">Max 2MB. JPG, PNG, GIF only.</small>
+                                                    <small class="text-muted">Max 2MB. JPG, PNG, GIF only. Max dimensions 2048x2048px.</small>
                                                 </div>
                                                 <button type="submit" name="upload_unit_photo" class="btn btn-success btn-sm w-100" id="uploadBtn_<?= $space_id ?>">
                                                     <i class="bi bi-cloud-upload me-1"></i>Upload Photo
@@ -1375,10 +1617,16 @@ function formatDateToMonthLetters($date) {
                                             <i class="bi bi-tools"></i>
                                             <h6 class="mb-0 ms-2">Maintenance History</h6>
                                         </div>
+                                        <?php if (isset($maintenance_history[$space_id]) && count($maintenance_history[$space_id]) > 3): ?>
+                                            <button type="button" class="toggle-maintenance" onclick="toggleMaintenanceHistory(<?= $space_id ?>)">
+                                                <i class="bi bi-chevron-down" id="maintenance-icon-<?= $space_id ?>"></i>
+                                                View All
+                                            </button>
+                                        <?php endif; ?>
                                     </div>
                                     
                                     <?php if (isset($maintenance_history[$space_id]) && !empty($maintenance_history[$space_id])): ?>
-                                        <ul class="maintenance-list">
+                                        <ul class="maintenance-list" id="maintenance-preview-<?= $space_id ?>">
                                             <?php foreach (array_slice($maintenance_history[$space_id], 0, 3) as $mh): ?>
                                                 <li class="maintenance-item">
                                                     <div>
@@ -1392,10 +1640,27 @@ function formatDateToMonthLetters($date) {
                                             <?php endforeach; ?>
                                         </ul>
                                         
+                                        <!-- Full Maintenance History (Hidden by default) -->
+                                        <div class="maintenance-dropdown d-none" id="maintenance-full-<?= $space_id ?>">
+                                            <ul class="maintenance-list">
+                                                <?php foreach ($maintenance_history[$space_id] as $mh): ?>
+                                                    <li class="maintenance-item">
+                                                        <div>
+                                                            <div class="maintenance-date"><?= htmlspecialchars($mh['RequestDate'] ?? 'N/A') ?></div>
+                                                            <small class="text-muted">Maintenance Request</small>
+                                                        </div>
+                                                        <span class="maintenance-status <?= strtolower($mh['Status'] ?? 'pending') ?>">
+                                                            <?= htmlspecialchars($mh['Status'] ?? 'Pending') ?>
+                                                        </span>
+                                                    </li>
+                                                <?php endforeach; ?>
+                                            </ul>
+                                        </div>
+                                        
                                         <?php if (count($maintenance_history[$space_id]) > 3): ?>
                                             <small class="text-muted">
                                                 <i class="bi bi-three-dots me-1"></i>
-                                                +<?= count($maintenance_history[$space_id]) - 3 ?> more
+                                                +<?= count($maintenance_history[$space_id]) - 3 ?>
                                             </small>
                                         <?php endif; ?>
                                     <?php else: ?>
@@ -1419,44 +1684,44 @@ function formatDateToMonthLetters($date) {
         <?php endif; ?>
 
         <!-- Quick Actions -->
-        <div class="row mt-4">
+        <div class="row mt-5">
             <div class="col-md-4 mb-3">
-                <div class="card text-center h-100">
+                <div class="card text-center">
                     <div class="card-body">
-                        <div class="text-primary mb-2">
-                            <i class="bi bi-credit-card-2-back fs-2"></i>
+                        <div class="text-primary mb-3">
+                            <i class="bi bi-credit-card-2-back fs-1"></i>
                         </div>
-                        <h6>Payment Center</h6>
-                        <p class="text-muted small mb-2">View invoices and payment history</p>
-                        <a href="invoice_history.php" class="btn btn-primary btn-sm">
+                        <h5>Payment Center</h5>
+                        <p class="text-muted">View invoices and payment history</p>
+                        <a href="invoice_history.php" class="btn btn-primary">
                             <i class="bi bi-arrow-right me-1"></i>Go to Payment
                         </a>
                     </div>
                 </div>
             </div>
             <div class="col-md-4 mb-3">
-                <div class="card text-center h-100">
+                <div class="card text-center">
                     <div class="card-body">
-                        <div class="text-success mb-2">
-                            <i class="bi bi-tools fs-2"></i>
+                        <div class="text-success mb-3">
+                            <i class="bi bi-tools fs-1"></i>
                         </div>
-                        <h6>Handyman Services</h6>
-                        <p class="text-muted small mb-2">Request maintenance and repairs</p>
-                        <a href="handyman_type.php" class="btn btn-success btn-sm">
+                        <h5>Handyman Services</h5>
+                        <p class="text-muted">Request maintenance and repairs</p>
+                        <a href="handyman_type.php" class="btn btn-success">
                             <i class="bi bi-arrow-right me-1"></i>Request Service
                         </a>
                     </div>
                 </div>
             </div>
             <div class="col-md-4 mb-3">
-                <div class="card text-center h-100">
+                <div class="card text-center">
                     <div class="card-body">
-                        <div class="text-warning mb-2">
-                            <i class="bi bi-gear fs-2"></i>
+                        <div class="text-warning mb-3">
+                            <i class="bi bi-gear fs-1"></i>
                         </div>
-                        <h6>Maintenance</h6>
-                        <p class="text-muted small mb-2">Track your maintenance requests</p>
-                        <a href="maintenance.php" class="btn btn-warning btn-sm text-white">
+                        <h5>Maintenance</h5>
+                        <p class="text-muted">Track your maintenance requests</p>
+                        <a href="maintenance.php" class="btn btn-warning text-white">
                             <i class="bi bi-arrow-right me-1"></i>View Status
                         </a>
                     </div>
@@ -1467,14 +1732,16 @@ function formatDateToMonthLetters($date) {
 
     <!-- Image Modal -->
     <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h6 class="modal-title">Unit Photo</h6>
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="border-radius: var(--border-radius); border: none; box-shadow: var(--shadow-xl);">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageModalLabel">
+                        <i class="bi bi-image me-2"></i>Unit Photo
+                    </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body p-0">
-                    <img id="modalImage" src="" alt="Unit photo" class="img-fluid">
+                <div class="modal-body text-center p-0">
+                    <img id="modalImage" src="" alt="Unit photo" class="img-fluid" style="max-height: 70vh;">
                 </div>
             </div>
         </div>
@@ -1513,8 +1780,109 @@ function formatDateToMonthLetters($date) {
             return false;
         }
 
-        // Form submission loading state
+        // Toggle maintenance history dropdown
+        function toggleMaintenanceHistory(spaceId) {
+            const preview = document.getElementById(`maintenance-preview-${spaceId}`);
+            const full = document.getElementById(`maintenance-full-${spaceId}`);
+            const icon = document.getElementById(`maintenance-icon-${spaceId}`);
+            
+            if (full.classList.contains('d-none')) {
+                // Show full history
+                preview.classList.add('d-none');
+                full.classList.remove('d-none');
+                icon.classList.remove('bi-chevron-down');
+                icon.classList.add('bi-chevron-up');
+            } else {
+                // Show preview only
+                preview.classList.remove('d-none');
+                full.classList.add('d-none');
+                icon.classList.remove('bi-chevron-up');
+                icon.classList.add('bi-chevron-down');
+            }
+        }
+
+        // Close navbar on mobile when clicking nav links
         document.addEventListener('DOMContentLoaded', function() {
+            const navbarCollapse = document.getElementById('navbarNav');
+            if (navbarCollapse) {
+                navbarCollapse.addEventListener('click', function(e) {
+                    let target = e.target;
+                    while (target && target !== navbarCollapse) {
+                        if (target.classList && (target.classList.contains('nav-link') || target.type === 'submit')) {
+                            if (window.innerWidth < 992) {
+                                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
+                                bsCollapse.hide();
+                            }
+                            break;
+                        }
+                        target = target.parentElement;
+                    }
+                });
+            }
+
+            // Enhanced file input with preview and validation
+            const fileInputs = document.querySelectorAll('input[type="file"]');
+            fileInputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    const file = this.files[0];
+                    const spaceId = this.id.replace('fileInput_', '');
+                    
+                    if (file) {
+                        // Validate file size
+                        if (file.size > 2 * 1024 * 1024) { // 2MB
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'File Too Large',
+                                text: 'Please select an image smaller than 2MB.',
+                                confirmButtonColor: '#2563eb'
+                            });
+                            this.value = '';
+                            return;
+                        }
+                        
+                        // Validate file type
+                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                        if (!allowedTypes.includes(file.type)) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Invalid File Type',
+                                text: 'Please select a JPG, PNG, or GIF image.',
+                                confirmButtonColor: '#2563eb'
+                            });
+                            this.value = '';
+                            return;
+                        }
+
+                        // Create image preview
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                // Remove existing preview
+                                const existingPreview = input.parentNode.querySelector('.image-preview');
+                                if (existingPreview) {
+                                    existingPreview.remove();
+                                }
+                                
+                                // Create preview
+                                const preview = document.createElement('img');
+                                preview.src = e.target.result;
+                                preview.className = 'image-preview';
+                                preview.style.maxWidth = '100px';
+                                preview.style.maxHeight = '100px';
+                                preview.style.objectFit = 'cover';
+                                preview.style.borderRadius = '8px';
+                                preview.style.marginTop = '10px';
+                                preview.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                                
+                                input.parentNode.appendChild(preview);
+                            };
+                            reader.readAsDataURL(file);
+                        }
+                    }
+                });
+            });
+
+            // Form submission loading state
             const uploadForms = document.querySelectorAll('form[id^="uploadForm_"]');
             uploadForms.forEach(form => {
                 form.addEventListener('submit', function(e) {
@@ -1535,7 +1903,7 @@ function formatDateToMonthLetters($date) {
                     }
                     
                     // Show loading state
-                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading...';
+                    submitBtn.innerHTML = '<span class="spinner me-1"></span>Uploading...';
                     submitBtn.disabled = true;
                     
                     // Reset button after 30 seconds (timeout)
@@ -1564,7 +1932,7 @@ function formatDateToMonthLetters($date) {
                     
                     const submitBtn = this.querySelector('button[name="submit_feedback"]');
                     const originalText = submitBtn.innerHTML;
-                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Submitting...';
+                    submitBtn.innerHTML = '<span class="spinner me-1"></span>Submitting...';
                     submitBtn.disabled = true;
                     
                     // Reset button after 10 seconds (timeout)
@@ -1574,22 +1942,71 @@ function formatDateToMonthLetters($date) {
                     }, 10000);
                 });
             });
-        });
 
-        <?php if ($show_login_success): ?>
-        document.addEventListener('DOMContentLoaded', function() {
-            Swal.fire({
-                icon: 'success',
-                title: 'Welcome!',
-                text: 'Login successful. Good to see you!',
-                confirmButtonColor: '#2563eb',
-                timer: 3000,
-                timerProgressBar: true,
-                toast: true,
-                position: 'top-end'
+            // Animate cards on scroll
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('fade-in');
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.card').forEach((card) => {
+                observer.observe(card);
             });
         });
-        <?php endif; ?>
+
+        // Live poll unread admin messages for client (Payment nav badge)
+        function pollClientUnreadAdminBadge() {
+            // Only run if client is logged in
+            <?php if (isset($_SESSION['client_id'])): ?>
+            fetch('../AJAX/get_unread_admin_chat_counts.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
+            })
+            .then(res => res.json())
+            .then(counts => {
+                // Sum all unread admin messages across all invoices
+                let total = 0;
+                Object.values(counts).forEach(cnt => { total += cnt; });
+                const badge = document.getElementById('client-unread-admin-badge');
+                if (badge) {
+                    if (total > 0) {
+                        badge.textContent = total;
+                        badge.classList.remove('d-none');
+                    } else {
+                        badge.textContent = '';
+                        badge.classList.add('d-none');
+                    }
+                }
+            });
+            <?php endif; ?>
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            pollClientUnreadAdminBadge();
+            setInterval(pollClientUnreadAdminBadge, 5000);
+        });
     </script>
+
+    <?php if ($show_login_success): ?>
+    <script>
+        Swal.fire({
+            icon: 'success',
+            title: 'Welcome!',
+            text: 'Login successful. Good to see you!',
+            confirmButtonColor: '#2563eb',
+            timer: 3000,
+            timerProgressBar: true
+        });
+    </script>
+    <?php endif; ?>
 </body>
 </html>
