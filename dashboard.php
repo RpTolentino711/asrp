@@ -333,53 +333,6 @@ if (isset($_SESSION['photo_upload_success'])) {
     unset($_SESSION['photo_upload_success']);
 }
 
-// --- GET PAID MONTHS DATA ---
-$paid_months = [];
-try {
-    // Get all paid invoices for this client
-    $all_invoices = $db->getClientInvoiceHistory($client_id);
-    $paid_invoices = array_filter($all_invoices, function($invoice) {
-        return strtolower($invoice['Status'] ?? '') === 'paid';
-    });
-    
-    // Group paid invoices by space and month
-    foreach ($paid_invoices as $invoice) {
-        $space_id = $invoice['Space_ID'];
-        $space_name = $invoice['SpaceName'];
-        $invoice_date = $invoice['InvoiceDate'];
-        
-        // Extract month and year
-        $month_year = date('F Y', strtotime($invoice_date));
-        $year_month = date('Y-m', strtotime($invoice_date)); // For sorting
-        
-        if (!isset($paid_months[$space_id])) {
-            $paid_months[$space_id] = [
-                'space_name' => $space_name,
-                'months' => []
-            ];
-        }
-        
-        // Add month if not already added
-        if (!in_array($month_year, $paid_months[$space_id]['months'])) {
-            $paid_months[$space_id]['months'][] = [
-                'display' => $month_year,
-                'sort' => $year_month
-            ];
-        }
-    }
-    
-    // Sort months chronologically for each space
-    foreach ($paid_months as $space_id => &$data) {
-        usort($data['months'], function($a, $b) {
-            return strcmp($a['sort'], $b['sort']);
-        });
-    }
-    
-} catch (Exception $e) {
-    error_log("Error fetching paid months: " . $e->getMessage());
-    $paid_months = [];
-}
-
 // --- SAFELY GET CLIENT DETAILS ---
 $client_details = $db->getClientDetails($client_id);
 $client_display = "Unknown User";
@@ -660,56 +613,6 @@ function formatDateToMonthLetters($date) {
 
         .card-body {
             padding: 1.5rem;
-        }
-
-        /* Paid Months Section Styles */
-        .paid-months-card {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border: 1px solid #bae6fd;
-        }
-
-        .paid-months-header {
-            background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
-            color: white;
-        }
-
-        .month-badge {
-            background: linear-gradient(135deg, var(--success), #34d399);
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin: 0.25rem;
-            display: inline-block;
-            box-shadow: var(--shadow-sm);
-            transition: var(--transition);
-        }
-
-        .month-badge:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .space-months {
-            background: white;
-            border-radius: var(--border-radius-sm);
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-left: 4px solid var(--success);
-        }
-
-        .space-name {
-            font-weight: 600;
-            color: var(--secondary);
-            margin-bottom: 0.75rem;
-            font-size: 1.1rem;
-        }
-
-        .months-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
         }
 
         /* Unit Cards */
@@ -1045,15 +948,6 @@ function formatDateToMonthLetters($date) {
             .maintenance-status {
                 margin-left: 0;
             }
-
-            .months-container {
-                justify-content: center;
-            }
-
-            .month-badge {
-                padding: 0.4rem 0.8rem;
-                font-size: 0.85rem;
-            }
         }
 
         @media (max-width: 576px) {
@@ -1071,10 +965,6 @@ function formatDateToMonthLetters($date) {
 
             .maintenance-section {
                 padding: 1rem;
-            }
-
-            .space-months {
-                padding: 0.75rem;
             }
         }
 
@@ -1265,60 +1155,6 @@ function formatDateToMonthLetters($date) {
         <?php if ($feedback_error): ?>
             <div class="alert alert-danger fade-in">
                 <i class="bi bi-exclamation-triangle me-2"></i><?= htmlspecialchars($feedback_error) ?>
-            </div>
-        <?php endif; ?>
-
-        <!-- Paid Months Section -->
-        <?php if (!empty($paid_months)): ?>
-            <div class="card paid-months-card mb-4 fade-in">
-                <div class="card-header paid-months-header">
-                    <h4 class="mb-0">
-                        <i class="bi bi-calendar-check me-2"></i>Your Paid Months
-                    </h4>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted mb-4">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Here are all the months you've successfully paid for across your rental units.
-                    </p>
-                    
-                    <?php foreach ($paid_months as $space_id => $data): ?>
-                        <div class="space-months">
-                            <div class="space-name">
-                                <i class="bi bi-building me-2"></i>
-                                <?= htmlspecialchars($data['space_name']) ?>
-                            </div>
-                            <div class="months-container">
-                                <?php foreach ($data['months'] as $month): ?>
-                                    <span class="month-badge">
-                                        <i class="bi bi-check-circle me-1"></i>
-                                        <?= htmlspecialchars($month['display']) ?>
-                                    </span>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                    
-                    <div class="mt-3 text-center">
-                        <small class="text-muted">
-                            <i class="bi bi-shield-check me-1"></i>
-                            All payments are verified and recorded in our system.
-                        </small>
-                    </div>
-                </div>
-            </div>
-        <?php else: ?>
-            <div class="card paid-months-card mb-4 fade-in">
-                <div class="card-header paid-months-header">
-                    <h4 class="mb-0">
-                        <i class="bi bi-calendar-check me-2"></i>Paid Months
-                    </h4>
-                </div>
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-calendar-x fs-1 text-muted mb-3 d-block"></i>
-                    <h5 class="text-muted">No Payment History Yet</h5>
-                    <p class="text-muted mb-0">Your paid months will appear here once you make payments.</p>
-                </div>
             </div>
         <?php endif; ?>
 
