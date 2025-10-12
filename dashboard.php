@@ -1510,7 +1510,11 @@ function formatDateToMonthLetters($date) {
     .then(res => {
         console.log('📡 Response status:', res.status);
         if (!res.ok) {
-            throw new Error(`HTTP error! status: ${res.status}`);
+            // Try to read error text for debugging
+            return res.text().then(text => {
+                console.error('🔴 AJAX error response:', text);
+                throw new Error(`HTTP error! status: ${res.status}\n${text}`);
+            });
         }
         return res.json();
     })
