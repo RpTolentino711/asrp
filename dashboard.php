@@ -4,27 +4,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Debug output for POST and FILES
-if (!empty($_POST) || !empty($_FILES)) {
-    echo '<pre style="background:#fffbe6;color:#b91c1c;padding:1em;border:1px solid #fde68a;max-width:700px;margin:2em auto;overflow:auto;">';
-    echo "<strong>POST:</strong>\n";
-    print_r($_POST);
-    echo "<strong>FILES:</strong>\n";
-    print_r($_FILES);
-    echo '</pre>';
-}
-
-// Debug photo upload specifically
-if (isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
-    echo '<div style="background:#e6f3ff;color:#1e40af;padding:1em;border:1px solid #60a5fa;margin:1em auto;max-width:700px;">';
-    echo "<strong>PHOTO UPLOAD DEBUG:</strong><br>";
-    echo "Space ID: " . $_POST['space_id'] . "<br>";
-    echo "File present: " . (isset($_FILES['unit_photo']) ? 'YES' : 'NO') . "<br>";
-    echo "Upload button in POST: " . (isset($_POST['upload_unit_photo']) ? 'YES' : 'NO') . "<br>";
-    echo "File error: " . $_FILES['unit_photo']['error'] . "<br>";
-    echo "</div>";
-}
-
 require 'database/database.php'; 
 session_start();
 
@@ -40,7 +19,6 @@ $client_id = $_SESSION['client_id'];
 // --- CHECK IF CLIENT IS INACTIVE ---
 $client_status = $db->getClientStatus($client_id);
 if ($client_status && isset($client_status['Status']) && strtolower($client_status['Status']) !== 'active') {
-    // Show SweetAlert and log out automatically
     echo <<<HTML
     <!doctype html>
     <html lang="en">
@@ -65,7 +43,7 @@ if ($client_status && isset($client_status['Status']) && strtolower($client_stat
       });
       setTimeout(function() {
         window.location.href = 'logout.php?inactive=1';
-      }, 7000); // Fallback: auto-logout after 7 seconds
+      }, 7000);
     </script>
     </body>
     </html>
@@ -79,30 +57,29 @@ if (isset($_SESSION['login_success'])) {
     unset($_SESSION['login_success']);
 }
 
-// Initialize feedback variables
+// Initialize variables
 $feedback_success = '';
 $feedback_error = '';
+$photo_upload_success = '';
+$photo_upload_error = '';
 
-// --- FEEDBACK PROCESSING (FIXED) ---
+// --- FEEDBACK PROCESSING ---
 if (isset($_POST['invoice_id']) && isset($_POST['rating']) && !empty($_POST['rating'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $rating = intval($_POST['rating']);
     $comments = isset($_POST['comments']) ? trim($_POST['comments']) : '';
 
-    // Validate rating range
     if ($rating >= 1 && $rating <= 5) {
-        // Check if feedback already exists for this invoice
         if (method_exists($db, 'checkExistingFeedback')) {
             $existing_feedback = $db->checkExistingFeedback($invoice_id);
         } else {
-            $existing_feedback = false; // Skip check if method doesn't exist
+            $existing_feedback = false;
         }
         
         if (!$existing_feedback) {
             if ($db->saveFeedback($invoice_id, $rating, $comments)) {
                 $feedback_success = "Thank you for your feedback!";
                 $_SESSION['feedback_success'] = $feedback_success;
-                // Redirect to prevent resubmission
                 header("Location: " . $_SERVER['PHP_SELF']);
                 exit();
             } else {
@@ -116,34 +93,23 @@ if (isset($_POST['invoice_id']) && isset($_POST['rating']) && !empty($_POST['rat
     }
 }
 
-// Check for feedback success from redirect
 if (isset($_SESSION['feedback_success'])) {
     $feedback_success = $_SESSION['feedback_success'];
     unset($_SESSION['feedback_success']);
 }
 
-// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
-$photo_upload_success = '';
-$photo_upload_error = '';
-
-// Function to add client photo to history (using negative client_id to distinguish from admin)
-function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
-    // Use negative client_id to distinguish client actions from admin actions
-    $client_id = -$_SESSION['client_id']; // Negative value indicates client action
+// --- PHOTO UPLOAD/DELETE LOGIC ---
+// Function to add client photo to history
+function addClientPhotoToHistory($db, $space_id, $photo_path, $action) {
+    $client_id = -$_SESSION['client_id'];
     
-    // For client actions, we'll use the addPhotoToHistory method but with negative client_id
-    if (method_exists($db, 'addPhotoToHistory')) {
-        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
-    }
-    
-    // Fallback: direct SQL if method doesn't exist
     try {
-        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
-                VALUES (?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
+                VALUES (?, ?, ?, ?, ?, ?)";
         
         $status = ($action === 'deleted') ? 'inactive' : 'active';
-        $stmt = $db->pdo->prepare($sql);
-        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status, $description]);
+        $stmt = $db->conn->prepare($sql);
+        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status]);
     } catch (PDOException $e) {
         error_log("addClientPhotoToHistory Error: " . $e->getMessage());
         return false;
@@ -161,47 +127,22 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
     
     if (!in_array($space_id, $valid_space_ids)) {
         $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
-    } else if ($file['error'] !== UPLOAD_ERR_OK) {
-        // Handle upload errors
-        switch($file['error']) {
-            case UPLOAD_ERR_INI_SIZE:
-            case UPLOAD_ERR_FORM_SIZE:
-                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
-                break;
-            case UPLOAD_ERR_PARTIAL:
-                $photo_upload_error = "File upload was interrupted. Please try again.";
-                break;
-            case UPLOAD_ERR_NO_FILE:
-                $photo_upload_error = "No file selected. Please choose an image to upload.";
-                break;
-            case UPLOAD_ERR_NO_TMP_DIR:
-                $photo_upload_error = "Server configuration error. Please contact support.";
-                break;
-            case UPLOAD_ERR_CANT_WRITE:
-                $photo_upload_error = "Failed to save file. Please try again.";
-                break;
-            default:
-                $photo_upload_error = "Unknown upload error occurred.";
-        }
     } else {
-        // Get current photos from JSON column
-        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-        $used_slots = count($current_photos);
+        // Get current active CLIENT photos count
+        $current_photos_count = $db->getActiveClientPhotosCount($space_id, $client_id);
         
-        if ($used_slots >= 6) {
+        if ($current_photos_count >= 6) {
             $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
         } else {
-            // Validate file type and size
+            // Validate file
             $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-            $max_size = 2 * 1024 * 1024; // 2MB
+            $max_size = 2 * 1024 * 1024;
             
-            // Get actual file type using finfo
             if (function_exists('finfo_open')) {
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
                 $actual_type = $finfo->file($file['tmp_name']);
             } else {
-                $actual_type = $file['type']; // Fallback
+                $actual_type = $file['type'];
             }
             
             if (!in_array($actual_type, $allowed_types)) {
@@ -209,21 +150,18 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
             } else if ($file['size'] > $max_size) {
                 $photo_upload_error = "File size too large. Maximum 2MB allowed.";
             } else {
-                // Validate image dimensions
                 $image_info = getimagesize($file['tmp_name']);
                 if ($image_info === false) {
                     $photo_upload_error = "Invalid image file. File appears to be corrupted.";
                 } else if ($image_info[0] > 2048 || $image_info[1] > 2048) {
                     $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels allowed.";
                 } else {
-                    // Generate secure filename
                     $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                     $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
                     
                     if (!in_array($ext, $allowed_extensions)) {
                         $photo_upload_error = "Invalid file extension. Only .jpg, .jpeg, .png, and .gif files are allowed.";
                     } else {
-                        // Create upload directory if it doesn't exist
                         $upload_dir = __DIR__ . "/uploads/unit_photos/";
                         if (!is_dir($upload_dir)) {
                             if (!mkdir($upload_dir, 0755, true)) {
@@ -232,27 +170,17 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
                         }
                         
                         if (empty($photo_upload_error)) {
-                            // Generate unique filename
                             $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
                             $filepath = $upload_dir . $filename;
                             
                             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                                // Add to existing photos array and save as JSON
-                                $current_photos[] = $filename;
-                                $json_photos = json_encode($current_photos);
-                                
-                                // Save to database (UPDATED FOR JSON)
-                                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                                    // ADD TO PHOTO HISTORY - Client uploaded photo
-                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
-                                    
+                                // Add to photo history with status 'active'
+                                if (addClientPhotoToHistory($db, $space_id, $filename, 'uploaded')) {
                                     $photo_upload_success = "Photo uploaded successfully for this unit!";
                                     $_SESSION['photo_upload_success'] = $photo_upload_success;
-                                    // Redirect to prevent resubmission
                                     header("Location: " . $_SERVER['PHP_SELF']);
                                     exit();
                                 } else {
-                                    // Delete uploaded file if database insert failed
                                     if (file_exists($filepath)) {
                                         unlink($filepath);
                                     }
@@ -269,12 +197,11 @@ if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_p
     }
 }
 
-// Photo Delete Processing (UPDATED FOR JSON)
+// Photo Delete Processing
 if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POST['photo_filename'])) {
     $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
     
-    // Validate space_id belongs to client
     $rented_units = $db->getRentedUnits($client_id);
     $valid_space_ids = array_column($rented_units, 'Space_ID');
     
@@ -283,57 +210,39 @@ if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POS
     } else if (empty($photo_filename)) {
         $photo_upload_error = "Invalid photo filename.";
     } else {
-        // Validate filename to prevent directory traversal
         if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
             $photo_upload_error = "Invalid photo filename format.";
         } else {
-            // Get current photos and remove the specified one
-            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
-            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
-            
-            if (!in_array($photo_filename, $current_photos)) {
-                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
-            } else {
-                // Remove photo from array
-                $updated_photos = array_values(array_diff($current_photos, [$photo_filename]));
-                $json_photos = json_encode($updated_photos);
-                
-                // Update database with new JSON array (UPDATED FOR JSON)
-                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
-                    // ADD TO PHOTO HISTORY - Client deleted photo
-                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
-                    
-                    // Delete file from filesystem
-                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
-                    $file_to_delete = $upload_dir . basename($photo_filename);
-                    if (file_exists($file_to_delete)) {
-                        if (unlink($file_to_delete)) {
-                            $photo_upload_success = "Photo deleted successfully!";
-                        } else {
-                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
-                        }
-                    } else {
+            // Add delete record to photo history with status 'inactive'
+            if (addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted')) {
+                // Delete file from filesystem
+                $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                $file_to_delete = $upload_dir . basename($photo_filename);
+                if (file_exists($file_to_delete)) {
+                    if (unlink($file_to_delete)) {
                         $photo_upload_success = "Photo deleted successfully!";
+                    } else {
+                        $photo_upload_success = "Photo deleted from database, but file removal failed.";
                     }
-                    $_SESSION['photo_upload_success'] = $photo_upload_success;
-                    // Redirect to prevent resubmission
-                    header("Location: " . $_SERVER['PHP_SELF']);
-                    exit();
                 } else {
-                    $photo_upload_error = "Failed to delete photo from database.";
+                    $photo_upload_success = "Photo deleted successfully!";
                 }
+                $_SESSION['photo_upload_success'] = $photo_upload_success;
+                header("Location: " . $_SERVER['PHP_SELF']);
+                exit();
+            } else {
+                $photo_upload_error = "Failed to delete photo from database.";
             }
         }
     }
 }
 
-// Check for photo success from redirect
 if (isset($_SESSION['photo_upload_success'])) {
     $photo_upload_success = $_SESSION['photo_upload_success'];
     unset($_SESSION['photo_upload_success']);
 }
 
-// --- SAFELY GET CLIENT DETAILS ---
+// --- GET CLIENT DATA ---
 $client_details = $db->getClientDetails($client_id);
 $client_display = "Unknown User";
 
@@ -351,34 +260,32 @@ try {
     $feedback_prompts = $db->getFeedbackPrompts($client_id);
     $rented_units = $db->getRentedUnits($client_id);
     
-    // Ensure arrays are returned
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
     
-    // Get maintenance history and photos only if there are rented units
     $maintenance_history = [];
-    $unit_photos = [];
+    $unit_active_photos = [];
     
     if (!empty($rented_units)) {
         $unit_ids = array_column($rented_units, 'Space_ID');
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
-        $unit_photos = $db->getUnitPhotosForClient($client_id);
         
-        // Ensure arrays are returned
+        // Get ONLY CLIENT'S ACTIVE photos from photo_history table
+        $unit_active_photos = $db->getActiveClientPhotosForUnits($unit_ids, $client_id);
+        
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
-        $unit_photos = is_array($unit_photos) ? $unit_photos : [];
+        $unit_active_photos = is_array($unit_active_photos) ? $unit_active_photos : [];
     }
     
 } catch (Exception $e) {
-    // Log error and set defaults
     error_log("Dashboard data fetch error: " . $e->getMessage());
     $feedback_prompts = [];
     $rented_units = [];
     $maintenance_history = [];
-    $unit_photos = [];
+    $unit_active_photos = [];
 }
 
-// Function to format date in month letters
+// Function to format date
 function formatDateToMonthLetters($date) {
     if ($date === 'N/A' || empty($date)) {
         return 'N/A';
@@ -388,7 +295,7 @@ function formatDateToMonthLetters($date) {
         $dateTime = new DateTime($date);
         return $dateTime->format('F j, Y');
     } catch (Exception $e) {
-        return $date; // Return original if parsing fails
+        return $date;
     }
 }
 ?>
@@ -399,16 +306,9 @@ function formatDateToMonthLetters($date) {
     <meta charset="utf-8">
     <title>Client Dashboard - ASRT Commercial Spaces</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
-    
-    <!-- Bootstrap & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-    
-    <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
@@ -448,7 +348,6 @@ function formatDateToMonthLetters($date) {
             padding: 0;
         }
 
-        /* Notification Badge */
         .notification-badge {
             position: absolute;
             top: 0.2em;
@@ -478,7 +377,6 @@ function formatDateToMonthLetters($date) {
             100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
         }
 
-        /* Modern Navigation */
         .navbar {
             background: rgba(255, 255, 255, 0.95) !important;
             backdrop-filter: blur(20px);
@@ -524,7 +422,6 @@ function formatDateToMonthLetters($date) {
             box-shadow: none;
         }
 
-        /* Dashboard Header */
         .dashboard-header {
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
             color: white;
@@ -562,7 +459,6 @@ function formatDateToMonthLetters($date) {
             margin-bottom: 0;
         }
 
-        /* Alert Styles */
         .alert {
             border: none;
             border-radius: var(--border-radius);
@@ -587,7 +483,6 @@ function formatDateToMonthLetters($date) {
             color: #92400e;
         }
 
-        /* Card Styles */
         .card {
             border: none;
             border-radius: var(--border-radius);
@@ -615,7 +510,6 @@ function formatDateToMonthLetters($date) {
             padding: 1.5rem;
         }
 
-        /* Unit Cards */
         .unit-card {
             border: 1px solid var(--gray-light);
             background: var(--lighter);
@@ -671,7 +565,6 @@ function formatDateToMonthLetters($date) {
             margin-bottom: 0.5rem;
         }
 
-        /* Photo Gallery */
         .photo-gallery {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
@@ -732,7 +625,6 @@ function formatDateToMonthLetters($date) {
             margin: 1rem 0;
         }
 
-        /* Upload Form */
         .upload-form {
             background: var(--light);
             border-radius: var(--border-radius-sm);
@@ -753,7 +645,6 @@ function formatDateToMonthLetters($date) {
             border-color: var(--primary);
         }
 
-        /* Image Preview */
         .image-preview {
             display: block;
             margin-top: 10px;
@@ -761,7 +652,6 @@ function formatDateToMonthLetters($date) {
             box-shadow: var(--shadow-sm);
         }
 
-        /* Maintenance History */
         .maintenance-section {
             background: var(--light);
             border-radius: var(--border-radius-sm);
@@ -836,7 +726,6 @@ function formatDateToMonthLetters($date) {
             padding: 1rem;
         }
 
-        /* Buttons */
         .btn {
             border-radius: var(--border-radius-sm);
             font-weight: 500;
@@ -881,7 +770,6 @@ function formatDateToMonthLetters($date) {
             color: white;
         }
 
-        /* Form Elements */
         .form-control,
         .form-select {
             border: 1px solid var(--gray-light);
@@ -904,7 +792,6 @@ function formatDateToMonthLetters($date) {
             margin-bottom: 0.5rem;
         }
 
-        /* Feedback Section */
         .feedback-card {
             background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
             border: 1px solid var(--warning);
@@ -914,7 +801,6 @@ function formatDateToMonthLetters($date) {
             background: white;
         }
 
-        /* Responsive Design */
         @media (max-width: 768px) {
             .welcome-title {
                 font-size: 2rem;
@@ -968,7 +854,6 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        /* Loading States */
         .loading {
             opacity: 0.7;
             pointer-events: none;
@@ -990,7 +875,6 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        /* Empty States */
         .empty-state {
             text-align: center;
             padding: 3rem 2rem;
@@ -1008,7 +892,6 @@ function formatDateToMonthLetters($date) {
             margin-bottom: 0.5rem;
         }
 
-        /* Animations */
         .fade-in {
             animation: fadeIn 0.5s ease-in-out;
         }
@@ -1024,7 +907,6 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        /* Maintenance History Dropdown */
         .maintenance-dropdown {
             max-height: 300px;
             overflow-y: auto;
@@ -1219,7 +1101,14 @@ function formatDateToMonthLetters($date) {
             <div class="row g-4">
                 <?php foreach ($rented_units as $rent): 
                     $space_id = intval($rent['Space_ID']);
-                    $photos = isset($unit_photos[$space_id]) ? $unit_photos[$space_id] : [];
+                    // Get ONLY CLIENT'S active photos
+                    $photos = isset($unit_active_photos[$space_id]) ? $unit_active_photos[$space_id] : [];
+                    $photo_paths = [];
+                    foreach ($photos as $photo_record) {
+                        if (!empty($photo_record['Photo_Path'])) {
+                            $photo_paths[] = $photo_record['Photo_Path'];
+                        }
+                    }
                     
                     // Get dates safely and format them
                     $rental_start = isset($rent['StartDate']) ? formatDateToMonthLetters($rent['StartDate']) : 'N/A';
@@ -1236,7 +1125,6 @@ function formatDateToMonthLetters($date) {
                                 $due_date = formatDateToMonthLetters($rental_end);
                             }
                         } catch (Exception $e) {
-                            // Use default values if method fails
                             error_log("Failed to get latest invoice: " . $e->getMessage());
                         }
                     }
@@ -1282,14 +1170,14 @@ function formatDateToMonthLetters($date) {
                                 <div class="flex-grow-1">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0">
-                                            <i class="bi bi-images me-1"></i>Unit Photos
+                                            <i class="bi bi-images me-1"></i>Your Unit Photos
                                         </h6>
-                                        <small class="text-muted"><?= count($photos) ?>/6</small>
+                                        <small class="text-muted"><?= count($photo_paths) ?>/6</small>
                                     </div>
 
-                                    <?php if (!empty($photos)): ?>
+                                    <?php if (!empty($photo_paths)): ?>
                                         <div class="photo-gallery">
-                                            <?php foreach ($photos as $photo): ?>
+                                            <?php foreach ($photo_paths as $photo): ?>
                                                 <div class="photo-item">
                                                     <img src="uploads/unit_photos/<?= htmlspecialchars($photo) ?>" 
                                                          alt="Unit Photo"
@@ -1316,7 +1204,7 @@ function formatDateToMonthLetters($date) {
                                     <?php endif; ?>
 
                                     <!-- Upload Form -->
-                                    <?php if (count($photos) < 6): ?>
+                                    <?php if (count($photo_paths) < 6): ?>
                                         <div class="upload-form">
                                             <form method="post" enctype="multipart/form-data" id="uploadForm_<?= $space_id ?>">
                                                 <input type="hidden" name="space_id" value="<?= $space_id ?>">
@@ -1500,7 +1388,6 @@ function formatDateToMonthLetters($date) {
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Submit the form
                     event.target.closest('form').submit();
                 }
             });
@@ -1514,13 +1401,11 @@ function formatDateToMonthLetters($date) {
             const icon = document.getElementById(`maintenance-icon-${spaceId}`);
             
             if (full.classList.contains('d-none')) {
-                // Show full history
                 preview.classList.add('d-none');
                 full.classList.remove('d-none');
                 icon.classList.remove('bi-chevron-down');
                 icon.classList.add('bi-chevron-up');
             } else {
-                // Show preview only
                 preview.classList.remove('d-none');
                 full.classList.add('d-none');
                 icon.classList.remove('bi-chevron-up');
@@ -1555,8 +1440,7 @@ function formatDateToMonthLetters($date) {
                     const spaceId = this.id.replace('fileInput_', '');
                     
                     if (file) {
-                        // Validate file size
-                        if (file.size > 2 * 1024 * 1024) { // 2MB
+                        if (file.size > 2 * 1024 * 1024) {
                             Swal.fire({
                                 icon: 'error',
                                 title: 'File Too Large',
@@ -1567,7 +1451,6 @@ function formatDateToMonthLetters($date) {
                             return;
                         }
                         
-                        // Validate file type
                         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
                         if (!allowedTypes.includes(file.type)) {
                             Swal.fire({
@@ -1580,17 +1463,14 @@ function formatDateToMonthLetters($date) {
                             return;
                         }
 
-                        // Create image preview
                         if (file.type.startsWith('image/')) {
                             const reader = new FileReader();
                             reader.onload = function(e) {
-                                // Remove existing preview
                                 const existingPreview = input.parentNode.querySelector('.image-preview');
                                 if (existingPreview) {
                                     existingPreview.remove();
                                 }
                                 
-                                // Create preview
                                 const preview = document.createElement('img');
                                 preview.src = e.target.result;
                                 preview.className = 'image-preview';
@@ -1616,7 +1496,6 @@ function formatDateToMonthLetters($date) {
                     const submitBtn = this.querySelector('button[type="submit"]');
                     const originalText = submitBtn.innerHTML;
                     
-                    // Validate file selection
                     const fileInput = this.querySelector('input[type="file"]');
                     if (!fileInput.files[0]) {
                         e.preventDefault();
@@ -1629,11 +1508,9 @@ function formatDateToMonthLetters($date) {
                         return;
                     }
                     
-                    // Show loading state
                     submitBtn.innerHTML = '<span class="spinner me-1"></span>Uploading...';
                     submitBtn.disabled = true;
                     
-                    // Reset button after 30 seconds (timeout)
                     setTimeout(() => {
                         submitBtn.innerHTML = originalText;
                         submitBtn.disabled = false;
@@ -1662,7 +1539,6 @@ function formatDateToMonthLetters($date) {
                     submitBtn.innerHTML = '<span class="spinner me-1"></span>Submitting...';
                     submitBtn.disabled = true;
                     
-                    // Reset button after 10 seconds (timeout)
                     setTimeout(() => {
                         submitBtn.innerHTML = originalText;
                         submitBtn.disabled = false;
@@ -1689,9 +1565,8 @@ function formatDateToMonthLetters($date) {
             });
         });
 
-        // Live poll unread admin messages for client (Payment nav badge)
+        // Live poll unread admin messages for client
         function pollClientUnreadAdminBadge() {
-            // Only run if client is logged in
             <?php if (isset($_SESSION['client_id'])): ?>
             fetch('../AJAX/get_unread_admin_chat_counts.php', {
                 method: 'POST',
@@ -1700,7 +1575,6 @@ function formatDateToMonthLetters($date) {
             })
             .then(res => res.json())
             .then(counts => {
-                // Sum all unread admin messages across all invoices
                 let total = 0;
                 Object.values(counts).forEach(cnt => { total += cnt; });
                 const badge = document.getElementById('client-unread-admin-badge');
