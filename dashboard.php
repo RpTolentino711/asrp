@@ -4,6 +4,27 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
+// Debug output for POST and FILES
+if (!empty($_POST) || !empty($_FILES)) {
+    echo '<pre style="background:#fffbe6;color:#b91c1c;padding:1em;border:1px solid #fde68a;max-width:700px;margin:2em auto;overflow:auto;">';
+    echo "<strong>POST:</strong>\n";
+    print_r($_POST);
+    echo "<strong>FILES:</strong>\n";
+    print_r($_FILES);
+    echo '</pre>';
+}
+
+// Debug photo upload specifically
+if (isset($_POST['space_id']) && isset($_FILES['unit_photo'])) {
+    echo '<div style="background:#e6f3ff;color:#1e40af;padding:1em;border:1px solid #60a5fa;margin:1em auto;max-width:700px;">';
+    echo "<strong>PHOTO UPLOAD DEBUG:</strong><br>";
+    echo "Space ID: " . $_POST['space_id'] . "<br>";
+    echo "File present: " . (isset($_FILES['unit_photo']) ? 'YES' : 'NO') . "<br>";
+    echo "Upload button in POST: " . (isset($_POST['upload_unit_photo']) ? 'YES' : 'NO') . "<br>";
+    echo "File error: " . $_FILES['unit_photo']['error'] . "<br>";
+    echo "</div>";
+}
+
 require 'database/database.php'; 
 session_start();
 
@@ -19,6 +40,7 @@ $client_id = $_SESSION['client_id'];
 // --- CHECK IF CLIENT IS INACTIVE ---
 $client_status = $db->getClientStatus($client_id);
 if ($client_status && isset($client_status['Status']) && strtolower($client_status['Status']) !== 'active') {
+    // Show SweetAlert and log out automatically
     echo <<<HTML
     <!doctype html>
     <html lang="en">
@@ -43,7 +65,7 @@ if ($client_status && isset($client_status['Status']) && strtolower($client_stat
       });
       setTimeout(function() {
         window.location.href = 'logout.php?inactive=1';
-      }, 7000);
+      }, 7000); // Fallback: auto-logout after 7 seconds
     </script>
     </body>
     </html>
@@ -57,10 +79,11 @@ if (isset($_SESSION['login_success'])) {
     unset($_SESSION['login_success']);
 }
 
-// Initialize variables
-$feedback_success = $feedback_error = $photo_upload_success = $photo_upload_error = '';
+// Initialize feedback variables
+$feedback_success = '';
+$feedback_error = '';
 
-// --- FEEDBACK PROCESSING ---
+// --- FEEDBACK PROCESSING (FIXED) ---
 if (isset($_POST['invoice_id']) && isset($_POST['rating']) && !empty($_POST['rating'])) {
     $invoice_id = intval($_POST['invoice_id']);
     $rating = intval($_POST['rating']);
@@ -72,13 +95,14 @@ if (isset($_POST['invoice_id']) && isset($_POST['rating']) && !empty($_POST['rat
         if (method_exists($db, 'checkExistingFeedback')) {
             $existing_feedback = $db->checkExistingFeedback($invoice_id);
         } else {
-            $existing_feedback = false;
+            $existing_feedback = false; // Skip check if method doesn't exist
         }
         
         if (!$existing_feedback) {
             if ($db->saveFeedback($invoice_id, $rating, $comments)) {
                 $feedback_success = "Thank you for your feedback!";
                 $_SESSION['feedback_success'] = $feedback_success;
+                // Redirect to prevent resubmission
                 header("Location: " . $_SERVER['PHP_SELF']);
                 exit();
             } else {
@@ -98,72 +122,145 @@ if (isset($_SESSION['feedback_success'])) {
     unset($_SESSION['feedback_success']);
 }
 
-// --- BUSINESS PHOTO UPLOAD PROCESSING ---
-if (isset($_FILES['business_photo']) && $_FILES['business_photo']['error'] === 0) {
-    $file = $_FILES['business_photo'];
-    $description = isset($_POST['photo_description']) ? trim($_POST['photo_description']) : 'Business photo uploaded by client';
+// --- PHOTO UPLOAD/DELETE LOGIC (UPDATED FOR JSON) ---
+$photo_upload_success = '';
+$photo_upload_error = '';
 
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        $photo_upload_error = "File upload error: " . $file['error'];
-    } else {
-        // Validate file type and size
-        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
-        $max_size = 2 * 1024 * 1024; // 2MB
+// Function to add client photo to history (using negative client_id to distinguish from admin)
+function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $description = null) {
+    // Use negative client_id to distinguish client actions from admin actions
+    $client_id = -$_SESSION['client_id']; // Negative value indicates client action
+    
+    // For client actions, we'll use the addPhotoToHistory method but with negative client_id
+    if (method_exists($db, 'addPhotoToHistory')) {
+        return $db->addPhotoToHistory($space_id, $photo_path, $action, null, $client_id);
+    }
+    
+    // Fallback: direct SQL if method doesn't exist
+    try {
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)";
         
-        // Get actual file type
-        if (function_exists('finfo_open')) {
-            $finfo = new finfo(FILEINFO_MIME_TYPE);
-            $actual_type = $finfo->file($file['tmp_name']);
-        } else {
-            $actual_type = $file['type'];
+        $status = ($action === 'deleted') ? 'inactive' : 'active';
+        $stmt = $db->pdo->prepare($sql);
+        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status, $description]);
+    } catch (PDOException $e) {
+        error_log("addClientPhotoToHistory Error: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Photo Upload Processing
+if (isset($_POST['space_id']) && isset($_FILES['unit_photo']) && $_FILES['unit_photo']['error'] === 0) {
+    $space_id = intval($_POST['space_id']);
+    $file = $_FILES['unit_photo'];
+
+    // Validate space_id belongs to client
+    $rented_units = $db->getRentedUnits($client_id);
+    $valid_space_ids = array_column($rented_units, 'Space_ID');
+    
+    if (!in_array($space_id, $valid_space_ids)) {
+        $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
+    } else if ($file['error'] !== UPLOAD_ERR_OK) {
+        // Handle upload errors
+        switch($file['error']) {
+            case UPLOAD_ERR_INI_SIZE:
+            case UPLOAD_ERR_FORM_SIZE:
+                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+                break;
+            case UPLOAD_ERR_PARTIAL:
+                $photo_upload_error = "File upload was interrupted. Please try again.";
+                break;
+            case UPLOAD_ERR_NO_FILE:
+                $photo_upload_error = "No file selected. Please choose an image to upload.";
+                break;
+            case UPLOAD_ERR_NO_TMP_DIR:
+                $photo_upload_error = "Server configuration error. Please contact support.";
+                break;
+            case UPLOAD_ERR_CANT_WRITE:
+                $photo_upload_error = "Failed to save file. Please try again.";
+                break;
+            default:
+                $photo_upload_error = "Unknown upload error occurred.";
         }
+    } else {
+        // Get current photos from JSON column
+        $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+        $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+        $used_slots = count($current_photos);
         
-        if (!in_array($actual_type, $allowed_types)) {
-            $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF images are allowed.";
-        } else if ($file['size'] > $max_size) {
-            $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+        if ($used_slots >= 6) {
+            $photo_upload_error = "You can upload up to 6 photos only. Please delete some photos first.";
         } else {
-            // Validate image dimensions
-            $image_info = getimagesize($file['tmp_name']);
-            if ($image_info === false) {
-                $photo_upload_error = "Invalid image file. File appears to be corrupted.";
+            // Validate file type and size
+            $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/jpg'];
+            $max_size = 2 * 1024 * 1024; // 2MB
+            
+            // Get actual file type using finfo
+            if (function_exists('finfo_open')) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $actual_type = $finfo->file($file['tmp_name']);
             } else {
-                // Generate secure filename
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
-                
-                if (!in_array($ext, $allowed_extensions)) {
-                    $photo_upload_error = "Invalid file extension.";
+                $actual_type = $file['type']; // Fallback
+            }
+            
+            if (!in_array($actual_type, $allowed_types)) {
+                $photo_upload_error = "Invalid file type. Only JPG, PNG, and GIF images are allowed.";
+            } else if ($file['size'] > $max_size) {
+                $photo_upload_error = "File size too large. Maximum 2MB allowed.";
+            } else {
+                // Validate image dimensions
+                $image_info = getimagesize($file['tmp_name']);
+                if ($image_info === false) {
+                    $photo_upload_error = "Invalid image file. File appears to be corrupted.";
+                } else if ($image_info[0] > 2048 || $image_info[1] > 2048) {
+                    $photo_upload_error = "Image dimensions too large. Maximum 2048x2048 pixels allowed.";
                 } else {
-                    // Create upload directory
-                    $upload_dir = __DIR__ . "/uploads/business_photos/";
-                    if (!is_dir($upload_dir)) {
-                        if (!mkdir($upload_dir, 0755, true)) {
-                            $photo_upload_error = "Failed to create upload directory.";
-                        }
-                    }
+                    // Generate secure filename
+                    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                    $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif'];
                     
-                    if (empty($photo_upload_error)) {
-                        // Generate unique filename
-                        $filename = "business_client_{$client_id}_" . uniqid() . "." . $ext;
-                        $filepath = $upload_dir . $filename;
-                        
-                        if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                            // Save to business_photo_history table using Database method
-                            if ($db->uploadBusinessPhoto($client_id, $filename, $description)) {
-                                $photo_upload_success = "Business photo uploaded successfully!";
-                                $_SESSION['photo_upload_success'] = $photo_upload_success;
-                                header("Location: " . $_SERVER['PHP_SELF']);
-                                exit();
-                            } else {
-                                // Delete uploaded file if database insert failed
-                                if (file_exists($filepath)) {
-                                    unlink($filepath);
-                                }
-                                $photo_upload_error = "Database error occurred. Photo was not saved.";
+                    if (!in_array($ext, $allowed_extensions)) {
+                        $photo_upload_error = "Invalid file extension. Only .jpg, .jpeg, .png, and .gif files are allowed.";
+                    } else {
+                        // Create upload directory if it doesn't exist
+                        $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                        if (!is_dir($upload_dir)) {
+                            if (!mkdir($upload_dir, 0755, true)) {
+                                $photo_upload_error = "Failed to create upload directory. Please contact support.";
                             }
-                        } else {
-                            $photo_upload_error = "Failed to move uploaded file.";
+                        }
+                        
+                        if (empty($photo_upload_error)) {
+                            // Generate unique filename
+                            $filename = "unit_{$space_id}_client_{$client_id}_" . uniqid() . "." . $ext;
+                            $filepath = $upload_dir . $filename;
+                            
+                            if (move_uploaded_file($file['tmp_name'], $filepath)) {
+                                // Add to existing photos array and save as JSON
+                                $current_photos[] = $filename;
+                                $json_photos = json_encode($current_photos);
+                                
+                                // Save to database (UPDATED FOR JSON)
+                                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                                    // ADD TO PHOTO HISTORY - Client uploaded photo
+                                    addClientPhotoToHistory($db, $space_id, $filename, 'uploaded', 'Client uploaded business photo');
+                                    
+                                    $photo_upload_success = "Photo uploaded successfully for this unit!";
+                                    $_SESSION['photo_upload_success'] = $photo_upload_success;
+                                    // Redirect to prevent resubmission
+                                    header("Location: " . $_SERVER['PHP_SELF']);
+                                    exit();
+                                } else {
+                                    // Delete uploaded file if database insert failed
+                                    if (file_exists($filepath)) {
+                                        unlink($filepath);
+                                    }
+                                    $photo_upload_error = "Database error occurred. Photo was not saved.";
+                                }
+                            } else {
+                                $photo_upload_error = "Failed to move uploaded file. Check file permissions.";
+                            }
                         }
                     }
                 }
@@ -172,32 +269,60 @@ if (isset($_FILES['business_photo']) && $_FILES['business_photo']['error'] === 0
     }
 }
 
-// --- BUSINESS PHOTO DELETE PROCESSING ---
-if (isset($_POST['delete_business_photo']) && isset($_POST['photo_filename'])) {
+// Photo Delete Processing (UPDATED FOR JSON)
+if (isset($_POST['space_id']) && isset($_POST['photo_filename']) && !empty($_POST['photo_filename'])) {
+    $space_id = intval($_POST['space_id']);
     $photo_filename = trim($_POST['photo_filename']);
     
-    // Validate filename
-    if (!preg_match('/^business_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+    // Validate space_id belongs to client
+    $rented_units = $db->getRentedUnits($client_id);
+    $valid_space_ids = array_column($rented_units, 'Space_ID');
+    
+    if (!in_array($space_id, $valid_space_ids)) {
+        $photo_upload_error = "Invalid space ID. You don't have access to this unit.";
+    } else if (empty($photo_filename)) {
         $photo_upload_error = "Invalid photo filename.";
     } else {
-        // Validate ownership
-        if ($db->validateBusinessPhotoOwnership($client_id, $photo_filename)) {
-            if ($db->deleteBusinessPhoto($client_id, $photo_filename)) {
-                // Delete file from filesystem
-                $upload_dir = __DIR__ . "/uploads/business_photos/";
-                $file_to_delete = $upload_dir . basename($photo_filename);
-                if (file_exists($file_to_delete)) {
-                    unlink($file_to_delete);
-                }
-                $photo_upload_success = "Business photo deleted successfully!";
-                $_SESSION['photo_upload_success'] = $photo_upload_success;
-                header("Location: " . $_SERVER['PHP_SELF']);
-                exit();
-            } else {
-                $photo_upload_error = "Failed to delete photo from database.";
-            }
+        // Validate filename to prevent directory traversal
+        if (!preg_match('/^unit_\d+_client_\d+_[a-zA-Z0-9]+\.(jpg|jpeg|png|gif)$/i', $photo_filename)) {
+            $photo_upload_error = "Invalid photo filename format.";
         } else {
-            $photo_upload_error = "Photo not found or you don't have permission to delete it.";
+            // Get current photos and remove the specified one
+            $unit_photos_temp = $db->getUnitPhotosForClient($client_id);
+            $current_photos = isset($unit_photos_temp[$space_id]) ? $unit_photos_temp[$space_id] : [];
+            
+            if (!in_array($photo_filename, $current_photos)) {
+                $photo_upload_error = "Photo not found or you don't have permission to delete it.";
+            } else {
+                // Remove photo from array
+                $updated_photos = array_values(array_diff($current_photos, [$photo_filename]));
+                $json_photos = json_encode($updated_photos);
+                
+                // Update database with new JSON array (UPDATED FOR JSON)
+                if ($db->updateUnitPhotos($space_id, $client_id, $json_photos)) {
+                    // ADD TO PHOTO HISTORY - Client deleted photo
+                    addClientPhotoToHistory($db, $space_id, $photo_filename, 'deleted', 'Client deleted business photo');
+                    
+                    // Delete file from filesystem
+                    $upload_dir = __DIR__ . "/uploads/unit_photos/";
+                    $file_to_delete = $upload_dir . basename($photo_filename);
+                    if (file_exists($file_to_delete)) {
+                        if (unlink($file_to_delete)) {
+                            $photo_upload_success = "Photo deleted successfully!";
+                        } else {
+                            $photo_upload_success = "Photo deleted from database, but file removal failed.";
+                        }
+                    } else {
+                        $photo_upload_success = "Photo deleted successfully!";
+                    }
+                    $_SESSION['photo_upload_success'] = $photo_upload_success;
+                    // Redirect to prevent resubmission
+                    header("Location: " . $_SERVER['PHP_SELF']);
+                    exit();
+                } else {
+                    $photo_upload_error = "Failed to delete photo from database.";
+                }
+            }
         }
     }
 }
@@ -208,11 +333,7 @@ if (isset($_SESSION['photo_upload_success'])) {
     unset($_SESSION['photo_upload_success']);
 }
 
-// --- GET CURRENT BUSINESS PHOTO AND HISTORY ---
-$current_business_photo = $db->getCurrentBusinessPhoto($client_id);
-$business_photo_history = $db->getBusinessPhotoHistory($client_id);
-
-// --- GET CLIENT DETAILS ---
+// --- SAFELY GET CLIENT DETAILS ---
 $client_details = $db->getClientDetails($client_id);
 $client_display = "Unknown User";
 
@@ -225,14 +346,16 @@ if ($client_details && is_array($client_details)) {
     $client_display = !empty($full_name) ? $full_name : (!empty($username) ? $username : "Unknown User");
 }
 
-// Get other data with error handling
+// Get data with error handling
 try {
     $feedback_prompts = $db->getFeedbackPrompts($client_id);
     $rented_units = $db->getRentedUnits($client_id);
     
+    // Ensure arrays are returned
     $feedback_prompts = is_array($feedback_prompts) ? $feedback_prompts : [];
     $rented_units = is_array($rented_units) ? $rented_units : [];
     
+    // Get maintenance history and photos only if there are rented units
     $maintenance_history = [];
     $unit_photos = [];
     
@@ -241,11 +364,13 @@ try {
         $maintenance_history = $db->getMaintenanceHistoryForUnits($unit_ids, $client_id);
         $unit_photos = $db->getUnitPhotosForClient($client_id);
         
+        // Ensure arrays are returned
         $maintenance_history = is_array($maintenance_history) ? $maintenance_history : [];
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }
     
 } catch (Exception $e) {
+    // Log error and set defaults
     error_log("Dashboard data fetch error: " . $e->getMessage());
     $feedback_prompts = [];
     $rented_units = [];
@@ -253,15 +378,17 @@ try {
     $unit_photos = [];
 }
 
+// Function to format date in month letters
 function formatDateToMonthLetters($date) {
     if ($date === 'N/A' || empty($date)) {
         return 'N/A';
     }
+    
     try {
         $dateTime = new DateTime($date);
         return $dateTime->format('F j, Y');
     } catch (Exception $e) {
-        return $date;
+        return $date; // Return original if parsing fails
     }
 }
 ?>
@@ -319,59 +446,6 @@ function formatDateToMonthLetters($date) {
             min-height: 100vh;
             margin: 0;
             padding: 0;
-        }
-
-        /* Business Photo Section */
-        .business-photo-section {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border-radius: var(--border-radius);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid #bae6fd;
-            box-shadow: var(--shadow-md);
-        }
-
-        .business-photo-current {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .business-photo-img {
-            max-width: 300px;
-            max-height: 300px;
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-lg);
-            margin: 0 auto 1rem;
-            display: block;
-            border: 3px solid white;
-        }
-
-        .business-photo-history {
-            margin-top: 2rem;
-            padding-top: 2rem;
-            border-top: 1px solid #cbd5e1;
-        }
-
-        .history-item {
-            background: white;
-            padding: 1rem;
-            border-radius: var(--border-radius-sm);
-            margin-bottom: 1rem;
-            border-left: 4px solid var(--primary);
-            box-shadow: var(--shadow-sm);
-        }
-
-        .history-item.inactive {
-            border-left-color: var(--gray);
-            opacity: 0.7;
-        }
-
-        .history-photo {
-            max-width: 80px;
-            max-height: 80px;
-            border-radius: var(--border-radius-sm);
-            margin-right: 1rem;
-            object-fit: cover;
         }
 
         /* Notification Badge */
@@ -679,6 +753,14 @@ function formatDateToMonthLetters($date) {
             border-color: var(--primary);
         }
 
+        /* Image Preview */
+        .image-preview {
+            display: block;
+            margin-top: 10px;
+            border-radius: var(--border-radius-sm);
+            box-shadow: var(--shadow-sm);
+        }
+
         /* Maintenance History */
         .maintenance-section {
             background: var(--light);
@@ -866,15 +948,6 @@ function formatDateToMonthLetters($date) {
             .maintenance-status {
                 margin-left: 0;
             }
-
-            .business-photo-section {
-                padding: 1.5rem;
-            }
-
-            .business-photo-img {
-                max-width: 250px;
-                max-height: 250px;
-            }
         }
 
         @media (max-width: 576px) {
@@ -892,15 +965,6 @@ function formatDateToMonthLetters($date) {
 
             .maintenance-section {
                 padding: 1rem;
-            }
-
-            .business-photo-section {
-                padding: 1rem;
-            }
-
-            .business-photo-img {
-                max-width: 200px;
-                max-height: 200px;
             }
         }
 
@@ -1013,8 +1077,8 @@ function formatDateToMonthLetters($date) {
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-center">
                     <li class="nav-item">
-                        <a class="nav-link active" href="client_dashboard.php">
-                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        <a class="nav-link" href="index.php">
+                            <i class="bi bi-house me-1"></i>Home
                         </a>
                     </li>
                     <li class="nav-item">
@@ -1052,7 +1116,7 @@ function formatDateToMonthLetters($date) {
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <h1 class="welcome-title">Welcome <?= htmlspecialchars($client_display) ?>!</h1>
-                        <p class="welcome-subtitle">Manage your business profile and rental units</p>
+                        <p class="welcome-subtitle">Manage your rental units and stay updated with your property status</p>
                     </div>
                     <div class="col-md-4 text-md-end">
                         <div class="d-flex align-items-center justify-content-md-end">
@@ -1093,114 +1157,6 @@ function formatDateToMonthLetters($date) {
                 <i class="bi bi-exclamation-triangle me-2"></i><?= htmlspecialchars($feedback_error) ?>
             </div>
         <?php endif; ?>
-
-        <!-- BUSINESS PHOTO SECTION -->
-        <div class="business-photo-section fade-in">
-            <div class="row">
-                <div class="col-md-6">
-                    <h3><i class="bi bi-camera me-2"></i>Business Photo</h3>
-                    <p class="text-muted">Upload your business photo to represent your profile</p>
-                    
-                    <!-- Current Business Photo -->
-                    <div class="business-photo-current">
-                        <?php if ($current_business_photo): ?>
-                            <img src="uploads/business_photos/<?= htmlspecialchars($current_business_photo) ?>" 
-                                 alt="Current Business Photo" 
-                                 class="business-photo-img"
-                                 onclick="showImageModal('uploads/business_photos/<?= htmlspecialchars($current_business_photo) ?>')">
-                            <div class="mt-3">
-                                <form method="post" class="d-inline">
-                                    <input type="hidden" name="photo_filename" value="<?= htmlspecialchars($current_business_photo) ?>">
-                                    <button type="submit" name="delete_business_photo" class="btn btn-danger"
-                                            onclick="return confirmDeleteBusinessPhoto(event);">
-                                        <i class="bi bi-trash me-1"></i>Delete Photo
-                                    </button>
-                                </form>
-                            </div>
-                        <?php else: ?>
-                            <div class="text-center py-5">
-                                <i class="bi bi-camera fs-1 text-muted mb-3 d-block"></i>
-                                <p class="text-muted">No business photo uploaded yet</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <div class="col-md-6">
-                    <!-- Upload Form -->
-                    <div class="upload-form">
-                        <h5><i class="bi bi-cloud-upload me-2"></i>Upload New Photo</h5>
-                        <form method="post" enctype="multipart/form-data" id="businessPhotoForm">
-                            <div class="mb-3">
-                                <label class="form-label">Select Photo</label>
-                                <input type="file" 
-                                       name="business_photo" 
-                                       accept="image/jpeg,image/jpg,image/png,image/gif" 
-                                       class="form-control" 
-                                       id="businessPhotoInput"
-                                       required>
-                                <small class="text-muted">Max 2MB. JPG, PNG, GIF only.</small>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Description (Optional)</label>
-                                <textarea name="photo_description" class="form-control" rows="2" 
-                                          placeholder="Describe your business photo..."></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100" id="businessPhotoBtn">
-                                <i class="bi bi-cloud-upload me-1"></i>Upload Business Photo
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Photo History -->
-            <?php if (!empty($business_photo_history)): ?>
-            <div class="business-photo-history">
-                <h5><i class="bi bi-clock-history me-2"></i>Photo History</h5>
-                <div class="history-list">
-                    <?php foreach ($business_photo_history as $history): ?>
-                        <div class="history-item <?= $history['Status'] === 'inactive' ? 'inactive' : '' ?>">
-                            <div class="d-flex align-items-center">
-                                <?php if (file_exists(__DIR__ . "/uploads/business_photos/" . $history['businessPhoto'])): ?>
-                                    <img src="uploads/business_photos/<?= htmlspecialchars($history['businessPhoto']) ?>" 
-                                         alt="History Photo" 
-                                         class="history-photo"
-                                         onclick="showImageModal('uploads/business_photos/<?= htmlspecialchars($history['businessPhoto']) ?>')">
-                                <?php else: ?>
-                                    <div class="history-photo bg-light d-flex align-items-center justify-content-center">
-                                        <i class="bi bi-image text-muted"></i>
-                                    </div>
-                                <?php endif; ?>
-                                <div class="flex-grow-1">
-                                    <div class="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <strong class="text-capitalize"><?= htmlspecialchars($history['Action']) ?></strong>
-                                            <?php if ($history['Status'] === 'active'): ?>
-                                                <span class="badge bg-success ms-2">Current</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <small class="text-muted"><?= formatDateToMonthLetters($history['Action_Date']) ?></small>
-                                    </div>
-                                    <?php if ($history['description']): ?>
-                                        <p class="mb-1 small"><?= htmlspecialchars($history['description']) ?></p>
-                                    <?php endif; ?>
-                                    <small class="text-muted d-block">
-                                        File: <?= htmlspecialchars($history['businessPhoto']) ?>
-                                    </small>
-                                    <?php if ($history['Previous_businessPhoto']): ?>
-                                        <small class="text-muted">
-                                            Previous: <?= htmlspecialchars($history['Previous_businessPhoto']) ?>
-                                        </small>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
 
         <!-- Feedback Section -->
         <?php if (!empty($feedback_prompts)): ?>
@@ -1507,12 +1463,12 @@ function formatDateToMonthLetters($date) {
             <div class="modal-content" style="border-radius: var(--border-radius); border: none; box-shadow: var(--shadow-xl);">
                 <div class="modal-header">
                     <h5 class="modal-title" id="imageModalLabel">
-                        <i class="bi bi-image me-2"></i>Photo Preview
+                        <i class="bi bi-image me-2"></i>Unit Photo
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center p-0">
-                    <img id="modalImage" src="" alt="Photo preview" class="img-fluid" style="max-height: 70vh;">
+                    <img id="modalImage" src="" alt="Unit photo" class="img-fluid" style="max-height: 70vh;">
                 </div>
             </div>
         </div>
@@ -1530,27 +1486,7 @@ function formatDateToMonthLetters($date) {
             imageModal.show();
         }
 
-        // Business photo delete confirmation
-        function confirmDeleteBusinessPhoto(event) {
-            event.preventDefault();
-            Swal.fire({
-                title: 'Delete Business Photo?',
-                text: `Are you sure you want to delete your business photo?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ef4444',
-                cancelButtonColor: '#6b7280',
-                confirmButtonText: 'Yes, delete it!',
-                cancelButtonText: 'Cancel'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    event.target.closest('form').submit();
-                }
-            });
-            return false;
-        }
-
-        // Unit photo delete confirmation
+        // Enhanced photo delete confirmation
         function confirmDeletePhoto(event, filename) {
             event.preventDefault();
             Swal.fire({
@@ -1564,6 +1500,7 @@ function formatDateToMonthLetters($date) {
                 cancelButtonText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
+                    // Submit the form
                     event.target.closest('form').submit();
                 }
             });
@@ -1577,11 +1514,13 @@ function formatDateToMonthLetters($date) {
             const icon = document.getElementById(`maintenance-icon-${spaceId}`);
             
             if (full.classList.contains('d-none')) {
+                // Show full history
                 preview.classList.add('d-none');
                 full.classList.remove('d-none');
                 icon.classList.remove('bi-chevron-down');
                 icon.classList.add('bi-chevron-up');
             } else {
+                // Show preview only
                 preview.classList.remove('d-none');
                 full.classList.add('d-none');
                 icon.classList.remove('bi-chevron-up');
@@ -1589,18 +1528,35 @@ function formatDateToMonthLetters($date) {
             }
         }
 
-        // Business photo upload validation
+        // Close navbar on mobile when clicking nav links
         document.addEventListener('DOMContentLoaded', function() {
-            const businessPhotoInput = document.getElementById('businessPhotoInput');
-            const businessPhotoForm = document.getElementById('businessPhotoForm');
-            const businessPhotoBtn = document.getElementById('businessPhotoBtn');
+            const navbarCollapse = document.getElementById('navbarNav');
+            if (navbarCollapse) {
+                navbarCollapse.addEventListener('click', function(e) {
+                    let target = e.target;
+                    while (target && target !== navbarCollapse) {
+                        if (target.classList && (target.classList.contains('nav-link') || target.type === 'submit')) {
+                            if (window.innerWidth < 992) {
+                                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
+                                bsCollapse.hide();
+                            }
+                            break;
+                        }
+                        target = target.parentElement;
+                    }
+                });
+            }
 
-            if (businessPhotoInput) {
-                businessPhotoInput.addEventListener('change', function() {
+            // Enhanced file input with preview and validation
+            const fileInputs = document.querySelectorAll('input[type="file"]');
+            fileInputs.forEach(input => {
+                input.addEventListener('change', function() {
                     const file = this.files[0];
+                    const spaceId = this.id.replace('fileInput_', '');
+                    
                     if (file) {
                         // Validate file size
-                        if (file.size > 2 * 1024 * 1024) {
+                        if (file.size > 2 * 1024 * 1024) { // 2MB
                             Swal.fire({
                                 icon: 'error',
                                 title: 'File Too Large',
@@ -1623,13 +1579,44 @@ function formatDateToMonthLetters($date) {
                             this.value = '';
                             return;
                         }
+
+                        // Create image preview
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = function(e) {
+                                // Remove existing preview
+                                const existingPreview = input.parentNode.querySelector('.image-preview');
+                                if (existingPreview) {
+                                    existingPreview.remove();
+                                }
+                                
+                                // Create preview
+                                const preview = document.createElement('img');
+                                preview.src = e.target.result;
+                                preview.className = 'image-preview';
+                                preview.style.maxWidth = '100px';
+                                preview.style.maxHeight = '100px';
+                                preview.style.objectFit = 'cover';
+                                preview.style.borderRadius = '8px';
+                                preview.style.marginTop = '10px';
+                                preview.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+                                
+                                input.parentNode.appendChild(preview);
+                            };
+                            reader.readAsDataURL(file);
+                        }
                     }
                 });
-            }
+            });
 
-            // Business photo form submission
-            if (businessPhotoForm) {
-                businessPhotoForm.addEventListener('submit', function(e) {
+            // Form submission loading state
+            const uploadForms = document.querySelectorAll('form[id^="uploadForm_"]');
+            uploadForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+                    
+                    // Validate file selection
                     const fileInput = this.querySelector('input[type="file"]');
                     if (!fileInput.files[0]) {
                         e.preventDefault();
@@ -1643,40 +1630,10 @@ function formatDateToMonthLetters($date) {
                     }
                     
                     // Show loading state
-                    const originalText = businessPhotoBtn.innerHTML;
-                    businessPhotoBtn.innerHTML = '<span class="spinner me-1"></span>Uploading...';
-                    businessPhotoBtn.disabled = true;
-                    
-                    // Reset button after 30 seconds (timeout)
-                    setTimeout(() => {
-                        businessPhotoBtn.innerHTML = originalText;
-                        businessPhotoBtn.disabled = false;
-                    }, 30000);
-                });
-            }
-
-            // Unit photo upload forms
-            const uploadForms = document.querySelectorAll('form[id^="uploadForm_"]');
-            uploadForms.forEach(form => {
-                form.addEventListener('submit', function(e) {
-                    const submitBtn = this.querySelector('button[type="submit"]');
-                    const fileInput = this.querySelector('input[type="file"]');
-                    
-                    if (!fileInput.files[0]) {
-                        e.preventDefault();
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'No File Selected',
-                            text: 'Please select an image to upload.',
-                            confirmButtonColor: '#2563eb'
-                        });
-                        return;
-                    }
-                    
-                    const originalText = submitBtn.innerHTML;
                     submitBtn.innerHTML = '<span class="spinner me-1"></span>Uploading...';
                     submitBtn.disabled = true;
                     
+                    // Reset button after 30 seconds (timeout)
                     setTimeout(() => {
                         submitBtn.innerHTML = originalText;
                         submitBtn.disabled = false;
@@ -1705,6 +1662,7 @@ function formatDateToMonthLetters($date) {
                     submitBtn.innerHTML = '<span class="spinner me-1"></span>Submitting...';
                     submitBtn.disabled = true;
                     
+                    // Reset button after 10 seconds (timeout)
                     setTimeout(() => {
                         submitBtn.innerHTML = originalText;
                         submitBtn.disabled = false;
@@ -1733,6 +1691,7 @@ function formatDateToMonthLetters($date) {
 
         // Live poll unread admin messages for client (Payment nav badge)
         function pollClientUnreadAdminBadge() {
+            // Only run if client is logged in
             <?php if (isset($_SESSION['client_id'])): ?>
             fetch('../AJAX/get_unread_admin_chat_counts.php', {
                 method: 'POST',
@@ -1741,6 +1700,7 @@ function formatDateToMonthLetters($date) {
             })
             .then(res => res.json())
             .then(counts => {
+                // Sum all unread admin messages across all invoices
                 let total = 0;
                 Object.values(counts).forEach(cnt => { total += cnt; });
                 const badge = document.getElementById('client-unread-admin-badge');
