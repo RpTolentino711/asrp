@@ -369,6 +369,10 @@ try {
         $unit_photos = is_array($unit_photos) ? $unit_photos : [];
     }
     
+    // Get payment history for the client
+    $payment_history = $db->getClientInvoiceHistory($client_id);
+    $payment_history = is_array($payment_history) ? $payment_history : [];
+    
 } catch (Exception $e) {
     // Log error and set defaults
     error_log("Dashboard data fetch error: " . $e->getMessage());
@@ -376,6 +380,7 @@ try {
     $rented_units = [];
     $maintenance_history = [];
     $unit_photos = [];
+    $payment_history = [];
 }
 
 // Function to format date in month letters
@@ -389,6 +394,58 @@ function formatDateToMonthLetters($date) {
         return $dateTime->format('F j, Y');
     } catch (Exception $e) {
         return $date; // Return original if parsing fails
+    }
+}
+
+// Function to calculate days until due
+function getDaysUntilDue($due_date) {
+    if ($due_date === 'N/A' || empty($due_date)) {
+        return 'N/A';
+    }
+    
+    try {
+        $due = new DateTime($due_date);
+        $today = new DateTime();
+        $interval = $today->diff($due);
+        
+        if ($due < $today) {
+            return '<span class="text-danger">Overdue by ' . $interval->days . ' days</span>';
+        } else {
+            return $interval->days . ' days';
+        }
+    } catch (Exception $e) {
+        return 'N/A';
+    }
+}
+
+// Separate invoices by status for payment tracking
+$paid_invoices = [];
+$unpaid_invoices = [];
+$upcoming_invoices = [];
+
+foreach ($payment_history as $invoice) {
+    $status = strtolower($invoice['Status'] ?? '');
+    $due_date = $invoice['EndDate'] ?? '';
+    
+    if ($status === 'paid') {
+        $paid_invoices[] = $invoice;
+    } else {
+        $unpaid_invoices[] = $invoice;
+        
+        // Check if invoice is upcoming (due in next 7 days)
+        if (!empty($due_date)) {
+            try {
+                $due = new DateTime($due_date);
+                $today = new DateTime();
+                $interval = $today->diff($due);
+                
+                if ($interval->days <= 7 && $due >= $today) {
+                    $upcoming_invoices[] = $invoice;
+                }
+            } catch (Exception $e) {
+                // Skip if date parsing fails
+            }
+        }
     }
 }
 ?>
@@ -613,6 +670,127 @@ function formatDateToMonthLetters($date) {
 
         .card-body {
             padding: 1.5rem;
+        }
+
+        /* Payment Tracking Cards */
+        .payment-stat-card {
+            background: linear-gradient(135deg, var(--lighter) 0%, var(--light) 100%);
+            border: 1px solid var(--gray-light);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            text-align: center;
+            transition: var(--transition);
+            height: 100%;
+        }
+
+        .payment-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .payment-stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 1.5rem;
+        }
+
+        .payment-stat-icon.paid {
+            background: linear-gradient(135deg, #10b981, #34d399);
+            color: white;
+        }
+
+        .payment-stat-icon.pending {
+            background: linear-gradient(135deg, #f59e0b, #fbbf24);
+            color: white;
+        }
+
+        .payment-stat-icon.upcoming {
+            background: linear-gradient(135deg, #3b82f6, #60a5fa);
+            color: white;
+        }
+
+        .payment-stat-icon.total {
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+            color: white;
+        }
+
+        .payment-stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .payment-stat-label {
+            color: var(--gray);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* Invoice Table */
+        .invoice-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .invoice-table th {
+            background: var(--light);
+            padding: 1rem;
+            font-weight: 600;
+            color: var(--secondary);
+            border-bottom: 2px solid var(--gray-light);
+        }
+
+        .invoice-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--gray-light);
+            vertical-align: middle;
+        }
+
+        .invoice-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .invoice-table tr:hover {
+            background: rgba(37, 99, 235, 0.02);
+        }
+
+        .status-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-paid {
+            background: rgba(16, 185, 129, 0.1);
+            color: #065f46;
+        }
+
+        .status-unpaid {
+            background: rgba(239, 68, 68, 0.1);
+            color: #991b1b;
+        }
+
+        .status-upcoming {
+            background: rgba(59, 130, 246, 0.1);
+            color: #1e40af;
+        }
+
+        .due-date-warning {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        .due-date-normal {
+            color: var(--success);
+            font-weight: 600;
         }
 
         /* Unit Cards */
@@ -948,6 +1126,19 @@ function formatDateToMonthLetters($date) {
             .maintenance-status {
                 margin-left: 0;
             }
+
+            .invoice-table {
+                font-size: 0.9rem;
+            }
+
+            .invoice-table th,
+            .invoice-table td {
+                padding: 0.75rem 0.5rem;
+            }
+
+            .payment-stat-number {
+                font-size: 1.5rem;
+            }
         }
 
         @media (max-width: 576px) {
@@ -964,6 +1155,10 @@ function formatDateToMonthLetters($date) {
             }
 
             .maintenance-section {
+                padding: 1rem;
+            }
+
+            .payment-stat-card {
                 padding: 1rem;
             }
         }
@@ -1158,9 +1353,133 @@ function formatDateToMonthLetters($date) {
             </div>
         <?php endif; ?>
 
+        <!-- Payment Tracking Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="fw-bold mb-0">
+                        <i class="bi bi-credit-card-2-front me-2"></i>Payment Tracking
+                    </h2>
+                    <div class="badge bg-primary fs-6">
+                        Financial Overview
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Statistics -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3 col-sm-6">
+                <div class="payment-stat-card fade-in">
+                    <div class="payment-stat-icon paid">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="payment-stat-number text-success"><?= count($paid_invoices) ?></div>
+                    <div class="payment-stat-label">Paid Invoices</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="payment-stat-card fade-in">
+                    <div class="payment-stat-icon pending">
+                        <i class="bi bi-clock"></i>
+                    </div>
+                    <div class="payment-stat-number text-warning"><?= count($unpaid_invoices) ?></div>
+                    <div class="payment-stat-label">Pending Payments</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="payment-stat-card fade-in">
+                    <div class="payment-stat-icon upcoming">
+                        <i class="bi bi-calendar-check"></i>
+                    </div>
+                    <div class="payment-stat-number text-primary"><?= count($upcoming_invoices) ?></div>
+                    <div class="payment-stat-label">Upcoming Due</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="payment-stat-card fade-in">
+                    <div class="payment-stat-icon total">
+                        <i class="bi bi-receipt"></i>
+                    </div>
+                    <div class="payment-stat-number text-secondary"><?= count($payment_history) ?></div>
+                    <div class="payment-stat-label">Total Invoices</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice History Table -->
+        <div class="card fade-in">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check me-2"></i>Invoice History
+                </h5>
+            </div>
+            <div class="card-body">
+                <?php if (!empty($payment_history)): ?>
+                    <div class="table-responsive">
+                        <table class="invoice-table">
+                            <thead>
+                                <tr>
+                                    <th>Unit</th>
+                                    <th>Billing Period</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Due Date</th>
+                                    <th>Days Until Due</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($payment_history as $invoice): 
+                                    $status = strtolower($invoice['Status'] ?? '');
+                                    $due_date = $invoice['EndDate'] ?? '';
+                                    $invoice_date = $invoice['InvoiceDate'] ?? '';
+                                    $days_until_due = getDaysUntilDue($due_date);
+                                ?>
+                                    <tr class="fade-in">
+                                        <td>
+                                            <strong><?= htmlspecialchars($invoice['SpaceName'] ?? 'N/A') ?></strong>
+                                        </td>
+                                        <td>
+                                            <?= formatDateToMonthLetters($invoice_date) ?> - <?= formatDateToMonthLetters($due_date) ?>
+                                        </td>
+                                        <td>
+                                            <strong>₱<?= number_format(floatval($invoice['InvoiceTotal'] ?? 0), 2) ?></strong>
+                                        </td>
+                                        <td>
+                                            <?php if ($status === 'paid'): ?>
+                                                <span class="status-badge status-paid">
+                                                    <i class="bi bi-check-circle me-1"></i>Paid
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="status-badge status-unpaid">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i>Unpaid
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?= formatDateToMonthLetters($due_date) ?>
+                                        </td>
+                                        <td>
+                                            <?= $days_until_due ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="empty-state">
+                        <i class="bi bi-receipt"></i>
+                        <h5>No Invoice History</h5>
+                        <p>You don't have any invoices yet. Your payment history will appear here.</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
         <!-- Feedback Section -->
         <?php if (!empty($feedback_prompts)): ?>
-            <div class="alert alert-warning fade-in">
+            <div class="alert alert-warning fade-in mt-4">
                 <i class="bi bi-chat-heart me-2"></i>
                 We value your experience! Please provide feedback for your recently ended rental(s).
             </div>
@@ -1206,7 +1525,7 @@ function formatDateToMonthLetters($date) {
         <?php endif; ?>
 
         <!-- Rented Units Section -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
             <h2 class="fw-bold mb-0">
                 <i class="bi bi-buildings me-2"></i>Your Rental Portfolio
             </h2>
@@ -1537,7 +1856,7 @@ function formatDateToMonthLetters($date) {
                     while (target && target !== navbarCollapse) {
                         if (target.classList && (target.classList.contains('nav-link') || target.type === 'submit')) {
                             if (window.innerWidth < 992) {
-                                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navbarCollapse);
+                                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(navaryCollapse);
                                 bsCollapse.hide();
                             }
                             break;
