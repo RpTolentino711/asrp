@@ -1501,71 +1501,71 @@ function formatDateToMonthLetters($date) {
         let shownPaymentNotifications = new Set();
         let shownReminderNotifications = new Set();
 
-        function checkPaymentStatusAndNotify() {
-            <?php if (!empty($rented_units) && isset($client_id)): ?>
-            console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
-            
-            // FIXED: Use correct path to AJAX folder
-fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
-            .then(res => {
-                console.log('📡 Response status:', res.status);
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then(data => {
-                console.log('📊 Payment status data:', data);
-                
-                if (data.success) {
-                    console.log('✅ Found paid invoices:', data.paid_invoices?.length || 0);
-                    console.log('📅 Found upcoming payments:', data.upcoming_payments?.length || 0);
-                    
-                    // Show payment confirmation notifications
-                    if (data.paid_invoices && data.paid_invoices.length > 0) {
-                        data.paid_invoices.forEach(invoice => {
-                            const notificationKey = `paid_${invoice.Invoice_ID}`;
-                            
-                            if (!shownPaymentNotifications.has(notificationKey)) {
-                                console.log('💰 Showing payment confirmation for invoice:', invoice.Invoice_ID);
-                                showPaymentConfirmation(invoice);
-                                shownPaymentNotifications.add(notificationKey);
-                                
-                                // Remove from set after 1 hour to allow re-notification if needed
-                                setTimeout(() => {
-                                    shownPaymentNotifications.delete(notificationKey);
-                                }, 3600000);
-                            }
-                        });
-                    }
-
-                    // Show payment reminder notifications
-                    if (data.upcoming_payments && data.upcoming_payments.length > 0) {
-                        data.upcoming_payments.forEach(invoice => {
-                            const reminderKey = `reminder_${invoice.Invoice_ID}`;
-                            
-                            if (!shownReminderNotifications.has(reminderKey)) {
-                                console.log('⏰ Showing payment reminder for invoice:', invoice.Invoice_ID);
-                                showPaymentReminder(invoice);
-                                shownReminderNotifications.add(reminderKey);
-                            }
-                        });
-                    }
-                    
-                    if (data.paid_invoices?.length === 0 && data.upcoming_payments?.length === 0) {
-                        console.log('ℹ️ No payment notifications to show');
-                    }
-                } else {
-                    console.error('❌ Payment status check failed:', data.error);
-                }
-            })
-            .catch(err => {
-                console.error('❌ Payment status check failed:', err);
-            });
-            <?php else: ?>
-            console.log('ℹ️ No rented units, skipping payment check');
-            <?php endif; ?>
+       function checkPaymentStatusAndNotify() {
+    <?php if (!empty($rented_units) && isset($client_id)): ?>
+    console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
+    
+    // USE ../AJAX/ like the working get_unread_admin_chat_counts.php
+    fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+    .then(res => {
+        console.log('📡 Response status:', res.status);
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
         }
+        return res.json();
+    })
+    .then(data => {
+        console.log('📊 Payment status data:', data);
+        
+        if (data.success) {
+            console.log('✅ Found paid invoices:', data.paid_invoices?.length || 0);
+            console.log('📅 Found upcoming payments:', data.upcoming_payments?.length || 0);
+            
+            // Show payment confirmation notifications
+            if (data.paid_invoices && data.paid_invoices.length > 0) {
+                data.paid_invoices.forEach(invoice => {
+                    const notificationKey = `paid_${invoice.Invoice_ID}`;
+                    
+                    if (!shownPaymentNotifications.has(notificationKey)) {
+                        console.log('💰 Showing payment confirmation for invoice:', invoice.Invoice_ID);
+                        showPaymentConfirmation(invoice);
+                        shownPaymentNotifications.add(notificationKey);
+                        
+                        // Remove from set after 1 hour to allow re-notification if needed
+                        setTimeout(() => {
+                            shownPaymentNotifications.delete(notificationKey);
+                        }, 3600000);
+                    }
+                });
+            }
+
+            // Show payment reminder notifications
+            if (data.upcoming_payments && data.upcoming_payments.length > 0) {
+                data.upcoming_payments.forEach(invoice => {
+                    const reminderKey = `reminder_${invoice.Invoice_ID}`;
+                    
+                    if (!shownReminderNotifications.has(reminderKey)) {
+                        console.log('⏰ Showing payment reminder for invoice:', invoice.Invoice_ID);
+                        showPaymentReminder(invoice);
+                        shownReminderNotifications.add(reminderKey);
+                    }
+                });
+            }
+            
+            if (data.paid_invoices?.length === 0 && data.upcoming_payments?.length === 0) {
+                console.log('ℹ️ No payment notifications to show');
+            }
+        } else {
+            console.error('❌ Payment status check failed:', data.error);
+        }
+    })
+    .catch(err => {
+        console.error('❌ Payment status check failed:', err);
+    });
+    <?php else: ?>
+    console.log('ℹ️ No rented units, skipping payment check');
+    <?php endif; ?>
+}
 
         function showPaymentConfirmation(invoice) {
             const nextDueDate = invoice.NextDueDate ? new Date(invoice.NextDueDate).toLocaleDateString('en-US', {
