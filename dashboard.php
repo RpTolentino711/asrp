@@ -1530,7 +1530,7 @@ function formatDateToMonthLetters($date) {
 
         // Function to check and show payment status popup
         function checkPaymentStatus() {
-            fetch('../AJAX/check_payment_status.php', {
+            fetch('AJAX/check_payment_status.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
