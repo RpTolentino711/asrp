@@ -2640,6 +2640,23 @@ public function addPhotoToHistory($space_id, $filename, $action, $previous_filen
     }
 }
 
+// Function to add client photo to history
+function addClientPhotoToHistory($db, $space_id, $photo_path, $action) {
+    $client_id = -$_SESSION['client_id'];
+    
+    try {
+        $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status) 
+                VALUES (?, ?, ?, ?, ?, ?)";
+        
+        $status = ($action === 'deleted') ? 'inactive' : 'active';
+        $stmt = $db->conn->prepare($sql);
+        return $stmt->execute([$space_id, $photo_path, $action, null, $client_id, $status]);
+    } catch (PDOException $e) {
+        error_log("addClientPhotoToHistory Error: " . $e->getMessage());
+        return false;
+    }
+}
+
 public function deactivatePhoto($space_id, $filename) {
     $sql = "UPDATE photo_history SET Status = 'inactive' 
             WHERE Space_ID = ? AND Photo_Path = ? AND Status = 'active'";
