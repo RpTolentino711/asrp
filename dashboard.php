@@ -1505,8 +1505,8 @@ function formatDateToMonthLetters($date) {
     <?php if (!empty($rented_units) && isset($client_id)): ?>
     console.log('🔔 Checking payment status for client:', <?= json_encode($client_id) ?>);
     
-    // USE ../AJAX/ like the working get_unread_admin_chat_counts.php
-    fetch(`../AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
+    // FIXED: Use AJAX/ instead of ../AJAX/
+    fetch(`AJAX/check_payment_status.php?client_id=<?= $client_id ?>&t=${Date.now()}`)
     .then(res => {
         console.log('📡 Response status:', res.status);
         if (!res.ok) {
@@ -1843,7 +1843,8 @@ function formatDateToMonthLetters($date) {
         function pollClientUnreadAdminBadge() {
             // Only run if client is logged in
             <?php if (isset($_SESSION['client_id'])): ?>
-            fetch('../AJAX/get_unread_admin_chat_counts.php', {
+            // FIXED: Use AJAX/ instead of ../AJAX/
+            fetch('AJAX/get_unread_admin_chat_counts.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: 'client_id=' + encodeURIComponent(<?= json_encode($_SESSION['client_id']) ?>)
