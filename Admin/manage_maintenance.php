@@ -9,6 +9,24 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// --- NOTIFICATION SYSTEM VARIABLES ---
+$unseen_rentals_sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
+$unseen_rentals_result = $db->getRow($unseen_rentals_sql);
+$unseen_rentals = $unseen_rentals_result['count'] ?? 0;
+
+$new_maintenance_sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0";
+$new_maintenance_result = $db->getRow($new_maintenance_sql);
+$new_maintenance_requests = $new_maintenance_result['count'] ?? 0;
+
+$unread_messages_sql = "SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0";
+$unread_messages_result = $db->getRow($unread_messages_sql);
+$unread_client_messages = $unread_messages_result['count'] ?? 0;
+
+// Get counts for sidebar badges
+$rental_count = $db->getRow("SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new'")['count'];
+$maintenance_count = $db->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'];
+$chat_count = $db->getRow("SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0")['count'];
+
 // MARK ALL MAINTENANCE REQUESTS AS SEEN WHEN ADMIN VIEWS THE PAGE
 $db->executeStatement(
     "UPDATE maintenancerequest SET admin_seen = 1 WHERE Status = 'Submitted' AND admin_seen = 0"
@@ -244,6 +262,17 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             width: 24px;
             margin-right: 0.75rem;
             font-size: 1.1rem;
+        }
+
+        .badge-notification {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 20px;
+            font-weight: 600;
         }
         
         .main-content {
@@ -748,6 +777,49 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Notification Styles */
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .bell-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            75% { transform: rotate(15deg); }
+        }
+
+        .tools-shake {
+            animation: toolsShake 0.5s ease-in-out;
+        }
+
+        @keyframes toolsShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-10deg) scale(1.1); }
+            50% { transform: rotate(10deg) scale(1.1); }
+            75% { transform: rotate(-5deg) scale(1.05); }
+        }
+
+        .message-shake {
+            animation: messageShake 0.5s ease-in-out;
+        }
+
+        @keyframes messageShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-8deg) scale(1.1); }
+            50% { transform: rotate(8deg) scale(1.1); }
+            75% { transform: rotate(-4deg) scale(1.05); }
+        }
         
         /* CRITICAL: Mobile Responsive Breakpoints */
         @media (max-width: 992px) {
@@ -930,6 +1002,9 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 <a href="view_rental_requests.php" class="nav-link">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Rental Requests</span>
+                    <?php if ($rental_count > 0): ?>
+                        <span class="badge badge-notification bg-danger notification-badge" id="sidebarRentalBadge"><?= $rental_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -937,6 +1012,9 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 <a href="manage_maintenance.php" class="nav-link active">
                     <i class="fas fa-tools"></i>
                     <span>Maintenance</span>
+                    <?php if ($maintenance_count > 0): ?>
+                        <span class="badge badge-notification bg-warning" id="sidebarMaintenanceBadge"><?= $maintenance_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -944,6 +1022,9 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
                 <a href="generate_invoice.php" class="nav-link">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Invoices</span>
+                    <?php if ($chat_count > 0): ?>
+                        <span class="badge badge-notification bg-info" id="sidebarInvoicesBadge"><?= $chat_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1263,100 +1344,350 @@ $handyman_list = $db->getAllHandymenWithJobTypes();
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-            const sidebar = document.getElementById('sidebar');
-            const mobileOverlay = document.getElementById('mobileOverlay');
+        // --- ENHANCED NOTIFICATION SYSTEM (EXCLUDING MAINTENANCE POPUPS) ---
+        let rentalNotificationCooldown = false;
+        let clientMessageNotificationCooldown = false;
+
+        let lastUnseenRentals = <?= $unseen_rentals ?>;
+        let lastUnreadClientMessages = <?= $unread_client_messages ?>;
+        let isFirstLoad = true;
+        let isTabActive = true;
+
+        // Debug logging
+        console.log('Maintenance page initialized');
+        console.log('Initial counts - Unseen Rentals: <?= $unseen_rentals ?>, Unread Messages: <?= $unread_client_messages ?>');
+
+        // Tab visibility handling
+        document.addEventListener('visibilitychange', function() {
+            isTabActive = !document.hidden;
+            console.log('Tab visibility changed:', isTabActive ? 'active' : 'hidden');
+            if (isTabActive) {
+                fetchDashboardCounts();
+            }
+        });
+
+        // Show rental notification (ONLY rental notifications - no maintenance notifications on maintenance page)
+        function showNewRequestNotification(count) {
+            if (rentalNotificationCooldown) {
+                console.log('Rental notification cooldown active');
+                return;
+            }
             
-            function toggleMobileMenu() {
-                sidebar.classList.toggle('active');
-                mobileOverlay.classList.toggle('active');
-                document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-            }
-
-            if (mobileMenuBtn) {
-                mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-            }
+            console.log('Showing rental notification for', count, 'new requests');
+            rentalNotificationCooldown = true;
             
-            if (mobileOverlay) {
-                mobileOverlay.addEventListener('click', toggleMobileMenu);
-            }
-
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.addEventListener('click', () => {
-                    if (window.innerWidth <= 992 && sidebar.classList.contains('active')) {
-                        toggleMobileMenu();
-                    }
-                });
-            });
-
-            let resizeTimer;
-            window.addEventListener('resize', () => {
-                clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(() => {
-                    if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
-                        sidebar.classList.remove('active');
-                        mobileOverlay.classList.remove('active');
-                        document.body.style.overflow = '';
-                    }
-                }, 250);
-            });
-
-            document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', function(e) {
-                    const submitBtn = this.querySelector('[type="submit"]');
-                    const mobileCard = this.closest('.mobile-card');
-                    
-                    // Show loading state
-                    if (mobileCard) {
-                        const loadingOverlay = mobileCard.querySelector('.loading-overlay');
-                        if (loadingOverlay) {
-                            loadingOverlay.classList.add('show');
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-success alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 20px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #10b981;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-bell text-success fs-4 me-3 bell-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🏠 New Rental Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new pending request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="view_rental_requests.php" class="btn btn-sm btn-success">
+                                <i class="fas fa-eye me-1"></i>View Requests
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
                         }
-                    }
-                    
-                    if (submitBtn) {
-                        const originalText = submitBtn.innerHTML;
-                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                        submitBtn.disabled = true;
-                    }
-                });
-            });
-
-            document.querySelectorAll('.alert').forEach(alert => {
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.style.opacity = '0';
-                        alert.style.transform = 'translateY(-20px)';
-                        setTimeout(() => {
-                            if (alert.parentNode) {
-                                alert.remove();
-                            }
-                        }, 300);
-                    }
-                }, 6000);
-            });
-
-            document.addEventListener('change', function(e) {
-                if (e.target.name === 'status' && e.target.value === 'Completed') {
-                    const requestId = e.target.closest('form').dataset.requestId;
-                    if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request.')) {
-                        const options = e.target.options;
-                        for (let i = 0; i < options.length; i++) {
-                            if (options[i].defaultSelected) {
-                                e.target.selectedIndex = i;
-                                break;
-                            }
-                        }
-                    }
+                    }, 300);
                 }
-            });
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                rentalNotificationCooldown = false;
+                console.log('Rental notification cooldown reset');
+            }, 10000);
+        }
 
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && sidebar.classList.contains('active')) {
+        // Show client message notification
+        function showNewClientMessageNotification(count) {
+            if (clientMessageNotificationCooldown) {
+                console.log('Client message notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing client message notification for', count, 'new messages');
+            clientMessageNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-info alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 100px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #06b6d4;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-comments text-info fs-4 me-3 message-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">💬 New Client Message!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new message${count > 1 ? 's' : ''} from client${count > 1 ? 's' : ''}.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="generate_invoice.php" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-inbox me-1"></i>View Messages
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                clientMessageNotificationCooldown = false;
+                console.log('Client message notification cooldown reset');
+            }, 10000);
+        }
+
+        function updateBadgeAnimation(badgeElement, newCount, oldCount) {
+            if (newCount > oldCount && !isFirstLoad) {
+                badgeElement.classList.add('notification-badge');
+                setTimeout(() => {
+                    badgeElement.classList.remove('notification-badge');
+                }, 3000);
+            }
+        }
+
+        // Function to update sidebar badges
+        function updateSidebarBadge(currentCount, badgeId, linkSelector) {
+            const sidebarBadge = document.getElementById(badgeId);
+            if (sidebarBadge) {
+                const oldCount = parseInt(sidebarBadge.textContent);
+                sidebarBadge.textContent = currentCount;
+                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+            } else {
+                // Create badge if it doesn't exist
+                const link = document.querySelector(`a[href="${linkSelector}"]`);
+                if (link && currentCount > 0) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = badgeId;
+                    newBadge.className = 'badge badge-notification bg-danger notification-badge';
+                    newBadge.textContent = currentCount;
+                    link.appendChild(newBadge);
+                }
+            }
+        }
+
+        // Fetch dashboard counts
+        function fetchDashboardCounts() {
+            if (!isTabActive) {
+                console.log('Tab not active, skipping count fetch');
+                return;
+            }
+            
+            console.log('Fetching dashboard counts...');
+            fetch('../AJAX/ajax_admin_dashboard_counts.php')
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Counts received:', data);
+                    
+                    if (data && !data.error) {
+                        const currentUnseenRentals = data.unseen_rentals ?? 0;
+                        const currentUnreadClientMessages = data.unread_client_messages ?? 0;
+
+                        // Check for new rental requests (NO maintenance notifications on maintenance page)
+                        if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
+                            const newRequests = currentUnseenRentals - lastUnseenRentals;
+                            console.log(`New rental requests detected: ${newRequests} (was ${lastUnseenRentals}, now ${currentUnseenRentals})`);
+                            showNewRequestNotification(newRequests);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnseenRentals, 'sidebarRentalBadge', 'view_rental_requests.php');
+                        }
+                        
+                        // Check for new client messages
+                        if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
+                            const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+                            console.log(`New client messages detected: ${newMessages} (was ${lastUnreadClientMessages}, now ${currentUnreadClientMessages})`);
+                            showNewClientMessageNotification(newMessages);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnreadClientMessages, 'sidebarInvoicesBadge', 'generate_invoice.php');
+                        }
+                        
+                        lastUnseenRentals = currentUnseenRentals;
+                        lastUnreadClientMessages = currentUnreadClientMessages;
+                        isFirstLoad = false;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching dashboard counts:', err);
+                });
+        }
+
+        // Mobile menu functionality
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        const mobileOverlay = document.getElementById('mobileOverlay');
+        
+        function toggleMobileMenu() {
+            sidebar.classList.toggle('active');
+            mobileOverlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        }
+
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+        }
+        
+        if (mobileOverlay) {
+            mobileOverlay.addEventListener('click', toggleMobileMenu);
+        }
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 992 && sidebar.classList.contains('active')) {
                     toggleMobileMenu();
                 }
             });
+        });
+
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
+                    sidebar.classList.remove('active');
+                    mobileOverlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }, 250);
+        });
+
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                const submitBtn = this.querySelector('[type="submit"]');
+                const mobileCard = this.closest('.mobile-card');
+                
+                // Show loading state
+                if (mobileCard) {
+                    const loadingOverlay = mobileCard.querySelector('.loading-overlay');
+                    if (loadingOverlay) {
+                        loadingOverlay.classList.add('show');
+                    }
+                }
+                
+                if (submitBtn) {
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                    submitBtn.disabled = true;
+                }
+            });
+        });
+
+        document.querySelectorAll('.alert').forEach(alert => {
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-20px)';
+                    setTimeout(() => {
+                        if (alert.parentNode) {
+                            alert.remove();
+                        }
+                    }, 300);
+                }
+            }, 6000);
+        });
+
+        document.addEventListener('change', function(e) {
+            if (e.target.name === 'status' && e.target.value === 'Completed') {
+                const requestId = e.target.closest('form').dataset.requestId;
+                if (!confirm('Mark maintenance request #' + requestId + ' as completed?\n\nThis will finalize the request.')) {
+                    const options = e.target.options;
+                    for (let i = 0; i < options.length; i++) {
+                        if (options[i].defaultSelected) {
+                            e.target.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && sidebar.classList.contains('active')) {
+                toggleMobileMenu();
+            }
+        });
+
+        // Debug: Manual trigger for testing
+        window.testNotification = function(type) {
+            if (type === 'rental') {
+                showNewRequestNotification(1);
+            } else if (type === 'client_message') {
+                showNewClientMessageNotification(1);
+            }
+        };
+
+        // Start polling for notifications
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Maintenance page fully loaded with ENHANCED notification system');
+            console.log('Test notifications with: testNotification("rental") or testNotification("client_message")');
+            
+            fetchDashboardCounts();
+            
+            // Poll every 5 seconds for faster response
+            setInterval(() => {
+                if (isTabActive) {
+                    fetchDashboardCounts();
+                }
+            }, 5000);
         });
     </script>
 </body>
