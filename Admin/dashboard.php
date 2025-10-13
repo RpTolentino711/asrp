@@ -29,10 +29,6 @@ $startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . 
 $endDate = date("Y-m-t", strtotime($startDate));
 $monthName = date('F Y', strtotime($startDate));
 
-// Get statistics - UPDATED VERSION
-// Real-time counts for dashboard widgets (no date filter)
-$counts = $db->getAdminDashboardCounts();
-
 // Monthly stats for the selected period
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
 $chartData = $db->getAdminMonthChartData($startDate, $endDate);
@@ -1162,7 +1158,7 @@ function timeAgo($datetime) {
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                        <p class="mb-3">Generate detailed monthly reports in Excel for <?= $monthName ?></p>
+                        <p class="mb-3">Generate detailed monthly reports in Excel or PDF format for <?= $monthName ?></p>
                         <div class="d-flex gap-2 flex-wrap">
                             <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
                                class="btn btn-success">
@@ -2092,6 +2088,7 @@ function timeAgo($datetime) {
             activityChart.options.plugins.legend.labels.padding = isMobile ? 10 : 20;
             activityChart.options.plugins.legend.labels.font.size = isMobile ? 10 : 12;
             activityChart.options.scales.x.ticks.font.size = isMobile ? 10 : 11;
+           
             activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
             activityChart.options.elements.point.radius = isMobile ? 2 : 4;
             activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
