@@ -1659,72 +1659,6 @@ if ($_POST) {
         let isFirstLoad = true;
         let isTabActive = true;
 
-        // Function to update sidebar badges (copied from dashboard.php)
-        function updateSidebarBadges(data) {
-            const currentUnseenRentals = data.unseen_rentals ?? 0;
-            const currentNewMaintenance = data.new_maintenance_requests ?? 0;
-            const currentUnreadClientMessages = data.unread_client_messages ?? 0;
-
-            // Update rental badge
-            updateBadge('sidebarRentalBadge', currentUnseenRentals, 'view_rental_requests.php', 'bg-danger');
-
-            // Update maintenance badge
-            updateBadge('sidebarMaintenanceBadge', currentNewMaintenance, 'manage_maintenance.php', 'bg-warning');
-
-            // Update invoices badge
-            updateBadge('sidebarInvoicesBadge', currentUnreadClientMessages, 'generate_invoice.php', 'bg-info');
-        }
-
-        // Helper function to update individual badges
-        function updateBadge(badgeId, currentCount, linkHref, badgeClass) {
-            const badge = document.getElementById(badgeId);
-            if (badge) {
-                const oldCount = parseInt(badge.textContent);
-                badge.textContent = currentCount;
-                updateBadgeAnimation(badge, currentCount, oldCount);
-            } else if (currentCount > 0) {
-                // Create badge if it doesn't exist
-                const link = document.querySelector(`a[href="${linkHref}"]`);
-                if (link) {
-                    const newBadge = document.createElement('span');
-                    newBadge.id = badgeId;
-                    newBadge.className = `badge badge-notification ${badgeClass} notification-badge`;
-                    newBadge.textContent = currentCount;
-                    link.appendChild(newBadge);
-                }
-            }
-        }
-
-        // Function to update badge animation
-        function updateBadgeAnimation(badgeElement, newCount, oldCount) {
-            if (newCount > oldCount && !isFirstLoad) {
-                badgeElement.classList.add('notification-badge');
-                setTimeout(() => {
-                    badgeElement.classList.remove('notification-badge');
-                }, 3000);
-            }
-        }
-
-        // NEW: Function to update invoices sidebar badge
-        function updateInvoicesSidebarBadge(currentCount) {
-            const sidebarBadge = document.getElementById('sidebarInvoicesBadge');
-            if (sidebarBadge) {
-                const oldCount = parseInt(sidebarBadge.textContent);
-                sidebarBadge.textContent = currentCount;
-                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
-            } else {
-                // Create badge if it doesn't exist
-                const invoicesLink = document.querySelector('a[href="generate_invoice.php"]');
-                if (invoicesLink) {
-                    const newBadge = document.createElement('span');
-                    newBadge.id = 'sidebarInvoicesBadge';
-                    newBadge.className = 'badge badge-notification bg-info notification-badge';
-                    newBadge.textContent = currentCount;
-                    invoicesLink.appendChild(newBadge);
-                }
-            }
-        }
-
         // Tab visibility handling
         document.addEventListener('visibilitychange', function() {
             isTabActive = !document.hidden;
@@ -1921,9 +1855,6 @@ if ($_POST) {
                         const currentUnseenRentals = data.unseen_rentals ?? 0;
                         const currentNewMaintenance = data.new_maintenance_requests ?? 0;
                         const currentUnreadClientMessages = data.unread_client_messages ?? 0;
-
-                        // Update sidebar badges FIRST (copied from dashboard.php)
-                        updateSidebarBadges(data);
 
                         // Check for new rental requests
                         if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
