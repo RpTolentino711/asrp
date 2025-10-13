@@ -1648,7 +1648,7 @@ if ($_POST) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // --- NOTIFICATION SYSTEM ---
+        // --- ENHANCED NOTIFICATION SYSTEM ---
         let rentalNotificationCooldown = false;
         let maintenanceNotificationCooldown = false;
         let clientMessageNotificationCooldown = false;
@@ -1659,9 +1659,14 @@ if ($_POST) {
         let isFirstLoad = true;
         let isTabActive = true;
 
+        // Debug logging
+        console.log('Manage Users initialized');
+        console.log('Initial counts - Unseen Rentals: <?= $unseen_rentals ?>, New Maintenance: <?= $new_maintenance_requests ?>, Unread Messages: <?= $unread_client_messages ?>');
+
         // Tab visibility handling
         document.addEventListener('visibilitychange', function() {
             isTabActive = !document.hidden;
+            console.log('Tab visibility changed:', isTabActive ? 'active' : 'hidden');
             if (isTabActive) {
                 fetchDashboardCounts();
             }
@@ -1669,8 +1674,12 @@ if ($_POST) {
 
         // Show rental notification
         function showNewRequestNotification(count) {
-            if (rentalNotificationCooldown) return;
+            if (rentalNotificationCooldown) {
+                console.log('Rental notification cooldown active');
+                return;
+            }
             
+            console.log('Showing rental notification for', count, 'new requests');
             rentalNotificationCooldown = true;
             
             const notification = document.createElement('div');
@@ -1722,13 +1731,18 @@ if ($_POST) {
             // Reset cooldown after 10 seconds
             setTimeout(() => {
                 rentalNotificationCooldown = false;
+                console.log('Rental notification cooldown reset');
             }, 10000);
         }
 
         // Show maintenance notification
         function showNewMaintenanceNotification(count) {
-            if (maintenanceNotificationCooldown) return;
+            if (maintenanceNotificationCooldown) {
+                console.log('Maintenance notification cooldown active');
+                return;
+            }
             
+            console.log('Showing maintenance notification for', count, 'new requests');
             maintenanceNotificationCooldown = true;
             
             const notification = document.createElement('div');
@@ -1780,13 +1794,18 @@ if ($_POST) {
             // Reset cooldown after 10 seconds
             setTimeout(() => {
                 maintenanceNotificationCooldown = false;
+                console.log('Maintenance notification cooldown reset');
             }, 10000);
         }
 
         // Show client message notification
         function showNewClientMessageNotification(count) {
-            if (clientMessageNotificationCooldown) return;
+            if (clientMessageNotificationCooldown) {
+                console.log('Client message notification cooldown active');
+                return;
+            }
             
+            console.log('Showing client message notification for', count, 'new messages');
             clientMessageNotificationCooldown = true;
             
             const notification = document.createElement('div');
@@ -1838,19 +1857,55 @@ if ($_POST) {
             // Reset cooldown after 10 seconds
             setTimeout(() => {
                 clientMessageNotificationCooldown = false;
+                console.log('Client message notification cooldown reset');
             }, 10000);
+        }
+
+        function updateBadgeAnimation(badgeElement, newCount, oldCount) {
+            if (newCount > oldCount && !isFirstLoad) {
+                badgeElement.classList.add('notification-badge');
+                setTimeout(() => {
+                    badgeElement.classList.remove('notification-badge');
+                }, 3000);
+            }
+        }
+
+        // Function to update sidebar badges
+        function updateSidebarBadge(currentCount, badgeId, linkSelector) {
+            const sidebarBadge = document.getElementById(badgeId);
+            if (sidebarBadge) {
+                const oldCount = parseInt(sidebarBadge.textContent);
+                sidebarBadge.textContent = currentCount;
+                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+            } else {
+                // Create badge if it doesn't exist
+                const link = document.querySelector(`a[href="${linkSelector}"]`);
+                if (link && currentCount > 0) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = badgeId;
+                    newBadge.className = 'badge badge-notification bg-danger notification-badge';
+                    newBadge.textContent = currentCount;
+                    link.appendChild(newBadge);
+                }
+            }
         }
 
         // Fetch dashboard counts
         function fetchDashboardCounts() {
-            if (!isTabActive) return;
+            if (!isTabActive) {
+                console.log('Tab not active, skipping count fetch');
+                return;
+            }
             
+            console.log('Fetching dashboard counts...');
             fetch('../AJAX/ajax_admin_dashboard_counts.php')
                 .then(res => {
                     if (!res.ok) throw new Error('Network response was not ok');
                     return res.json();
                 })
                 .then(data => {
+                    console.log('Counts received:', data);
+                    
                     if (data && !data.error) {
                         const currentUnseenRentals = data.unseen_rentals ?? 0;
                         const currentNewMaintenance = data.new_maintenance_requests ?? 0;
@@ -1859,19 +1914,31 @@ if ($_POST) {
                         // Check for new rental requests
                         if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
                             const newRequests = currentUnseenRentals - lastUnseenRentals;
+                            console.log(`New rental requests detected: ${newRequests} (was ${lastUnseenRentals}, now ${currentUnseenRentals})`);
                             showNewRequestNotification(newRequests);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnseenRentals, 'sidebarRentalBadge', 'view_rental_requests.php');
                         }
                         
                         // Check for new maintenance requests
                         if (!isFirstLoad && currentNewMaintenance > lastNewMaintenance) {
                             const newMaintenance = currentNewMaintenance - lastNewMaintenance;
+                            console.log(`New maintenance requests detected: ${newMaintenance} (was ${lastNewMaintenance}, now ${currentNewMaintenance})`);
                             showNewMaintenanceNotification(newMaintenance);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentNewMaintenance, 'sidebarMaintenanceBadge', 'manage_maintenance.php');
                         }
                         
                         // Check for new client messages
                         if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
                             const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+                            console.log(`New client messages detected: ${newMessages} (was ${lastUnreadClientMessages}, now ${currentUnreadClientMessages})`);
                             showNewClientMessageNotification(newMessages);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnreadClientMessages, 'sidebarInvoicesBadge', 'generate_invoice.php');
                         }
                         
                         lastUnseenRentals = currentUnseenRentals;
@@ -1981,8 +2048,22 @@ if ($_POST) {
             document.querySelector('input[name="unit_page"]').value = 1;
         });
 
+        // Debug: Manual trigger for testing
+        window.testNotification = function(type) {
+            if (type === 'rental') {
+                showNewRequestNotification(1);
+            } else if (type === 'maintenance') {
+                showNewMaintenanceNotification(1);
+            } else if (type === 'client_message') {
+                showNewClientMessageNotification(1);
+            }
+        };
+
         // Start polling for notifications
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('Manage Users fully loaded with ENHANCED notification system');
+            console.log('Test notifications with: testNotification("rental") or testNotification("maintenance") or testNotification("client_message")');
+            
             fetchDashboardCounts();
             
             // Poll every 5 seconds for faster response
