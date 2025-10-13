@@ -1440,8 +1440,8 @@ function timeAgo($datetime) {
     let lastNewMaintenanceCount = <?= $new_maintenance_requests ?>;
     let isFirstLoad = true;
     let isTabActive = true;
-    let notificationCooldown = false;
-
+let rentalNotificationCooldown = false;
+let maintenanceNotificationCooldown = false;
     // Stop polling when tab is not visible
     document.addEventListener('visibilitychange', function() {
         isTabActive = !document.hidden;
