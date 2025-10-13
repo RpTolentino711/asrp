@@ -1,3 +1,4 @@
+
 <?php
 
 class Database {
@@ -1456,7 +1457,7 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         (SELECT COUNT(*) FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0) as unread_client_messages";
     
     try {
-        $stmt = $this->pdo->prepare($sql); // FIX: use $this->pdo instead of $this->conn
+        $stmt = $this->conn->prepare($sql);
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -2731,6 +2732,11 @@ public function getSpaceName($space_id) {
         return 'Unknown Space';
     }
 }
+
+
+
+}
+
 
 
 
