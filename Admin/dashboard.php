@@ -302,33 +302,6 @@ function timeAgo($datetime) {
             font-weight: 600;
             font-size: 0.9rem;
         }
-
-        <!-- Export Report Card -->
-        <div class="dashboard-card animate-fade-in">
-            <div class="card-header">
-                <i class="fas fa-file-export"></i>
-                <span>Export Monthly Report</span>
-            </div>
-            <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <p class="mb-3">Generate detailed monthly reports in Excel or PDF format for <?= $monthName ?></p>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
-                               class="btn btn-success">
-                                <i class="fas fa-file-excel me-2"></i>Export Excel
-                            </a>
-                        </div>
-                    </div>
-                    <div class="col-md-4 text-md-end">
-                        <div class="text-muted small">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Includes: Financial, Rental, Maintenance & Occupancy data
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
         
         /* Stats Grid */
         .stats-grid {
@@ -1185,7 +1158,7 @@ function timeAgo($datetime) {
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-md-8">
-                        <p class="mb-3">Generate detailed monthly reports in Excel<?= $monthName ?></p>
+                        <p class="mb-3">Generate detailed monthly reports in Excel for <?= $monthName ?></p>
                         <div class="d-flex gap-2 flex-wrap">
                             <a href="export_monthly_data.php?month=<?= $selectedMonth ?>&year=<?= $selectedYear ?>&type=excel" 
                                class="btn btn-success">
@@ -1433,15 +1406,16 @@ function timeAgo($datetime) {
         }
     });
 
-    // --- LIVE ADMIN: Real-time Notification System ---
+    // --- FIXED LIVE ADMIN: Separate cooldowns for rental and maintenance notifications ---
+    let rentalNotificationCooldown = false;
+    let maintenanceNotificationCooldown = false;
     let lastPendingCount = <?= $pending ?>;
     let lastMaintenanceCount = <?= $pending_maintenance ?>;
     let lastUnseenRentals = <?= $unseen_rentals ?>;
     let lastNewMaintenanceCount = <?= $new_maintenance_requests ?>;
     let isFirstLoad = true;
     let isTabActive = true;
-let rentalNotificationCooldown = false;
-let maintenanceNotificationCooldown = false;
+
     // Stop polling when tab is not visible
     document.addEventListener('visibilitychange', function() {
         isTabActive = !document.hidden;
@@ -1454,9 +1428,9 @@ let maintenanceNotificationCooldown = false;
     });
 
     function showNewRequestNotification(newRequestsCount) {
-        if (notificationCooldown) return;
+        if (rentalNotificationCooldown) return;
         
-        notificationCooldown = true;
+        rentalNotificationCooldown = true;
         
         // Create notification element
         const notification = document.createElement('div');
@@ -1507,14 +1481,14 @@ let maintenanceNotificationCooldown = false;
         
         // Reset cooldown after 10 seconds
         setTimeout(() => {
-            notificationCooldown = false;
+            rentalNotificationCooldown = false;
         }, 10000);
     }
 
     function showNewMaintenanceNotification(newRequestsCount) {
-        if (notificationCooldown) return;
+        if (maintenanceNotificationCooldown) return;
         
-        notificationCooldown = true;
+        maintenanceNotificationCooldown = true;
         
         const notification = document.createElement('div');
         notification.className = 'alert alert-warning alert-dismissible fade show';
@@ -1564,7 +1538,7 @@ let maintenanceNotificationCooldown = false;
         
         // Reset cooldown after 10 seconds
         setTimeout(() => {
-            notificationCooldown = false;
+            maintenanceNotificationCooldown = false;
         }, 10000);
     }
 
@@ -1988,7 +1962,8 @@ let maintenanceNotificationCooldown = false;
 
     // Tooltip functionality for status breakdowns
     document.addEventListener('DOMContentLoaded', function() {
-        console.log('Dashboard loaded with live rental & maintenance notifications');
+        console.log('Dashboard loaded with FIXED live rental & maintenance notifications');
+        console.log('Now rental and maintenance notifications can pop up simultaneously!');
     });
     </script>
 </body>
