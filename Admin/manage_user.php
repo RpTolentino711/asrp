@@ -9,6 +9,29 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// --- NOTIFICATION SYSTEM: Get real-time counts (SAME AS DASHBOARD) ---
+$counts = $db->getAdminDashboardCounts();
+
+// Extract values like dashboard does
+$pending = $counts['pending_rentals'] ?? 0;
+$pending_maintenance = $counts['pending_maintenance'] ?? 0;
+$unpaid_invoices = $counts['unpaid_invoices'] ?? 0;
+$overdue_invoices = $counts['overdue_invoices'] ?? 0;
+
+// For AJAX real-time updates - FIXED: Get from database directly (SAME AS DASHBOARD)
+$unseen_rentals_sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
+$unseen_rentals_result = $db->getRow($unseen_rentals_sql);
+$unseen_rentals = $unseen_rentals_result['count'] ?? 0;
+
+$new_maintenance_sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0";
+$new_maintenance_result = $db->getRow($new_maintenance_sql);
+$new_maintenance_requests = $new_maintenance_result['count'] ?? 0;
+
+// NEW: Get initial unread client messages count (SAME AS DASHBOARD)
+$unread_messages_sql = "SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0";
+$unread_messages_result = $db->getRow($unread_messages_sql);
+$unread_client_messages = $unread_messages_result['count'] ?? 0;
+
 $msg = "";
 
 // --- Pagination Configuration ---
@@ -303,6 +326,7 @@ if ($_POST) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <style>
         :root {
             --primary: #6366f1;
@@ -824,6 +848,49 @@ if ($_POST) {
             background-color: #f9fafb;
             border-color: #d1d5db;
         }
+
+        /* --- NOTIFICATION STYLES --- */
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .bell-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            75% { transform: rotate(15deg); }
+        }
+
+        .tools-shake {
+            animation: toolsShake 0.5s ease-in-out;
+        }
+
+        @keyframes toolsShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-10deg) scale(1.1); }
+            50% { transform: rotate(10deg) scale(1.1); }
+            75% { transform: rotate(-5deg) scale(1.05); }
+        }
+
+        .message-shake {
+            animation: messageShake 0.5s ease-in-out;
+        }
+
+        @keyframes messageShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-8deg) scale(1.1); }
+            50% { transform: rotate(8deg) scale(1.1); }
+            75% { transform: rotate(-4deg) scale(1.05); }
+        }
         
         /* Mobile Responsive */
         @media (max-width: 992px) {
@@ -1055,6 +1122,9 @@ if ($_POST) {
                 <a href="view_rental_requests.php" class="nav-link">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Rental Requests</span>
+                    <?php if ($unseen_rentals > 0): ?>
+                        <span class="badge badge-notification bg-danger notification-badge" id="sidebarRentalBadge"><?= $unseen_rentals ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1062,6 +1132,9 @@ if ($_POST) {
                 <a href="manage_maintenance.php" class="nav-link">
                     <i class="fas fa-tools"></i>
                     <span>Maintenance</span>
+                    <?php if ($new_maintenance_requests > 0): ?>
+                        <span class="badge badge-notification bg-warning" id="sidebarMaintenanceBadge"><?= $new_maintenance_requests ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1069,6 +1142,9 @@ if ($_POST) {
                 <a href="generate_invoice.php" class="nav-link">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Invoices</span>
+                    <?php if ($unread_client_messages > 0): ?>
+                        <span class="badge badge-notification bg-info" id="sidebarInvoicesBadge"><?= $unread_client_messages ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1578,6 +1654,343 @@ if ($_POST) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- NOTIFICATION SYSTEM ---
+        let rentalNotificationCooldown = false;
+        let maintenanceNotificationCooldown = false;
+        let clientMessageNotificationCooldown = false;
+
+        let lastUnseenRentals = <?= $unseen_rentals ?>;
+        let lastNewMaintenance = <?= $new_maintenance_requests ?>;
+        let lastUnreadClientMessages = <?= $unread_client_messages ?>;
+        let isFirstLoad = true;
+        let isTabActive = true;
+
+        // Debug logging
+        console.log('User Management initialized');
+        console.log('Initial counts - Unseen Rentals: <?= $unseen_rentals ?>, New Maintenance: <?= $new_maintenance_requests ?>, Unread Messages: <?= $unread_client_messages ?>');
+
+        // Tab visibility handling
+        document.addEventListener('visibilitychange', function() {
+            isTabActive = !document.hidden;
+            console.log('Tab visibility changed:', isTabActive ? 'active' : 'hidden');
+            if (isTabActive) {
+                fetchDashboardCounts();
+            }
+        });
+
+        // Show rental notification
+        function showNewRequestNotification(count) {
+            if (rentalNotificationCooldown) {
+                console.log('Rental notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing rental notification for', count, 'new requests');
+            rentalNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-success alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 20px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #10b981;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-bell text-success fs-4 me-3 bell-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🏠 New Rental Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new pending request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="view_rental_requests.php" class="btn btn-sm btn-success">
+                                <i class="fas fa-eye me-1"></i>View Requests
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                rentalNotificationCooldown = false;
+                console.log('Rental notification cooldown reset');
+            }, 10000);
+        }
+
+        // Show maintenance notification
+        function showNewMaintenanceNotification(count) {
+            if (maintenanceNotificationCooldown) {
+                console.log('Maintenance notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing maintenance notification for', count, 'new requests');
+            maintenanceNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-warning alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 100px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #f59e0b;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-tools text-warning fs-4 me-3 tools-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🔧 New Maintenance Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new maintenance request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="manage_maintenance.php" class="btn btn-sm btn-warning text-white">
+                                <i class="fas fa-tools me-1"></i>View Maintenance
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                maintenanceNotificationCooldown = false;
+                console.log('Maintenance notification cooldown reset');
+            }, 10000);
+        }
+
+        // Show client message notification
+        function showNewClientMessageNotification(count) {
+            if (clientMessageNotificationCooldown) {
+                console.log('Client message notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing client message notification for', count, 'new messages');
+            clientMessageNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-info alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 180px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #06b6d4;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-comments text-info fs-4 me-3 message-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">💬 New Client Message!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new message${count > 1 ? 's' : ''} from client${count > 1 ? 's' : ''}.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="generate_invoice.php" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-inbox me-1"></i>View Messages
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                clientMessageNotificationCooldown = false;
+                console.log('Client message notification cooldown reset');
+            }, 10000);
+        }
+
+        function updateBadgeAnimation(badgeElement, newCount, oldCount) {
+            if (newCount > oldCount && !isFirstLoad) {
+                badgeElement.classList.add('notification-badge');
+                setTimeout(() => {
+                    badgeElement.classList.remove('notification-badge');
+                }, 3000);
+            }
+        }
+
+        // Update sidebar badges
+        function updateRentalSidebarBadge(currentCount) {
+            const sidebarBadge = document.getElementById('sidebarRentalBadge');
+            if (sidebarBadge) {
+                const oldCount = parseInt(sidebarBadge.textContent);
+                sidebarBadge.textContent = currentCount;
+                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+            } else {
+                // Create badge if it doesn't exist
+                const rentalLink = document.querySelector('a[href="view_rental_requests.php"]');
+                if (rentalLink) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = 'sidebarRentalBadge';
+                    newBadge.className = 'badge badge-notification bg-danger notification-badge';
+                    newBadge.textContent = currentCount;
+                    rentalLink.appendChild(newBadge);
+                }
+            }
+        }
+
+        function updateMaintenanceSidebarBadge(currentCount) {
+            const sidebarBadge = document.getElementById('sidebarMaintenanceBadge');
+            if (sidebarBadge) {
+                const oldCount = parseInt(sidebarBadge.textContent);
+                sidebarBadge.textContent = currentCount;
+                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+            } else {
+                // Create badge if it doesn't exist
+                const maintenanceLink = document.querySelector('a[href="manage_maintenance.php"]');
+                if (maintenanceLink) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = 'sidebarMaintenanceBadge';
+                    newBadge.className = 'badge badge-notification bg-warning notification-badge';
+                    newBadge.textContent = currentCount;
+                    maintenanceLink.appendChild(newBadge);
+                }
+            }
+        }
+
+        function updateInvoicesSidebarBadge(currentCount) {
+            const sidebarBadge = document.getElementById('sidebarInvoicesBadge');
+            if (sidebarBadge) {
+                const oldCount = parseInt(sidebarBadge.textContent);
+                sidebarBadge.textContent = currentCount;
+                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+            } else {
+                // Create badge if it doesn't exist
+                const invoicesLink = document.querySelector('a[href="generate_invoice.php"]');
+                if (invoicesLink) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = 'sidebarInvoicesBadge';
+                    newBadge.className = 'badge badge-notification bg-info notification-badge';
+                    newBadge.textContent = currentCount;
+                    invoicesLink.appendChild(newBadge);
+                }
+            }
+        }
+
+        // Fetch dashboard counts
+        function fetchDashboardCounts() {
+            if (!isTabActive) {
+                console.log('Tab not active, skipping count fetch');
+                return;
+            }
+            
+            console.log('Fetching dashboard counts...');
+            fetch('../AJAX/ajax_admin_dashboard_counts.php')
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Counts received:', data);
+                    
+                    if (data && !data.error) {
+                        const currentUnseenRentals = data.unseen_rentals ?? 0;
+                        const currentNewMaintenance = data.new_maintenance_requests ?? 0;
+                        const currentUnreadClientMessages = data.unread_client_messages ?? 0;
+
+                        // Check for new rental requests
+                        if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
+                            const newRequests = currentUnseenRentals - lastUnseenRentals;
+                            console.log(`New rental requests detected: ${newRequests} (was ${lastUnseenRentals}, now ${currentUnseenRentals})`);
+                            showNewRequestNotification(newRequests);
+                            updateRentalSidebarBadge(currentUnseenRentals);
+                        }
+                        
+                        // Check for new maintenance requests
+                        if (!isFirstLoad && currentNewMaintenance > lastNewMaintenance) {
+                            const newMaintenance = currentNewMaintenance - lastNewMaintenance;
+                            console.log(`New maintenance requests detected: ${newMaintenance} (was ${lastNewMaintenance}, now ${currentNewMaintenance})`);
+                            showNewMaintenanceNotification(newMaintenance);
+                            updateMaintenanceSidebarBadge(currentNewMaintenance);
+                        }
+                        
+                        // Check for new client messages
+                        if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
+                            const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+                            console.log(`New client messages detected: ${newMessages} (was ${lastUnreadClientMessages}, now ${currentUnreadClientMessages})`);
+                            showNewClientMessageNotification(newMessages);
+                            updateInvoicesSidebarBadge(currentUnreadClientMessages);
+                        }
+                        
+                        lastUnseenRentals = currentUnseenRentals;
+                        lastNewMaintenance = currentNewMaintenance;
+                        lastUnreadClientMessages = currentUnreadClientMessages;
+                        isFirstLoad = false;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching dashboard counts:', err);
+                });
+        }
+
+        // --- ORIGINAL SCRIPT FUNCTIONALITY ---
         // Mobile menu functionality
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const sidebar = document.getElementById('sidebar');
@@ -1681,6 +2094,33 @@ if ($_POST) {
             document.querySelector('input[name="client_page"]').value = 1;
             document.querySelector('input[name="unit_page"]').value = 1;
         });
+
+        // Initial load and set up polling for notifications
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM loaded, starting notification polling...');
+            fetchDashboardCounts();
+            
+            // Poll every 5 seconds for faster response
+            setInterval(() => {
+                if (isTabActive) {
+                    fetchDashboardCounts();
+                }
+            }, 5000);
+        });
+
+        // Debug: Manual trigger for testing
+        window.testNotification = function(type) {
+            if (type === 'rental') {
+                showNewRequestNotification(1);
+            } else if (type === 'maintenance') {
+                showNewMaintenanceNotification(1);
+            } else if (type === 'client_message') {
+                showNewClientMessageNotification(1);
+            }
+        };
+
+        console.log('User Management fully loaded with notification system');
+        console.log('Test notifications with: testNotification("rental") or testNotification("maintenance") or testNotification("client_message")');
     </script>
 </body>
 </html>
