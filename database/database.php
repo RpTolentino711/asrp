@@ -1456,7 +1456,7 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         (SELECT COUNT(*) FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0) as unread_client_messages";
     
     try {
-        $stmt = $this->pdo->prepare($sql); // FIX: use $this->pdo
+        $stmt = $this->pdo->prepare($sql); // FIX: use $this->pdo instead of $this->conn
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -1782,7 +1782,6 @@ public function acceptRentalRequest($request_id) {
 
     $this->pdo->beginTransaction();
     try {
-        // 1. Mark request as accepted AND
         // 1. Mark request as accepted AND seen
         $this->executeStatement(
             "UPDATE rentalrequest SET Status = 'Accepted', admin_seen = 1 WHERE Request_ID = ?",
@@ -2732,11 +2731,6 @@ public function getSpaceName($space_id) {
         return 'Unknown Space';
     }
 }
-
-
-
-}
-
 
 
 
