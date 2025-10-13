@@ -22,8 +22,7 @@ $startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . 
 $endDate = date("Y-m-t", strtotime($startDate));
 $monthName = date('F Y', strtotime($startDate));
 
-// Get statistics - UPDATED VERSION
-// Real-time counts for dashboard widgets (no date filter)
+// Get statistics
 $counts = $db->getAdminDashboardCounts();
 
 // Monthly stats for the selected period
@@ -43,22 +42,25 @@ $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 
-// For AJAX real-time updates
-$new_maintenance_requests = $counts['new_maintenance_requests'] ?? 0;
-$unseen_rentals = $counts['unseen_rentals'] ?? 0;
+// For AJAX real-time updates - FIXED: Get from database directly
+$unseen_rentals_sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
+$unseen_rentals_result = $db->getRow($unseen_rentals_sql);
+$unseen_rentals = $unseen_rentals_result['count'] ?? 0;
+
+$new_maintenance_sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0";
+$new_maintenance_result = $db->getRow($new_maintenance_sql);
+$new_maintenance_requests = $new_maintenance_result['count'] ?? 0;
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
     $msg_id = intval($_POST['soft_delete_msg_id']);
     $db->executeStatement("UPDATE free_message SET is_deleted = 1 WHERE Message_ID = ?", [$msg_id]);
     
-    // If it's an AJAX request, return JSON response
     if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
         header('Content-Type: application/json');
         echo json_encode(['success' => true, 'message_id' => $msg_id]);
         exit();
     } else {
-        // Traditional form submission
         $filterParam = isset($_GET['filter']) ? 'filter=' . urlencode($_GET['filter']) : '';
         header("Location: dashboard.php" . ($filterParam ? "?$filterParam" : ""));
         exit();
@@ -1406,33 +1408,39 @@ function timeAgo($datetime) {
         }
     });
 
-    // --- FIXED LIVE ADMIN: Separate cooldowns for rental and maintenance notifications ---
+    // --- FIXED NOTIFICATION SYSTEM ---
     let rentalNotificationCooldown = false;
     let maintenanceNotificationCooldown = false;
-    let lastPendingCount = <?= $pending ?>;
-    let lastMaintenanceCount = <?= $pending_maintenance ?>;
     let lastUnseenRentals = <?= $unseen_rentals ?>;
-    let lastNewMaintenanceCount = <?= $new_maintenance_requests ?>;
+    let lastNewMaintenance = <?= $new_maintenance_requests ?>;
     let isFirstLoad = true;
     let isTabActive = true;
 
-    // Stop polling when tab is not visible
+    // Debug logging
+    console.log('Dashboard initialized');
+    console.log('Initial counts - Unseen Rentals: <?= $unseen_rentals ?>, New Maintenance: <?= $new_maintenance_requests ?>');
+
+    // Tab visibility handling
     document.addEventListener('visibilitychange', function() {
         isTabActive = !document.hidden;
+        console.log('Tab visibility changed:', isTabActive ? 'active' : 'hidden');
         if (isTabActive) {
-            // Refresh immediately when tab becomes active
             fetchDashboardCounts();
             fetchLatestRequests();
             fetchLatestMaintenance();
         }
     });
 
-    function showNewRequestNotification(newRequestsCount) {
-        if (rentalNotificationCooldown) return;
+    // Show rental notification
+    function showNewRequestNotification(count) {
+        if (rentalNotificationCooldown) {
+            console.log('Rental notification cooldown active');
+            return;
+        }
         
+        console.log('Showing rental notification for', count, 'new requests');
         rentalNotificationCooldown = true;
         
-        // Create notification element
         const notification = document.createElement('div');
         notification.className = 'alert alert-success alert-dismissible fade show';
         notification.style.cssText = `
@@ -1451,7 +1459,7 @@ function timeAgo($datetime) {
                 </div>
                 <div class="flex-grow-1">
                     <h6 class="alert-heading mb-1">🏠 New Rental Request!</h6>
-                    <p class="mb-2">You have <strong>${newRequestsCount}</strong> new pending request${newRequestsCount > 1 ? 's' : ''} to review.</p>
+                    <p class="mb-2">You have <strong>${count}</strong> new pending request${count > 1 ? 's' : ''} to review.</p>
                     <div class="d-flex gap-2 mt-2">
                         <a href="view_rental_requests.php" class="btn btn-sm btn-success">
                             <i class="fas fa-eye me-1"></i>View Requests
@@ -1482,19 +1490,25 @@ function timeAgo($datetime) {
         // Reset cooldown after 10 seconds
         setTimeout(() => {
             rentalNotificationCooldown = false;
+            console.log('Rental notification cooldown reset');
         }, 10000);
     }
 
-    function showNewMaintenanceNotification(newRequestsCount) {
-        if (maintenanceNotificationCooldown) return;
+    // Show maintenance notification
+    function showNewMaintenanceNotification(count) {
+        if (maintenanceNotificationCooldown) {
+            console.log('Maintenance notification cooldown active');
+            return;
+        }
         
+        console.log('Showing maintenance notification for', count, 'new requests');
         maintenanceNotificationCooldown = true;
         
         const notification = document.createElement('div');
         notification.className = 'alert alert-warning alert-dismissible fade show';
         notification.style.cssText = `
             position: fixed; 
-            top: 80px; 
+            top: 100px; 
             right: 20px; 
             z-index: 9999; 
             min-width: 320px; 
@@ -1508,7 +1522,7 @@ function timeAgo($datetime) {
                 </div>
                 <div class="flex-grow-1">
                     <h6 class="alert-heading mb-1">🔧 New Maintenance Request!</h6>
-                    <p class="mb-2">You have <strong>${newRequestsCount}</strong> new maintenance request${newRequestsCount > 1 ? 's' : ''} to review.</p>
+                    <p class="mb-2">You have <strong>${count}</strong> new maintenance request${count > 1 ? 's' : ''} to review.</p>
                     <div class="d-flex gap-2 mt-2">
                         <a href="manage_maintenance.php" class="btn btn-sm btn-warning text-white">
                             <i class="fas fa-tools me-1"></i>View Maintenance
@@ -1539,168 +1553,93 @@ function timeAgo($datetime) {
         // Reset cooldown after 10 seconds
         setTimeout(() => {
             maintenanceNotificationCooldown = false;
+            console.log('Maintenance notification cooldown reset');
         }, 10000);
     }
 
-    function updateBadgeAnimation(badgeElement, newCount, oldCount) {
-        if (newCount > oldCount && !isFirstLoad) {
-            badgeElement.classList.add('notification-badge');
-            setTimeout(() => {
-                badgeElement.classList.remove('notification-badge');
-            }, 3000);
-        }
-    }
-
+    // Fetch dashboard counts
     function fetchDashboardCounts() {
-        if (!isTabActive) return;
+        if (!isTabActive) {
+            console.log('Tab not active, skipping count fetch');
+            return;
+        }
         
+        console.log('Fetching dashboard counts...');
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error('Network response was not ok');
+                return res.json();
+            })
             .then(data => {
+                console.log('Counts received:', data);
+                
                 if (data && !data.error) {
+                    const currentUnseenRentals = data.unseen_rentals ?? 0;
+                    const currentNewMaintenance = data.new_maintenance_requests ?? 0;
                     const currentPending = data.pending_rentals ?? 0;
                     const currentMaintenance = data.pending_maintenance ?? 0;
                     const currentUnpaid = data.unpaid_invoices ?? 0;
                     const currentOverdue = data.overdue_invoices ?? 0;
-                    const currentUnseenRentals = data.unseen_rentals ?? 0;
-                    const currentNewMaintenance = data.new_maintenance_requests ?? 0;
 
-                    // Update counts on dashboard
+                    // Update dashboard counts
                     document.getElementById('pendingRentalsCount').textContent = currentPending;
                     document.getElementById('pendingMaintenanceCount').textContent = currentMaintenance;
                     document.getElementById('unpaidInvoicesCount').textContent = currentUnpaid;
                     document.getElementById('overdueInvoicesCount').textContent = currentOverdue;
 
-                    // Check for new rental requests (using unseen count for notifications)
+                    // Check for new rental requests
                     if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
                         const newRequests = currentUnseenRentals - lastUnseenRentals;
+                        console.log(`New rental requests detected: ${newRequests} (was ${lastUnseenRentals}, now ${currentUnseenRentals})`);
                         showNewRequestNotification(newRequests);
-                        updateSidebarBadge(currentPending);
                     }
                     
                     // Check for new maintenance requests
-                    if (!isFirstLoad && currentNewMaintenance > lastNewMaintenanceCount) {
-                        const newMaintenance = currentNewMaintenance - lastNewMaintenanceCount;
+                    if (!isFirstLoad && currentNewMaintenance > lastNewMaintenance) {
+                        const newMaintenance = currentNewMaintenance - lastNewMaintenance;
+                        console.log(`New maintenance requests detected: ${newMaintenance} (was ${lastNewMaintenance}, now ${currentNewMaintenance})`);
                         showNewMaintenanceNotification(newMaintenance);
-                        updateMaintenanceSidebarBadge(currentMaintenance);
                     }
                     
-                    lastPendingCount = currentPending;
-                    lastMaintenanceCount = currentMaintenance;
                     lastUnseenRentals = currentUnseenRentals;
-                    lastNewMaintenanceCount = currentNewMaintenance;
+                    lastNewMaintenance = currentNewMaintenance;
                     isFirstLoad = false;
                 }
             })
-            .catch(err => console.log('Error fetching dashboard counts:', err));
-    }
-
-    function updateSidebarBadge(currentCount) {
-        const sidebarBadge = document.getElementById('sidebarRentalBadge');
-        if (sidebarBadge) {
-            const oldCount = parseInt(sidebarBadge.textContent);
-            sidebarBadge.textContent = currentCount;
-            updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
-        } else {
-            // Create badge if it doesn't exist
-            const rentalLink = document.querySelector('a[href="view_rental_requests.php"]');
-            if (rentalLink) {
-                const newBadge = document.createElement('span');
-                newBadge.id = 'sidebarRentalBadge';
-                newBadge.className = 'badge badge-notification bg-danger notification-badge';
-                newBadge.textContent = currentCount;
-                rentalLink.appendChild(newBadge);
-            }
-        }
-    }
-
-    function updateMaintenanceSidebarBadge(currentCount) {
-        const sidebarBadge = document.getElementById('sidebarMaintenanceBadge');
-        if (sidebarBadge) {
-            const oldCount = parseInt(sidebarBadge.textContent);
-            sidebarBadge.textContent = currentCount;
-            updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
-        } else {
-            // Create badge if it doesn't exist
-            const maintenanceLink = document.querySelector('a[href="manage_maintenance.php"]');
-            if (maintenanceLink) {
-                const newBadge = document.createElement('span');
-                newBadge.id = 'sidebarMaintenanceBadge';
-                newBadge.className = 'badge badge-notification bg-warning notification-badge';
-                newBadge.textContent = currentCount;
-                maintenanceLink.appendChild(newBadge);
-            }
-        }
-    }
-
-    // FIXED: Maintenance requests function
-    function fetchLatestMaintenance() {
-        if (!isTabActive) return;
-        
-        fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php?mark_seen=true')
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-                return res.text();
-            })
-            .then(html => {
-                const container = document.getElementById('latestMaintenanceContainer');
-                if (container) {
-                    container.innerHTML = html;
-                    
-                    // Update the badge count
-                    const containerDiv = container.querySelector('[data-count]');
-                    if (containerDiv) {
-                        const currentCount = parseInt(containerDiv.getAttribute('data-count'));
-                        const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
-                        const badge = document.getElementById('latestMaintenanceBadge');
-                        if (badge) {
-                            const oldCount = parseInt(badge.textContent);
-                            badge.textContent = currentCount;
-                            updateBadgeAnimation(badge, currentCount, oldCount);
-                        }
-                    }
-                }
-            })
             .catch(err => {
-                console.error('Error fetching maintenance requests:', err);
-                document.getElementById('latestMaintenanceContainer').innerHTML = 
-                    '<div class="text-center p-4 text-muted">' +
-                    '<i class="fas fa-exclamation-triangle text-warning mb-2"></i>' +
-                    '<p>Error loading maintenance requests</p>' +
-                    '<small class="text-muted">Please try refreshing the page</small>' +
-                    '</div>';
+                console.error('Error fetching dashboard counts:', err);
             });
     }
 
+    // Fetch latest rental requests
     function fetchLatestRequests() {
         if (!isTabActive) return;
         
-        // Mark requests as seen when loading
         fetch('../AJAX/ajax_admin_dashboard_latest_requests.php?mark_seen=true')
             .then(res => res.text())
             .then(html => {
-                const container = document.getElementById('latestRequestsContainer');
-                container.innerHTML = html;
-                
-                // Update the badge count
-                const containerDiv = container.querySelector('[data-count]');
-                if (containerDiv) {
-                    const currentCount = parseInt(containerDiv.getAttribute('data-count'));
-                    const newCount = parseInt(containerDiv.getAttribute('data-new-count') || 0);
-                    const badge = document.getElementById('latestRequestsBadge');
-                    if (badge) {
-                        const oldCount = parseInt(badge.textContent);
-                        badge.textContent = currentCount;
-                        updateBadgeAnimation(badge, currentCount, oldCount);
-                    }
-                }
+                document.getElementById('latestRequestsContainer').innerHTML = html;
             })
             .catch(err => {
                 console.error('Error fetching latest requests:', err);
                 document.getElementById('latestRequestsContainer').innerHTML = 
                     '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading requests</p></div>';
+            });
+    }
+
+    // Fetch latest maintenance requests
+    function fetchLatestMaintenance() {
+        if (!isTabActive) return;
+        
+        fetch('../AJAX/ajax_admin_dashboard_latest_maintenance.php?mark_seen=true')
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('latestMaintenanceContainer').innerHTML = html;
+            })
+            .catch(err => {
+                console.error('Error fetching maintenance requests:', err);
+                document.getElementById('latestMaintenanceContainer').innerHTML = 
+                    '<div class="text-center p-4 text-muted"><i class="fas fa-exclamation-triangle"></i><p>Error loading maintenance</p></div>';
             });
     }
 
@@ -1797,6 +1736,7 @@ function timeAgo($datetime) {
 
     // Initial load and set up polling
     document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, starting polling...');
         fetchDashboardCounts();
         fetchLatestRequests();
         fetchLatestMaintenance();
@@ -1822,17 +1762,17 @@ function timeAgo($datetime) {
         
         // Set initial filter button state
         recentBtn.classList.add('active');
+        
+        // Poll every 5 seconds for faster response
+        setInterval(() => {
+            if (isTabActive) {
+                fetchDashboardCounts();
+                fetchLatestRequests();
+                fetchLatestMaintenance();
+                fetchMessages();
+            }
+        }, 5000);
     });
-
-    // Poll every 10 seconds for real-time updates
-    setInterval(() => {
-        if (isTabActive) {
-            fetchDashboardCounts();
-            fetchLatestRequests();
-            fetchLatestMaintenance();
-            fetchMessages();
-        }
-    }, 10000); // 10 seconds
 
     // Chart initialization
     const chartData = <?= json_encode($chartData) ?>;
@@ -1883,23 +1823,7 @@ function timeAgo($datetime) {
                             size: window.innerWidth <= 768 ? 10 : 12
                         }
                     }
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    titleColor: '#1f2937',
-                    bodyColor: '#374151',
-                    borderColor: '#e5e7eb',
-                    borderWidth: 1,
-                    padding: 10,
-                    cornerRadius: 8
                 }
-            },
-            interaction: {
-                mode: 'nearest',
-                axis: 'x',
-                intersect: false
             },
             scales: {
                 x: { 
@@ -1921,50 +1845,21 @@ function timeAgo($datetime) {
                         }
                     }
                 }
-            },
-            elements: {
-                point: {
-                    radius: window.innerWidth <= 768 ? 2 : 4,
-                    hoverRadius: window.innerWidth <= 768 ? 4 : 6
-                }
             }
         }
     });
 
-    // Handle window resize for chart responsiveness
-    window.addEventListener('resize', () => {
-        if (activityChart) {
-            const isMobile = window.innerWidth <= 768;
-            activityChart.options.plugins.legend.labels.padding = isMobile ? 10 : 20;
-            activityChart.options.plugins.legend.labels.font.size = isMobile ? 10 : 12;
-            activityChart.options.scales.x.ticks.font.size = isMobile ? 10 : 11;
-            activityChart.options.scales.y.ticks.font.size = isMobile ? 10 : 11;
-            activityChart.options.elements.point.radius = isMobile ? 2 : 4;
-            activityChart.options.elements.point.hoverRadius = isMobile ? 4 : 6;
-            activityChart.update();
+    // Debug: Manual trigger for testing
+    window.testNotification = function(type) {
+        if (type === 'rental') {
+            showNewRequestNotification(1);
+        } else if (type === 'maintenance') {
+            showNewMaintenanceNotification(1);
         }
-    });
+    };
 
-    // Auto-hide notifications after 5 seconds
-    document.querySelectorAll('.alert').forEach(alert => {
-        setTimeout(() => {
-            if (alert.parentNode) {
-                alert.style.opacity = '0';
-                alert.style.transform = 'translateY(-10px)';
-                setTimeout(() => {
-                    if (alert.parentNode) {
-                        alert.remove();
-                    }
-                }, 300);
-            }
-        }, 5000);
-    });
-
-    // Tooltip functionality for status breakdowns
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Dashboard loaded with FIXED live rental & maintenance notifications');
-        console.log('Now rental and maintenance notifications can pop up simultaneously!');
-    });
+    console.log('Dashboard fully loaded with FIXED notification system');
+    console.log('Test notifications with: testNotification("rental") or testNotification("maintenance")');
     </script>
 </body>
 </html>
