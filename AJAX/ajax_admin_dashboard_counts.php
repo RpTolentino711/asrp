@@ -17,7 +17,8 @@ try {
         'unpaid_invoices' => 0,
         'overdue_invoices' => 0,
         'new_maintenance_requests' => 0,
-        'unseen_rentals' => 0 // Add this for notification tracking
+        'unseen_rentals' => 0,
+        'unread_client_messages' => 0 // Add this for client message notifications
     ];
     
     // Pending rental requests (ALL pending, not just unseen)
@@ -50,6 +51,12 @@ try {
     $result = $db->getRow($sql);
     $counts['overdue_invoices'] = $result['count'] ?? 0;
     
+    // NEW: Get count of unread client messages in invoice chat
+    $sql = "SELECT COUNT(*) as count FROM invoice_chat 
+            WHERE Sender_Type = 'client' AND is_read_admin = 0";
+    $result = $db->getRow($sql);
+    $counts['unread_client_messages'] = $result['count'] ?? 0;
+    
     header('Content-Type: application/json');
     echo json_encode($counts);
     
@@ -62,6 +69,7 @@ try {
         'overdue_invoices' => 0,
         'new_maintenance_requests' => 0,
         'unseen_rentals' => 0,
+        'unread_client_messages' => 0,
         'error' => $e->getMessage()
     ]);
 }
