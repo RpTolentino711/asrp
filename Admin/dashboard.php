@@ -2,6 +2,11 @@
 session_start();
 require '../database/database.php';
 
+// Add error reporting at the top for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 $db = new Database();
 
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
@@ -612,9 +617,6 @@ function timeAgo($datetime) {
         .message-content {
             color: #4b5563;
             margin-bottom: 0.75rem;
-        }
-            top: 1rem;
-            right: 1rem;
         }
         
         /* Filter Buttons */
