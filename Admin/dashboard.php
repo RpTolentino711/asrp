@@ -46,6 +46,7 @@ $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 // For AJAX real-time updates
 $new_maintenance_requests = $counts['new_maintenance_requests'] ?? 0;
 $unseen_rentals = $counts['unseen_rentals'] ?? 0;
+$unread_client_messages = $counts['unread_client_messages'] ?? 0;
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -1438,6 +1439,7 @@ function timeAgo($datetime) {
     let lastMaintenanceCount = <?= $pending_maintenance ?>;
     let lastUnseenRentals = <?= $unseen_rentals ?>;
     let lastNewMaintenanceCount = <?= $new_maintenance_requests ?>;
+    let lastUnreadClientMessages = <?= $unread_client_messages ?>;
     let isFirstLoad = true;
     let isTabActive = true;
     let notificationCooldown = false;
@@ -1568,15 +1570,57 @@ function timeAgo($datetime) {
         }, 10000);
     }
 
-    function updateBadgeAnimation(badgeElement, newCount, oldCount) {
-        if (newCount > oldCount && !isFirstLoad) {
-            badgeElement.classList.add('notification-badge');
-            setTimeout(() => {
-                badgeElement.classList.remove('notification-badge');
-            }, 3000);
-        }
+    function showNewClientMessageNotification(newMessagesCount) {
+        if (notificationCooldown) return;
+        notificationCooldown = true;
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-info alert-dismissible fade show';
+        notification.style.cssText = `
+            position: fixed; 
+            top: 120px; 
+            right: 20px; 
+            z-index: 9999; 
+            min-width: 320px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-left: 4px solid #06b6d4;
+        `;
+        notification.innerHTML = `
+            <div class="d-flex align-items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-comments text-info fs-4 me-3 bell-shake"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading mb-1">💬 New Client Message!</h6>
+                    <p class="mb-2">You have <strong>${newMessagesCount}</strong> new message${newMessagesCount > 1 ? 's' : ''} from clients.</p>
+                    <div class="d-flex gap-2 mt-2">
+                        <a href="#messageBoardContainer" class="btn btn-sm btn-info">
+                            <i class="fas fa-eye me-1"></i>View Messages
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, 8000);
+        setTimeout(() => {
+            notificationCooldown = false;
+        }, 10000);
     }
 
+    // --- FETCHING DATA & UPDATING DASHBOARD ---
     function fetchDashboardCounts() {
         if (!isTabActive) return;
         
@@ -1590,6 +1634,7 @@ function timeAgo($datetime) {
                     const currentOverdue = data.overdue_invoices ?? 0;
                     const currentUnseenRentals = data.unseen_rentals ?? 0;
                     const currentNewMaintenance = data.new_maintenance_requests ?? 0;
+                    const currentUnreadClientMessages = data.unread_client_messages ?? 0;
 
                     // Update counts on dashboard
                     document.getElementById('pendingRentalsCount').textContent = currentPending;
@@ -1611,55 +1656,32 @@ function timeAgo($datetime) {
                         updateMaintenanceSidebarBadge(currentMaintenance);
                     }
                     
+                    // Check for new client messages
+                    if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
+                        const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+                        showNewClientMessageNotification(newMessages);
+                    }
+                    
                     lastPendingCount = currentPending;
                     lastMaintenanceCount = currentMaintenance;
                     lastUnseenRentals = currentUnseenRentals;
                     lastNewMaintenanceCount = currentNewMaintenance;
+                    lastUnreadClientMessages = currentUnreadClientMessages;
                     isFirstLoad = false;
                 }
             })
             .catch(err => console.log('Error fetching dashboard counts:', err));
     }
 
-    function updateSidebarBadge(currentCount) {
-        const sidebarBadge = document.getElementById('sidebarRentalBadge');
-        if (sidebarBadge) {
-            const oldCount = parseInt(sidebarBadge.textContent);
-            sidebarBadge.textContent = currentCount;
-            updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
-        } else {
-            // Create badge if it doesn't exist
-            const rentalLink = document.querySelector('a[href="view_rental_requests.php"]');
-            if (rentalLink) {
-                const newBadge = document.createElement('span');
-                newBadge.id = 'sidebarRentalBadge';
-                newBadge.className = 'badge badge-notification bg-danger notification-badge';
-                newBadge.textContent = currentCount;
-                rentalLink.appendChild(newBadge);
-            }
+    function updateBadgeAnimation(badgeElement, newCount, oldCount) {
+        if (newCount > oldCount && !isFirstLoad) {
+            badgeElement.classList.add('notification-badge');
+            setTimeout(() => {
+                badgeElement.classList.remove('notification-badge');
+            }, 3000);
         }
     }
 
-    function updateMaintenanceSidebarBadge(currentCount) {
-        const sidebarBadge = document.getElementById('sidebarMaintenanceBadge');
-        if (sidebarBadge) {
-            const oldCount = parseInt(sidebarBadge.textContent);
-            sidebarBadge.textContent = currentCount;
-            updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
-        } else {
-            // Create badge if it doesn't exist
-            const maintenanceLink = document.querySelector('a[href="manage_maintenance.php"]');
-            if (maintenanceLink) {
-                const newBadge = document.createElement('span');
-                newBadge.id = 'sidebarMaintenanceBadge';
-                newBadge.className = 'badge badge-notification bg-warning notification-badge';
-                newBadge.textContent = currentCount;
-                maintenanceLink.appendChild(newBadge);
-            }
-        }
-    }
-
-    // FIXED: Maintenance requests function
     function fetchLatestMaintenance() {
         if (!isTabActive) return;
         
