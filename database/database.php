@@ -1519,55 +1519,24 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
 
 
 
-public function getAdminDashboardCounts($startDate = null, $endDate = null)
-{
-    // Default to current month if no date range provided
+public function getAdminDashboardCounts($startDate = null, $endDate = null) {
+    // If no dates provided, use current month
     if (!$startDate || !$endDate) {
         $startDate = date('Y-m-01');
         $endDate = date('Y-m-t');
     }
-
-    // Add time component to include the full end date
+    
+    // Add time component to include the entire end date
     $endDateWithTime = $endDate . ' 23:59:59';
-
-    // SQL Query — counts across multiple tables
+    
     $sql = "SELECT 
-            (SELECT COUNT(*) 
-             FROM rentalrequest 
-             WHERE Status = 'Pending' 
-             AND Flow_Status = 'new') AS pending_rentals,
-
-            (SELECT COUNT(*) 
-             FROM maintenancerequest 
-             WHERE Status IN ('Submitted', 'In Progress')) AS pending_maintenance,
-
-            (SELECT COUNT(*) 
-             FROM invoice 
-             WHERE Status = 'unpaid') AS unpaid_invoices,
-
-            (SELECT COUNT(*) 
-             FROM invoice 
-             WHERE Status = 'unpaid' 
-             AND EndDate < CURDATE()) AS overdue_invoices,
-
-            (SELECT COUNT(*) 
-             FROM maintenancerequest 
-             WHERE Status = 'Submitted' 
-             AND admin_seen = 0) AS new_maintenance_requests
-    ";
-
-    try {
-        // ✅ Prepare and execute PDO query
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute();
-
-        // ✅ Return as associative array
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        // Log error and return empty array to avoid breaking dashboard
-        error_log("Error fetching admin dashboard counts: " . $e->getMessage());
-        return [];
-    }
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
+    
+    return $this->getRow($sql); // Remove date parameters for real-time counts
 }
 
 
