@@ -9,6 +9,11 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// --- GET COUNTS FOR SIDEBAR NOTIFICATIONS ---
+$rental_count = $db->getRow("SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new'")['count'];
+$maintenance_count = $db->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'];
+$chat_count = $db->getRow("SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0")['count'];
+
 $msg = "";
 
 // --- Pagination Configuration ---
@@ -293,6 +298,19 @@ if ($_POST) {
     $total_unit_pages = ceil($total_units / $units_per_page);
     $paginated_units = array_slice($all_units, $unit_offset, $units_per_page);
 }
+
+// --- NOTIFICATION SYSTEM VARIABLES ---
+$unseen_rentals_sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
+$unseen_rentals_result = $db->getRow($unseen_rentals_sql);
+$unseen_rentals = $unseen_rentals_result['count'] ?? 0;
+
+$new_maintenance_sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0";
+$new_maintenance_result = $db->getRow($new_maintenance_sql);
+$new_maintenance_requests = $new_maintenance_result['count'] ?? 0;
+
+$unread_messages_sql = "SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0";
+$unread_messages_result = $db->getRow($unread_messages_sql);
+$unread_client_messages = $unread_messages_result['count'] ?? 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -824,6 +842,49 @@ if ($_POST) {
             background-color: #f9fafb;
             border-color: #d1d5db;
         }
+
+        /* Notification Styles */
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .bell-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            75% { transform: rotate(15deg); }
+        }
+
+        .tools-shake {
+            animation: toolsShake 0.5s ease-in-out;
+        }
+
+        @keyframes toolsShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-10deg) scale(1.1); }
+            50% { transform: rotate(10deg) scale(1.1); }
+            75% { transform: rotate(-5deg) scale(1.05); }
+        }
+
+        .message-shake {
+            animation: messageShake 0.5s ease-in-out;
+        }
+
+        @keyframes messageShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-8deg) scale(1.1); }
+            50% { transform: rotate(8deg) scale(1.1); }
+            75% { transform: rotate(-4deg) scale(1.05); }
+        }
         
         /* Mobile Responsive */
         @media (max-width: 992px) {
@@ -1055,6 +1116,9 @@ if ($_POST) {
                 <a href="view_rental_requests.php" class="nav-link">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Rental Requests</span>
+                    <?php if ($rental_count > 0): ?>
+                        <span class="badge badge-notification bg-danger notification-badge" id="sidebarRentalBadge"><?= $rental_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1062,6 +1126,9 @@ if ($_POST) {
                 <a href="manage_maintenance.php" class="nav-link">
                     <i class="fas fa-tools"></i>
                     <span>Maintenance</span>
+                    <?php if ($maintenance_count > 0): ?>
+                        <span class="badge badge-notification bg-warning" id="sidebarMaintenanceBadge"><?= $maintenance_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1069,6 +1136,9 @@ if ($_POST) {
                 <a href="generate_invoice.php" class="nav-link">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Invoices</span>
+                    <?php if ($chat_count > 0): ?>
+                        <span class="badge badge-notification bg-info" id="sidebarInvoicesBadge"><?= $chat_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -1578,6 +1648,243 @@ if ($_POST) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- NOTIFICATION SYSTEM ---
+        let rentalNotificationCooldown = false;
+        let maintenanceNotificationCooldown = false;
+        let clientMessageNotificationCooldown = false;
+
+        let lastUnseenRentals = <?= $unseen_rentals ?>;
+        let lastNewMaintenance = <?= $new_maintenance_requests ?>;
+        let lastUnreadClientMessages = <?= $unread_client_messages ?>;
+        let isFirstLoad = true;
+        let isTabActive = true;
+
+        // Tab visibility handling
+        document.addEventListener('visibilitychange', function() {
+            isTabActive = !document.hidden;
+            if (isTabActive) {
+                fetchDashboardCounts();
+            }
+        });
+
+        // Show rental notification
+        function showNewRequestNotification(count) {
+            if (rentalNotificationCooldown) return;
+            
+            rentalNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-success alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 20px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #10b981;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-bell text-success fs-4 me-3 bell-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🏠 New Rental Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new pending request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="view_rental_requests.php" class="btn btn-sm btn-success">
+                                <i class="fas fa-eye me-1"></i>View Requests
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                rentalNotificationCooldown = false;
+            }, 10000);
+        }
+
+        // Show maintenance notification
+        function showNewMaintenanceNotification(count) {
+            if (maintenanceNotificationCooldown) return;
+            
+            maintenanceNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-warning alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 100px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #f59e0b;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-tools text-warning fs-4 me-3 tools-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🔧 New Maintenance Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new maintenance request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="manage_maintenance.php" class="btn btn-sm btn-warning text-white">
+                                <i class="fas fa-tools me-1"></i>View Maintenance
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                maintenanceNotificationCooldown = false;
+            }, 10000);
+        }
+
+        // Show client message notification
+        function showNewClientMessageNotification(count) {
+            if (clientMessageNotificationCooldown) return;
+            
+            clientMessageNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-info alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 180px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #06b6d4;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-comments text-info fs-4 me-3 message-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">💬 New Client Message!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new message${count > 1 ? 's' : ''} from client${count > 1 ? 's' : ''}.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="generate_invoice.php" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-inbox me-1"></i>View Messages
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                clientMessageNotificationCooldown = false;
+            }, 10000);
+        }
+
+        // Fetch dashboard counts
+        function fetchDashboardCounts() {
+            if (!isTabActive) return;
+            
+            fetch('../AJAX/ajax_admin_dashboard_counts.php')
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                })
+                .then(data => {
+                    if (data && !data.error) {
+                        const currentUnseenRentals = data.unseen_rentals ?? 0;
+                        const currentNewMaintenance = data.new_maintenance_requests ?? 0;
+                        const currentUnreadClientMessages = data.unread_client_messages ?? 0;
+
+                        // Check for new rental requests
+                        if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
+                            const newRequests = currentUnseenRentals - lastUnseenRentals;
+                            showNewRequestNotification(newRequests);
+                        }
+                        
+                        // Check for new maintenance requests
+                        if (!isFirstLoad && currentNewMaintenance > lastNewMaintenance) {
+                            const newMaintenance = currentNewMaintenance - lastNewMaintenance;
+                            showNewMaintenanceNotification(newMaintenance);
+                        }
+                        
+                        // Check for new client messages
+                        if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
+                            const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+                            showNewClientMessageNotification(newMessages);
+                        }
+                        
+                        lastUnseenRentals = currentUnseenRentals;
+                        lastNewMaintenance = currentNewMaintenance;
+                        lastUnreadClientMessages = currentUnreadClientMessages;
+                        isFirstLoad = false;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching dashboard counts:', err);
+                });
+        }
+
         // Mobile menu functionality
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const sidebar = document.getElementById('sidebar');
@@ -1622,14 +1929,6 @@ if ($_POST) {
             if (form.querySelector('[name="hard_delete_client"]')) {
                 form.addEventListener('submit', function(e) {
                     if (!confirm('PERMANENTLY DELETE this client and all their records? This cannot be undone!')) {
-                        e.preventDefault();
-                    }
-                });
-            }
-            
-            if (form.querySelector('[name="delete_unit"]')) {
-                form.addEventListener('submit', function(e) {
-                    if (!confirm('Permanently delete this unit and all its records? This cannot be undone!')) {
                         e.preventDefault();
                     }
                 });
@@ -1680,6 +1979,18 @@ if ($_POST) {
         document.getElementById('clientUnitFilter').addEventListener('change', function() {
             document.querySelector('input[name="client_page"]').value = 1;
             document.querySelector('input[name="unit_page"]').value = 1;
+        });
+
+        // Start polling for notifications
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDashboardCounts();
+            
+            // Poll every 5 seconds for faster response
+            setInterval(() => {
+                if (isTabActive) {
+                    fetchDashboardCounts();
+                }
+            }, 5000);
         });
     </script>
 </body>
