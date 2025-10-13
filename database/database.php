@@ -1437,63 +1437,27 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
 
 
 
-public function getAdminDashboardCounts($startDate = null, $endDate = null)
-{
-    // Use current month if no date range provided
+public function getAdminDashboardCounts($startDate = null, $endDate = null) {
+    // If no dates provided, use current month
     if (!$startDate || !$endDate) {
         $startDate = date('Y-m-01');
         $endDate = date('Y-m-t');
     }
-
+    
     // Add time component to include the entire end date
     $endDateWithTime = $endDate . ' 23:59:59';
-
+    
     $sql = "SELECT 
-            (SELECT COUNT(*) 
-             FROM rentalrequest 
-             WHERE Status = 'Pending' 
-             AND Flow_Status = 'new' 
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS pending_rentals,
-
-            (SELECT COUNT(*) 
-             FROM rentalrequest 
-             WHERE Status = 'Pending' 
-             AND admin_seen = 0 
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS unseen_rentals,
-
-            (SELECT COUNT(*) 
-             FROM maintenancerequest 
-             WHERE Status IN ('Submitted', 'In Progress') 
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS pending_maintenance,
-
-            (SELECT COUNT(*) 
-             FROM maintenancerequest 
-             WHERE Status = 'Submitted' 
-             AND admin_seen = 0 
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS new_maintenance_requests,
-
-            (SELECT COUNT(*) 
-             FROM invoice 
-             WHERE Status = 'unpaid' 
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS unpaid_invoices,
-
-            (SELECT COUNT(*) 
-             FROM invoice 
-             WHERE Status = 'unpaid' 
-             AND EndDate < CURDATE()
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS overdue_invoices,
-
-            (SELECT COUNT(*) 
-             FROM invoice_chat 
-             WHERE Sender_Type = 'client' 
-             AND is_read_admin = 0 
-             AND Created_At BETWEEN :startDate AND :endDateWithTime) AS unread_client_messages
-    ";
-
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0) as unseen_rentals,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
+        (SELECT COUNT(*) FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0) as unread_client_messages";
+    
     try {
         $stmt = $this->conn->prepare($sql);
-        $stmt->bindParam(':startDate', $startDate);
-        $stmt->bindParam(':endDateWithTime', $endDateWithTime);
         $stmt->execute();
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -1501,7 +1465,6 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null)
         return [];
     }
 }
-
 
 
 public function getUnreadClientMessagesCount() {
