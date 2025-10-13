@@ -9,6 +9,15 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// Get statistics - UPDATED VERSION
+// Real-time counts for dashboard widgets (no date filter)
+$counts = $db->getAdminDashboardCounts();
+
+// Add this with your other count variables around line 50
+$unread_client_messages = $counts['unread_client_messages'] ?? 0;
+$lastUnreadClientMessages = $unread_client_messages;
+
+
 // Get selected month/year from request or use current month
 $selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : date('m');
 $selectedYear = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
@@ -21,10 +30,6 @@ if ($selectedYear < 2020 || $selectedYear > 2030) $selectedYear = date('Y');
 $startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . "-01";
 $endDate = date("Y-m-t", strtotime($startDate));
 $monthName = date('F Y', strtotime($startDate));
-
-// Get statistics - UPDATED VERSION
-// Real-time counts for dashboard widgets (no date filter)
-$counts = $db->getAdminDashboardCounts();
 
 // Monthly stats for the selected period
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
@@ -1130,6 +1135,10 @@ function timeAgo($datetime) {
                 <span class="period-badge"><?= $monthName ?></span>
             </div>
         </div>
+
+
+
+
         
         <!-- Month/Year Picker Card -->
         <div class="month-picker-card animate-fade-in">
@@ -1331,6 +1340,24 @@ function timeAgo($datetime) {
             </div>
         </div>
         
+        <!-- Client Messages Card -->
+<div class="col-lg-6">
+    <div class="dashboard-card h-100 animate-fade-in">
+        <div class="card-header">
+            <i class="fas fa-comments"></i>
+            <span>Latest Client Messages</span>
+            <span class="badge bg-info ms-2" id="latestClientMessagesBadge"><?= $unread_client_messages ?></span>
+        </div>
+        <div class="card-body p-0" id="latestClientMessagesContainer">
+            <!-- Client messages will be loaded here via AJAX -->
+            <div class="text-center p-4 text-muted">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading client messages...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
         <!-- Requests Section -->
         <div class="row">
             <!-- Rental Requests Card -->
@@ -1441,6 +1468,7 @@ function timeAgo($datetime) {
     let isFirstLoad = true;
     let isTabActive = true;
     let notificationCooldown = false;
+let lastUnreadClientMessages = <?= $unread_client_messages ?>;
 
     // Stop polling when tab is not visible
     document.addEventListener('visibilitychange', function() {
@@ -1453,6 +1481,101 @@ function timeAgo($datetime) {
         }
     });
 
+    function showNewClientMessageNotification(newMessagesCount) {
+    if (notificationCooldown) return;
+    
+    notificationCooldown = true;
+    
+    const notification = document.createElement('div');
+    notification.className = 'alert alert-info alert-dismissible fade show';
+    notification.style.cssText = `
+        position: fixed; 
+        top: 140px; 
+        right: 20px; 
+        z-index: 9999; 
+        min-width: 320px; 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-left: 4px solid #06b6d4;
+    `;
+    notification.innerHTML = `
+        <div class="d-flex align-items-start">
+            <div class="flex-shrink-0">
+                <i class="fas fa-comments text-info fs-4 me-3 bell-shake"></i>
+            </div>
+            <div class="flex-grow-1">
+                <h6 class="alert-heading mb-1">💬 New Client Message!</h6>
+                <p class="mb-2">You have <strong>${newMessagesCount}</strong> new message${newMessagesCount > 1 ? 's' : ''} from clients.</p>
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-info" onclick="fetchClientMessages()">
+                        <i class="fas fa-eye me-1"></i>View Messages
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                        Dismiss
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 8 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, 8000);
+    
+    // Reset cooldown after 10 seconds
+    setTimeout(() => {
+        notificationCooldown = false;
+    }, 10000);
+}
+
+function fetchClientMessages() {
+    if (!isTabActive) return;
+    
+    fetch('../AJAX/ajax_admin_dashboard_client_messages.php?mark_seen=true')
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+            return res.text();
+        })
+        .then(html => {
+            const container = document.getElementById('latestClientMessagesContainer');
+            if (container) {
+                container.innerHTML = html;
+                
+                // Update the badge count
+                const containerDiv = container.querySelector('[data-unread-count]');
+                if (containerDiv) {
+                    const currentCount = parseInt(containerDiv.getAttribute('data-unread-count'));
+                    const badge = document.getElementById('latestClientMessagesBadge');
+                    if (badge) {
+                        const oldCount = parseInt(badge.textContent);
+                        badge.textContent = currentCount;
+                        updateBadgeAnimation(badge, currentCount, oldCount);
+                    }
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Error fetching client messages:', err);
+            document.getElementById('latestClientMessagesContainer').innerHTML = 
+                '<div class="text-center p-4 text-muted">' +
+                '<i class="fas fa-exclamation-triangle text-info mb-2"></i>' +
+                '<p>Error loading client messages</p>' +
+                '<small class="text-muted">Please try refreshing the page</small>' +
+                '</div>';
+        });
+}
     function showNewRequestNotification(newRequestsCount) {
         if (notificationCooldown) return;
         
@@ -1578,6 +1701,15 @@ function timeAgo($datetime) {
     }
 
     function fetchDashboardCounts() {
+        // Inside fetchDashboardCounts() function, add this check:
+if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
+    const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+    showNewClientMessageNotification(newMessages);
+    updateClientMessagesSidebarBadge(currentUnreadClientMessages);
+}
+
+// Don't forget to update the tracking variable:
+lastUnreadClientMessages = currentUnreadClientMessages;
         if (!isTabActive) return;
         
         fetch('../AJAX/ajax_admin_dashboard_counts.php')
@@ -1639,6 +1771,26 @@ function timeAgo($datetime) {
             }
         }
     }
+    function updateClientMessagesSidebarBadge(currentCount) {
+    // You might want to add a badge to the Invoices link in sidebar
+    const invoicesLink = document.querySelector('a[href="generate_invoice.php"]');
+    if (invoicesLink) {
+        let badge = invoicesLink.querySelector('.badge.bg-info');
+        if (!badge && currentCount > 0) {
+            badge = document.createElement('span');
+            badge.className = 'badge badge-notification bg-info notification-badge';
+            badge.textContent = currentCount;
+            invoicesLink.appendChild(badge);
+        } else if (badge) {
+            const oldCount = parseInt(badge.textContent);
+            badge.textContent = currentCount;
+            updateBadgeAnimation(badge, currentCount, oldCount);
+            if (currentCount === 0) {
+                badge.remove();
+            }
+        }
+    }
+}
 
     function updateMaintenanceSidebarBadge(currentCount) {
         const sidebarBadge = document.getElementById('sidebarMaintenanceBadge');
@@ -1849,6 +2001,19 @@ function timeAgo($datetime) {
         // Set initial filter button state
         recentBtn.classList.add('active');
     });
+// In DOMContentLoaded event:
+fetchClientMessages();
+
+// In your setInterval polling:
+setInterval(() => {
+    if (isTabActive) {
+        fetchDashboardCounts();
+        fetchLatestRequests();
+        fetchLatestMaintenance();
+        fetchClientMessages(); // Add this line
+        fetchMessages();
+    }
+}, 10000);
 
     // Poll every 10 seconds for real-time updates
     setInterval(() => {
@@ -1954,8 +2119,7 @@ function timeAgo($datetime) {
                     hoverRadius: window.innerWidth <= 768 ? 4 : 6
                 }
             }
-        }
-    });
+        });
 
     // Handle window resize for chart responsiveness
     window.addEventListener('resize', () => {

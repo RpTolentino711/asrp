@@ -1449,12 +1449,77 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     
     $sql = "SELECT 
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
+        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0) as unseen_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
+        (SELECT COUNT(*) FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0) as unread_client_messages";
     
-    return $this->getRow($sql); // Remove date parameters for real-time counts
+    try {
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error getting admin dashboard counts: " . $e->getMessage());
+        return [];
+    }
+}
+
+
+public function getUnreadClientMessagesCount() {
+    $sql = "SELECT COUNT(*) as unread_count 
+            FROM invoice_chat 
+            WHERE Sender_Type = 'client' 
+            AND is_read_admin = 0";
+    
+    try {
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['unread_count'] ?? 0;
+    } catch (PDOException $e) {
+        error_log("Error getting unread client messages count: " . $e->getMessage());
+        return 0;
+    }
+}
+
+public function getLatestClientMessages($limit = 5) {
+    $sql = "SELECT ic.*, c.Client_fn, c.Client_ln, s.Name as UnitName, i.Invoice_ID
+            FROM invoice_chat ic
+            LEFT JOIN invoice i ON ic.Invoice_ID = i.Invoice_ID
+            LEFT JOIN client c ON i.Client_ID = c.Client_ID
+            LEFT JOIN space s ON i.Space_ID = s.Space_ID
+            WHERE ic.Sender_Type = 'client'
+            ORDER BY ic.Created_At DESC 
+            LIMIT ?";
+    
+    try {
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("Error getting latest client messages: " . $e->getMessage());
+        return [];
+    }
+}
+public function markClientMessagesAsRead($invoice_id = null) {
+    try {
+        if ($invoice_id) {
+            $sql = "UPDATE invoice_chat SET is_read_admin = 1 WHERE Invoice_ID = ? AND Sender_Type = 'client'";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([$invoice_id]);
+        } else {
+            $sql = "UPDATE invoice_chat SET is_read_admin = 1 WHERE Sender_Type = 'client' AND is_read_admin = 0";
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute();
+        }
+        return true;
+    } catch (PDOException $e) {
+        error_log("Error marking client messages as read: " . $e->getMessage());
+        return false;
+    }
 }
 
 
