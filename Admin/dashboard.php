@@ -9,6 +9,9 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     exit();
 }
 
+// Real-time counts for dashboard widgets (no date filter)
+$counts = $db->getAdminDashboardCounts();
+
 // Add this with your other count variables around line 50
 $unread_client_messages = $counts['unread_client_messages'] ?? 0;
 $lastUnreadClientMessages = $unread_client_messages;
@@ -614,9 +617,6 @@ function timeAgo($datetime) {
             color: #4b5563;
             margin-bottom: 0.75rem;
         }
-
-        .message-actions {
-            position: absolute;
             top: 1rem;
             right: 1rem;
         }
@@ -1308,8 +1308,13 @@ function timeAgo($datetime) {
             </div>
         </div>
         
-        <!-- Client Messages Card -->
-        <div class="col-lg-6">
+      
+
+        <!-- Requests Section -->
+        <div class="row">
+                    <!-- Client Messages Card -->
+
+              <div class="col-lg-6">
             <div class="dashboard-card h-100 animate-fade-in">
                 <div class="card-header">
                     <i class="fas fa-comments"></i>
@@ -1326,8 +1331,6 @@ function timeAgo($datetime) {
             </div>
         </div>
 
-        <!-- Requests Section -->
-        <div class="row">
             <!-- Rental Requests Card -->
             <div class="col-lg-6">
                 <div class="dashboard-card h-100 animate-fade-in">
