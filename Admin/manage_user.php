@@ -1659,6 +1659,82 @@ if ($_POST) {
         let isFirstLoad = true;
         let isTabActive = true;
 
+        // Function to update sidebar badges
+        function updateSidebarBadges(data) {
+            const currentUnseenRentals = data.unseen_rentals ?? 0;
+            const currentNewMaintenance = data.new_maintenance_requests ?? 0;
+            const currentUnreadClientMessages = data.unread_client_messages ?? 0;
+
+            // Update rental badge
+            const rentalBadge = document.getElementById('sidebarRentalBadge');
+            if (rentalBadge) {
+                const oldCount = parseInt(rentalBadge.textContent);
+                rentalBadge.textContent = currentUnseenRentals;
+                if (currentUnseenRentals > oldCount && !isFirstLoad) {
+                    rentalBadge.classList.add('notification-badge');
+                    setTimeout(() => {
+                        rentalBadge.classList.remove('notification-badge');
+                    }, 3000);
+                }
+            } else if (currentUnseenRentals > 0) {
+                // Create badge if it doesn't exist
+                const rentalLink = document.querySelector('a[href="view_rental_requests.php"]');
+                if (rentalLink) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = 'sidebarRentalBadge';
+                    newBadge.className = 'badge badge-notification bg-danger notification-badge';
+                    newBadge.textContent = currentUnseenRentals;
+                    rentalLink.appendChild(newBadge);
+                }
+            }
+
+            // Update maintenance badge
+            const maintenanceBadge = document.getElementById('sidebarMaintenanceBadge');
+            if (maintenanceBadge) {
+                const oldCount = parseInt(maintenanceBadge.textContent);
+                maintenanceBadge.textContent = currentNewMaintenance;
+                if (currentNewMaintenance > oldCount && !isFirstLoad) {
+                    maintenanceBadge.classList.add('notification-badge');
+                    setTimeout(() => {
+                        maintenanceBadge.classList.remove('notification-badge');
+                    }, 3000);
+                }
+            } else if (currentNewMaintenance > 0) {
+                // Create badge if it doesn't exist
+                const maintenanceLink = document.querySelector('a[href="manage_maintenance.php"]');
+                if (maintenanceLink) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = 'sidebarMaintenanceBadge';
+                    newBadge.className = 'badge badge-notification bg-warning notification-badge';
+                    newBadge.textContent = currentNewMaintenance;
+                    maintenanceLink.appendChild(newBadge);
+                }
+            }
+
+            // Update invoices badge
+            const invoicesBadge = document.getElementById('sidebarInvoicesBadge');
+            if (invoicesBadge) {
+                const oldCount = parseInt(invoicesBadge.textContent);
+                invoicesBadge.textContent = currentUnreadClientMessages;
+                if (currentUnreadClientMessages > oldCount && !isFirstLoad) {
+                    invoicesBadge.classList.add('notification-badge');
+                    setTimeout(() => {
+                        invoicesBadge.classList.remove('notification-badge');
+                    }, 3000);
+                }
+            } else if (currentUnreadClientMessages > 0) {
+                // Create badge if it doesn't exist
+                const invoicesLink = document.querySelector('a[href="generate_invoice.php"]');
+                if (invoicesLink) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = 'sidebarInvoicesBadge';
+                    newBadge.className = 'badge badge-notification bg-info notification-badge';
+                    newBadge.textContent = currentUnreadClientMessages;
+                    invoicesLink.appendChild(newBadge);
+                }
+            }
+        }
+
         // Tab visibility handling
         document.addEventListener('visibilitychange', function() {
             isTabActive = !document.hidden;
@@ -1855,6 +1931,9 @@ if ($_POST) {
                         const currentUnseenRentals = data.unseen_rentals ?? 0;
                         const currentNewMaintenance = data.new_maintenance_requests ?? 0;
                         const currentUnreadClientMessages = data.unread_client_messages ?? 0;
+
+                        // Update sidebar badges
+                        updateSidebarBadges(data);
 
                         // Check for new rental requests
                         if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
