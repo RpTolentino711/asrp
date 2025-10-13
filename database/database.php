@@ -93,7 +93,6 @@ public function executeQuery($sql, $params = []) {
 
 
 
-
 public function getOccupancyData($startDate, $endDate) {
     try {
         $monthDays = date('t', strtotime($startDate));
@@ -188,8 +187,91 @@ public function updateUnitPhotos($space_id, $client_id, $json_photos) {
     }
 }
 
+    public function getCurrentBusinessPhoto($client_id) {
+        try {
+            $sql = "SELECT businessPhoto FROM business_photo_history 
+                    WHERE Client_ID = ? AND Status = 'active' 
+                    ORDER BY Action_Date DESC LIMIT 1";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ? $result['businessPhoto'] : null;
+        } catch (PDOException $e) {
+            error_log("getCurrentBusinessPhoto Error: " . $e->getMessage());
+            return null;
+        }
+    }
 
+     public function getBusinessPhotoHistory($client_id) {
+        try {
+            $sql = "SELECT * FROM business_photo_history 
+                    WHERE Client_ID = ? 
+                    ORDER BY Action_Date DESC";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("getBusinessPhotoHistory Error: " . $e->getMessage());
+            return [];
+        }
+    }
 
+     public function uploadBusinessPhoto($client_id, $photo_path, $description = null) {
+        try {
+            $this->pdo->beginTransaction();
+            
+            // Set all previous photos to inactive
+            $sql = "UPDATE business_photo_history SET Status = 'inactive' WHERE Client_ID = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id]);
+            
+            // Insert new active photo
+            $sql = "INSERT INTO business_photo_history 
+                    (Client_ID, businessPhoto, description, Action, Previous_businessPhoto, Action_By, Status) 
+                    VALUES (?, ?, ?, 'uploaded', NULL, ?, 'active')";
+            
+            $action_by = -$client_id; // Negative value indicates client action
+            $stmt = $this->pdo->prepare($sql);
+            $success = $stmt->execute([$client_id, $photo_path, $description, $action_by]);
+            
+            $this->pdo->commit();
+            return $success;
+            
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            error_log("uploadBusinessPhoto Error: " . $e->getMessage());
+            return false;
+        }
+    }
+     public function deleteBusinessPhoto($client_id, $photo_filename) {
+        try {
+            $sql = "UPDATE business_photo_history 
+                    SET Status = 'inactive', Action = 'deleted', Action_Date = NOW() 
+                    WHERE Client_ID = ? AND businessPhoto = ? AND Status = 'active'";
+            
+            $stmt = $this->pdo->prepare($sql);
+            return $stmt->execute([$client_id, $photo_filename]);
+            
+        } catch (PDOException $e) {
+            error_log("deleteBusinessPhoto Error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+       public function validateBusinessPhotoOwnership($client_id, $photo_filename) {
+        try {
+            $sql = "SELECT COUNT(*) as count FROM business_photo_history 
+                    WHERE Client_ID = ? AND businessPhoto = ?";
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute([$client_id, $photo_filename]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result['count'] > 0;
+        } catch (PDOException $e) {
+            error_log("validateBusinessPhotoOwnership Error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
 public function getUnitPhotosForClient($client_id) {
     try {
         $sql = "SELECT Space_ID, BusinessPhoto
@@ -1449,77 +1531,12 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
     
     $sql = "SELECT 
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0) as unseen_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid') as unpaid_invoices,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
-        (SELECT COUNT(*) FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0) as unread_client_messages";
+        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
     
-    try {
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute();
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("Error getting admin dashboard counts: " . $e->getMessage());
-        return [];
-    }
-}
-
-
-public function getUnreadClientMessagesCount() {
-    $sql = "SELECT COUNT(*) as unread_count 
-            FROM invoice_chat 
-            WHERE Sender_Type = 'client' 
-            AND is_read_admin = 0";
-    
-    try {
-        $stmt = $this->conn->prepare($sql);
-        $stmt->execute();
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result['unread_count'] ?? 0;
-    } catch (PDOException $e) {
-        error_log("Error getting unread client messages count: " . $e->getMessage());
-        return 0;
-    }
-}
-
-public function getLatestClientMessages($limit = 5) {
-    $sql = "SELECT ic.*, c.Client_fn, c.Client_ln, s.Name as UnitName, i.Invoice_ID
-            FROM invoice_chat ic
-            LEFT JOIN invoice i ON ic.Invoice_ID = i.Invoice_ID
-            LEFT JOIN client c ON i.Client_ID = c.Client_ID
-            LEFT JOIN space s ON i.Space_ID = s.Space_ID
-            WHERE ic.Sender_Type = 'client'
-            ORDER BY ic.Created_At DESC 
-            LIMIT ?";
-    
-    try {
-        $stmt = $this->conn->prepare($sql);
-        $stmt->bindValue(1, $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("Error getting latest client messages: " . $e->getMessage());
-        return [];
-    }
-}
-public function markClientMessagesAsRead($invoice_id = null) {
-    try {
-        if ($invoice_id) {
-            $sql = "UPDATE invoice_chat SET is_read_admin = 1 WHERE Invoice_ID = ? AND Sender_Type = 'client'";
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute([$invoice_id]);
-        } else {
-            $sql = "UPDATE invoice_chat SET is_read_admin = 1 WHERE Sender_Type = 'client' AND is_read_admin = 0";
-            $stmt = $this->conn->prepare($sql);
-            $stmt->execute();
-        }
-        return true;
-    } catch (PDOException $e) {
-        error_log("Error marking client messages as read: " . $e->getMessage());
-        return false;
-    }
+    return $this->getRow($sql); // Remove date parameters for real-time counts
 }
 
 
