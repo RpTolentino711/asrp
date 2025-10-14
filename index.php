@@ -617,42 +617,6 @@ $testimonials = $db->getHomepageTestimonials(20);
 }
 
 
-/* Default (desktop/tablet): keep scroll box to avoid long text overflow */
-.description-text {
-  max-height: 120px;
-  overflow-y: auto;
-  line-height: 1.6;
-  padding-right: 5px;
-  margin-bottom: 1.5rem; /* adds spacing below text */
-}
-
-/* Container for the description background box */
-.modal-body .bg-dark.bg-opacity-50 {
-  margin-bottom: 2rem;
-}
-
-/* 🧭 Mobile fix: show full description, remove scroll box, improve spacing */
-@media (max-width: 576px) {
-  .description-text {
-    max-height: none;          /* allow full expansion */
-    overflow-y: visible;       /* no scrollbars */
-    font-size: 0.95rem;        /* slightly smaller for readability */
-    margin-bottom: 1.5rem;     /* add breathing room */
-  }
-
-  .modal-body .bg-dark.bg-opacity-50 {
-    margin-bottom: 2rem;       /* consistent spacing before thumbnails */
-  }
-
-  .modal-body {
-    padding-bottom: 3rem;      /* prevent thumbnails from overlapping text */
-  }
-
-  .carousel-indicators {
-    position: relative !important;
-    margin-top: 1rem;          /* move indicators below text properly */
-  }
-}
 
   </style>
 </head>
