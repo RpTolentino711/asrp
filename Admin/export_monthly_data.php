@@ -176,34 +176,33 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "<table>";
     echo "<tr><th>Invoice ID</th><th>Client</th><th>Unit</th><th>Amount</th><th>Issue Date</th><th>Due Date</th><th>Status</th><th>Days Overdue</th></tr>";
     
-$today = new DateTime();
-foreach ($detailedInvoices as $invoice) {
-    $dueDate = new DateTime($invoice['EndDate']);
-    
-    // ONLY calculate days overdue for UNPAID invoices
-    if ($invoice['Status'] == 'unpaid' && $today > $dueDate) {
-        $daysOverdue = $today->diff($dueDate)->days;
-    } else {
-        $daysOverdue = 0; // No overdue for paid invoices or not-yet-due invoices
+    $today = new DateTime();
+    foreach ($detailedInvoices as $invoice) {
+        $dueDate = new DateTime($invoice['EndDate']);
+        
+        // FIXED: Only calculate days overdue for UNPAID invoices that are actually overdue
+        $daysOverdue = 0;
+        if ($invoice['Status'] == 'unpaid' && $today > $dueDate) {
+            $daysOverdue = $today->diff($dueDate)->days;
+        }
+        
+        $statusClass = '';
+        if ($invoice['Status'] == 'paid') $statusClass = 'positive';
+        if ($invoice['Status'] == 'unpaid' && $daysOverdue > 0) $statusClass = 'negative';
+        if ($invoice['Status'] == 'unpaid' && $daysOverdue == 0) $statusClass = 'warning';
+        
+        echo "<tr>";
+        echo "<td>INV-" . str_pad($invoice['Invoice_ID'], 4, '0', STR_PAD_LEFT) . "</td>";
+        echo "<td>" . htmlspecialchars($invoice['Client_fn'] . ' ' . $invoice['Client_ln']) . "</td>";
+        echo "<td>" . htmlspecialchars($invoice['UnitName'] ?? 'N/A') . "</td>";
+        echo "<td class='right'>₱" . number_format($invoice['InvoiceTotal'], 2) . "</td>";
+        echo "<td>" . date('M j, Y', strtotime($invoice['InvoiceDate'])) . "</td>";
+        echo "<td>" . date('M j, Y', strtotime($invoice['EndDate'])) . "</td>";
+        echo "<td class='$statusClass'>" . ucfirst($invoice['Status']) . "</td>";
+        // FIXED: Show days overdue ONLY for unpaid overdue invoices
+        echo "<td class='center'>" . ($invoice['Status'] == 'unpaid' && $daysOverdue > 0 ? $daysOverdue : '-') . "</td>";
+        echo "</tr>";
     }
-    
-    $statusClass = '';
-    if ($invoice['Status'] == 'paid') $statusClass = 'positive';
-    if ($invoice['Status'] == 'unpaid' && $daysOverdue > 0) $statusClass = 'negative';
-    if ($invoice['Status'] == 'unpaid' && $daysOverdue == 0) $statusClass = 'warning';
-    
-    echo "<tr>";
-    echo "<td>INV-" . str_pad($invoice['Invoice_ID'], 4, '0', STR_PAD_LEFT) . "</td>";
-    echo "<td>" . htmlspecialchars($invoice['Client_fn'] . ' ' . $invoice['Client_ln']) . "</td>";
-    echo "<td>" . htmlspecialchars($invoice['UnitName'] ?? 'N/A') . "</td>";
-    echo "<td class='right'>₱" . number_format($invoice['InvoiceTotal'], 2) . "</td>";
-    echo "<td>" . date('M j, Y', strtotime($invoice['InvoiceDate'])) . "</td>";
-    echo "<td>" . date('M j, Y', strtotime($invoice['EndDate'])) . "</td>";
-    echo "<td class='$statusClass'>" . ucfirst($invoice['Status']) . "</td>";
-    // Show days overdue ONLY for unpaid overdue invoices, otherwise show '-'
-    echo "<td class='center'>" . ($invoice['Status'] == 'unpaid' && $daysOverdue > 0 ? $daysOverdue : '-') . "</td>";
-    echo "</tr>";
-}
     echo "</table>";
     echo "<br>";
     
