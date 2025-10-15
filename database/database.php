@@ -1688,7 +1688,7 @@ public function getDetailedMaintenanceData($startDate, $endDate) {
 
 public function getDetailedInvoiceData($startDate, $endDate) {
     try {
-        // Use Created_At to show payments made in that period
+        // Include invoices whose period or payments fall within the selected range
         $sql = "SELECT 
                     i.Invoice_ID,
                     i.Client_ID,
@@ -1703,13 +1703,23 @@ public function getDetailedInvoiceData($startDate, $endDate) {
                 FROM invoice i
                 JOIN client c ON i.Client_ID = c.Client_ID
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
-                WHERE i.Created_At BETWEEN ? AND ?
-                ORDER BY i.Created_At DESC";
+                WHERE 
+                    (
+                        (i.InvoiceDate BETWEEN ? AND ?) OR
+                        (i.EndDate BETWEEN ? AND ?) OR
+                        (i.Status = 'paid' AND i.Created_At BETWEEN ? AND ?)
+                    )
+                ORDER BY i.EndDate DESC";
         
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$startDate, $endDate]);
+        $stmt->execute([
+            $startDate, $endDate,  // InvoiceDate range
+            $startDate, $endDate,  // EndDate range
+            $startDate, $endDate   // Paid date range
+        ]);
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+        // Ensure clean and formatted data for export
         foreach ($result as &$row) {
             $row['Status'] = ucfirst($row['Status'] ?? 'Unpaid');
             $row['UnitName'] = $row['UnitName'] ?: 'N/A';
