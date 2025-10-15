@@ -161,11 +161,12 @@ public function getOccupancyData($startDate, $endDate) {
 public function getFinancialSummary($startDate, $endDate) {
     try {
         $endDateWithTime = $endDate . ' 23:59:59';
+        $today = date('Y-m-d');
         
         $sql = "SELECT 
                     -- Invoice counts (for October period)
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as overdue_count,
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= CURDATE() AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as pending_count,
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < ? AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as overdue_count,
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= ? AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as pending_count,
                     COUNT(CASE WHEN Status = 'paid' AND Created_At BETWEEN ? AND ? THEN 1 END) as paid_count,
                     
                     -- Revenue by space type (payments MADE in October)
@@ -204,8 +205,10 @@ public function getFinancialSummary($startDate, $endDate) {
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
             // Overdue count (unpaid invoices dated in October that are overdue)
-            $startDate, $endDate,
-            $startDate, $endDate,
+            $today, $startDate, $endDate,
+            
+            // Pending count (unpaid invoices dated in October that are not overdue)
+            $today, $startDate, $endDate,
             
             // Paid count (payments made in October)
             $startDate, $endDateWithTime,
