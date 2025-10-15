@@ -160,7 +160,7 @@ public function getOccupancyData($startDate, $endDate) {
 
 public function getFinancialSummary($startDate, $endDate) {
     try {
-        $today = date('Y-m-d');
+        $endDateWithTime = $endDate . ' 23:59:59';
         
         $sql = "SELECT 
                     -- Invoice counts (invoices DUE in October)
@@ -202,9 +202,11 @@ public function getFinancialSummary($startDate, $endDate) {
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            // Overdue count (unpaid invoices DUE in October that are overdue)
-            $today, $startDate, $endDate,
-            $today, $startDate, $endDate,
+            // Overdue count (unpaid invoices DUE in October that are overdue by end of month)
+            $endDate, $startDate, $endDate,
+            
+            // Pending count (unpaid invoices DUE in October that are not overdue by end of month)
+            $endDate, $startDate, $endDate,
             
             // Paid count (invoices DUE in October that are paid)
             $startDate, $endDate,
