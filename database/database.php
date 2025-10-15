@@ -98,29 +98,56 @@ public function getOccupancyData($startDate, $endDate) {
         $monthDays = date('t', strtotime($startDate));
         
         $sql = "SELECT 
-                    s.Space_ID, s.Name, s.Price, st.SpaceTypeName,
-                    c.Client_fn, c.Client_ln,
+                    s.Space_ID, 
+                    s.Name, 
+                    s.Price, 
+                    st.SpaceTypeName,
+                    c.Client_fn, 
+                    c.Client_ln,
+                    c.Client_Email,
                     cs.active,
-                    CASE WHEN cs.active = 1 THEN 'Occupied' ELSE 'Vacant' END as Status,
-                    DATEDIFF(LEAST(?, i.EndDate), GREATEST(?, i.InvoiceDate)) as occupied_days,
+                    CASE 
+                        WHEN cs.active = 1 THEN 'Occupied' 
+                        ELSE 'Vacant' 
+                    END as Status,
+                    -- Calculate actual occupied days within the period
+                    CASE 
+                        WHEN cs.active = 1 AND i.InvoiceDate IS NOT NULL THEN
+                            DATEDIFF(
+                                LEAST(?, COALESCE(i.EndDate, ?)),
+                                GREATEST(?, COALESCE(i.InvoiceDate, ?))
+                            )
+                        ELSE 0
+                    END as occupied_days,
                     ? as month_days,
-                    (DATEDIFF(LEAST(?, i.EndDate), GREATEST(?, i.InvoiceDate)) / ? * 100) as utilization_rate,
-                    i.InvoiceTotal as revenue
+                    -- Calculate utilization rate
+                    CASE 
+                        WHEN cs.active = 1 AND i.InvoiceDate IS NOT NULL THEN
+                            (DATEDIFF(
+                                LEAST(?, COALESCE(i.EndDate, ?)),
+                                GREATEST(?, COALESCE(i.InvoiceDate, ?))
+                            ) / ? * 100)
+                        ELSE 0
+                    END as utilization_rate,
+                    COALESCE(i.InvoiceTotal, 0) as revenue,
+                    i.InvoiceDate,
+                    i.EndDate,
+                    i.Status as InvoiceStatus
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID AND cs.active = 1
                 LEFT JOIN client c ON cs.Client_ID = c.Client_ID
                 LEFT JOIN invoice i ON s.Space_ID = i.Space_ID 
-                    AND i.Status = 'paid' 
                     AND i.InvoiceDate BETWEEN ? AND ?
                 WHERE s.Flow_Status = 'old'
-                ORDER BY s.SpaceType_ID, s.Name";
+                ORDER BY st.SpaceTypeName, s.Name";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            $endDate, $startDate, $monthDays,
-            $endDate, $startDate, $monthDays,
-            $startDate, $endDate
+            $endDate, $endDate, $startDate, $startDate, // For occupied_days
+            $monthDays,
+            $endDate, $endDate, $startDate, $startDate, $monthDays, // For utilization_rate
+            $startDate, $endDate // For invoice date range
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
@@ -128,14 +155,35 @@ public function getOccupancyData($startDate, $endDate) {
         return [];
     }
 }
-
 public function getFinancialSummary($startDate, $endDate) {
     try {
         $sql = "SELECT 
+                    -- Invoice counts
                     COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_count,
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
-                    COALESCE(SUM(CASE WHEN Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= CURDATE() THEN 1 END) as pending_count,
+                    COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_count,
+                    
+                    -- Revenue by space type
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
+                    
+                    -- Total revenue
+                    COALESCE(SUM(CASE WHEN i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue,
+                    
+                    -- Potential revenue from unpaid invoices
+                    COALESCE(SUM(CASE WHEN i.Status = 'unpaid' THEN i.InvoiceTotal ELSE 0 END), 0) as potential_revenue,
+                    
+                    -- Average revenue per paid invoice
+                    COALESCE(AVG(CASE WHEN i.Status = 'paid' THEN i.InvoiceTotal END), 0) as avg_revenue_per_invoice,
+                    
+                    -- Occupancy rate calculation
+                    ROUND(
+                        (SELECT COUNT(DISTINCT Space_ID) 
+                         FROM clientspace 
+                         WHERE active = 1) * 100.0 / 
+                        NULLIF((SELECT COUNT(*) FROM space WHERE Flow_Status = 'old'), 0), 
+                    2) as occupancy_rate
+                    
                 FROM invoice i
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
@@ -149,7 +197,6 @@ public function getFinancialSummary($startDate, $endDate) {
         return [];
     }
 }
-
 
 
 
@@ -1498,23 +1545,27 @@ public function getPendingRentalRequests() {
 
     
 
-public function getMonthlyEarningsStats($startDate, $endDate) {
-    // Include the time component to cover the entire end date
+ublic function getMonthlyEarningsStats($startDate, $endDate) {
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
-        COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
+        COALESCE(SUM(CASE WHEN Status = 'paid' THEN InvoiceTotal ELSE 0 END), 0) as total_earnings,
         COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count
+        COUNT(CASE WHEN Status = 'unpaid' THEN 1 END) as unpaid_invoices_count,
+        COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_invoices_count,
+        COALESCE(AVG(CASE WHEN Status = 'paid' THEN InvoiceTotal END), 0) as average_payment,
+        (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count,
+        (SELECT COUNT(*) FROM rentalrequest WHERE Requested_At BETWEEN ? AND ?) as new_rental_requests
         FROM invoice 
-        WHERE Status = 'paid' 
-        AND InvoiceDate BETWEEN ? AND ?"; // Use InvoiceDate instead of Created_At
+        WHERE InvoiceDate BETWEEN ? AND ?";
     
     return $this->getRow($sql, [
-        $startDate, $endDateWithTime, 
+        $startDate, $endDateWithTime,
+        $startDate, $endDateWithTime,
         $startDate, $endDate
     ]);
 }
+
 
 
 
@@ -1554,14 +1605,17 @@ public function getMaintenanceStats($startDate, $endDate) {
 }
 
 public function getTotalRentalRequests($startDate, $endDate) {
-    // Include the time component to cover the entire end date
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
         COUNT(*) as total_rental_requests,
         COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
         COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
-        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
+        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals,
+        COUNT(CASE WHEN Flow_Status = 'new' THEN 1 END) as new_requests,
+        COUNT(CASE WHEN Flow_Status = 'done' THEN 1 END) as processed_requests,
+        -- Calculate conversion rate
+        ROUND((COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) * 100.0 / NULLIF(COUNT(*), 0)), 2) as conversion_rate
         FROM rentalrequest 
         WHERE Requested_At BETWEEN ? AND ?";
     
@@ -1570,39 +1624,74 @@ public function getTotalRentalRequests($startDate, $endDate) {
         'total' => $result['total_rental_requests'] ?? 0,
         'pending' => $result['pending_rentals'] ?? 0,
         'accepted' => $result['accepted_rentals'] ?? 0,
-        'rejected' => $result['rejected_rentals'] ?? 0
+        'rejected' => $result['rejected_rentals'] ?? 0,
+        'new_requests' => $result['new_requests'] ?? 0,
+        'processed_requests' => $result['processed_requests'] ?? 0,
+        'conversion_rate' => $result['conversion_rate'] ?? 0
     ];
 }
 
 
 public function getTotalMaintenanceRequests($startDate, $endDate) {
-    // Include the time component to cover the entire end date
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
         COUNT(*) as total_maintenance,
         COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted_requests,
         COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress_requests,
-        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed_requests
-        FROM maintenancerequest 
-        WHERE RequestDate BETWEEN ? AND ?";
+        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed_requests,
+        COUNT(CASE WHEN admin_seen = 0 THEN 1 END) as unread_requests,
+        -- Average completion time in days
+        ROUND(AVG(CASE 
+            WHEN Status = 'Completed' THEN 
+                DATEDIFF(
+                    (SELECT MAX(StatusChangeDate) 
+                     FROM maintenancerequeststatushistory 
+                     WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed'),
+                    mr.RequestDate
+                )
+            END), 1) as avg_completion_days
+        FROM maintenancerequest mr
+        WHERE mr.RequestDate BETWEEN ? AND ?";
     
     $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
     return [
         'total' => $result['total_maintenance'] ?? 0,
         'submitted' => $result['submitted_requests'] ?? 0,
         'in_progress' => $result['in_progress_requests'] ?? 0,
-        'completed' => $result['completed_requests'] ?? 0
+        'completed' => $result['completed_requests'] ?? 0,
+        'unread_requests' => $result['unread_requests'] ?? 0,
+        'avg_completion_days' => $result['avg_completion_days'] ?? 0
     ];
 }
 
 
+
 public function getDetailedRentalData($startDate, $endDate) {
     try {
-        $sql = "SELECT rr.*, c.Client_fn, c.Client_ln, c.Client_Email, s.Name as UnitName, s.Price
+        $sql = "SELECT 
+                    rr.*, 
+                    c.Client_fn, 
+                    c.Client_ln, 
+                    c.Client_Email,
+                    c.Client_Phone,
+                    s.Name as UnitName, 
+                    s.Price,
+                    st.SpaceTypeName,
+                    DATEDIFF(rr.EndDate, rr.StartDate) as rental_duration,
+                    CASE 
+                        WHEN rr.Status = 'Accepted' AND cs.CS_ID IS NOT NULL THEN 'Active Tenant'
+                        WHEN rr.Status = 'Accepted' THEN 'Approved - Not Active'
+                        ELSE rr.Status
+                    END as RentalStatus,
+                    cs.active as IsActiveTenant
                 FROM rentalrequest rr
                 JOIN client c ON rr.Client_ID = c.Client_ID
                 LEFT JOIN space s ON rr.Space_ID = s.Space_ID
+                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+                LEFT JOIN clientspace cs ON rr.Space_ID = cs.Space_ID 
+                    AND rr.Client_ID = cs.Client_ID 
+                    AND cs.active = 1
                 WHERE rr.Requested_At BETWEEN ? AND ?
                 ORDER BY rr.Requested_At DESC";
         
@@ -1617,14 +1706,38 @@ public function getDetailedRentalData($startDate, $endDate) {
 
 public function getDetailedMaintenanceData($startDate, $endDate) {
     try {
-        $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as UnitName, 
-                       h.Handyman_fn, h.Handyman_ln,
-                       (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory 
-                        WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate
+        $sql = "SELECT 
+                    mr.*, 
+                    c.Client_fn, 
+                    c.Client_ln, 
+                    c.Client_Email,
+                    s.Name as UnitName, 
+                    s.SpaceType_ID,
+                    h.Handyman_fn, 
+                    h.Handyman_ln,
+                    h.Phone as HandymanPhone,
+                    jt.JobType_Name,
+                    (SELECT MAX(StatusChangeDate) 
+                     FROM maintenancerequeststatushistory 
+                     WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate,
+                    (SELECT NewStatus 
+                     FROM maintenancerequeststatushistory 
+                     WHERE Request_ID = mr.Request_ID 
+                     ORDER BY StatusChangeDate DESC 
+                     LIMIT 1) as CurrentStatus,
+                    DATEDIFF(
+                        COALESCE((SELECT MAX(StatusChangeDate) 
+                                 FROM maintenancerequeststatushistory 
+                                 WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed'), 
+                                 NOW()),
+                        mr.RequestDate
+                    ) as days_to_complete
                 FROM maintenancerequest mr
                 JOIN client c ON mr.Client_ID = c.Client_ID
                 LEFT JOIN space s ON mr.Space_ID = s.Space_ID
                 LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+                LEFT JOIN handymanjob hj ON h.Handyman_ID = hj.Handyman_ID
+                LEFT JOIN jobtype jt ON hj.JobType_ID = jt.JobType_ID
                 WHERE mr.RequestDate BETWEEN ? AND ?
                 ORDER BY mr.RequestDate DESC";
         
@@ -1639,10 +1752,17 @@ public function getDetailedMaintenanceData($startDate, $endDate) {
 
 public function getDetailedInvoiceData($startDate, $endDate) {
     try {
-        $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name as UnitName
+        $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name as UnitName,
+                       st.SpaceTypeName, s.Price as SpacePrice,
+                       CASE 
+                           WHEN i.Status = 'paid' THEN 'Paid'
+                           WHEN i.Status = 'unpaid' AND i.EndDate < CURDATE() THEN 'Overdue'
+                           ELSE 'Pending'
+                       END as PaymentStatus
                 FROM invoice i
                 JOIN client c ON i.Client_ID = c.Client_ID
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
+                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 WHERE i.InvoiceDate BETWEEN ? AND ?
                 ORDER BY i.InvoiceDate DESC";
         
