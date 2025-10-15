@@ -170,7 +170,6 @@ public function getFinancialSummary($startDate, $endDate) {
 
 
 
-
 public function getUserByEmail($email) {
     $stmt = $this->pdo->prepare("SELECT * FROM client WHERE LOWER(Client_Email) = LOWER(?)");
     $stmt->execute([$email]);
@@ -1569,25 +1568,33 @@ public function getMaintenanceStats($startDate, $endDate) {
     return $this->getRow($sql, [$startDate, $endDate]);
 }
 
+
 public function getTotalRentalRequests($startDate, $endDate) {
-    // Include the time component to cover the entire end date
-    $endDateWithTime = $endDate . ' 23:59:59';
-    
     $sql = "SELECT 
-        COUNT(*) as total_rental_requests,
-        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
-        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
-        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
-        FROM rentalrequest 
-        WHERE Requested_At BETWEEN ? AND ?";
+        COUNT(*) as total,
+        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending,
+        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted,
+        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected
+    FROM rentalrequest 
+    WHERE DATE(Requested_At) BETWEEN ? AND ?";
     
-    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
-    return [
-        'total' => $result['total_rental_requests'] ?? 0,
-        'pending' => $result['pending_rentals'] ?? 0,
-        'accepted' => $result['accepted_rentals'] ?? 0,
-        'rejected' => $result['rejected_rentals'] ?? 0
-    ];
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+public function getTotalMaintenanceRequests($startDate, $endDate) {
+    $sql = "SELECT 
+        COUNT(*) as total,
+        COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted,
+        COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress,
+        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed
+    FROM maintenancerequest 
+    WHERE DATE(RequestDate) BETWEEN ? AND ?";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 
@@ -1631,25 +1638,23 @@ public function getDetailedRentalData($startDate, $endDate) {
 
 
 public function getDetailedMaintenanceData($startDate, $endDate) {
-    try {
-        $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as UnitName, 
-                       h.Handyman_fn, h.Handyman_ln,
-                       (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory 
-                        WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate
-                FROM maintenancerequest mr
-                JOIN client c ON mr.Client_ID = c.Client_ID
-                LEFT JOIN space s ON mr.Space_ID = s.Space_ID
-                LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
-                WHERE mr.RequestDate BETWEEN ? AND ?
-                ORDER BY mr.RequestDate DESC";
-        
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$startDate, $endDate]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
-        error_log("Error getting detailed maintenance data: " . $e->getMessage());
-        return [];
-    }
+    $sql = "SELECT 
+        mr.*,
+        c.Client_fn, c.Client_ln,
+        s.Name as UnitName,
+        h.Handyman_fn, h.Handyman_ln,
+        (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory 
+         WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate
+    FROM maintenancerequest mr
+    LEFT JOIN client c ON mr.Client_ID = c.Client_ID
+    LEFT JOIN space s ON mr.Space_ID = s.Space_ID
+    LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+    WHERE DATE(mr.RequestDate) BETWEEN ? AND ?
+    ORDER BY mr.RequestDate DESC";
+    
+    $stmt = $this->conn->prepare($sql);
+    $stmt->execute([$startDate, $endDate]);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 public function getDetailedInvoiceData($startDate, $endDate) {
