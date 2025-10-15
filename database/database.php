@@ -109,14 +109,23 @@ public function getOccupancyData($startDate, $endDate) {
                         WHEN s.Flow_Status = 'old' AND cs.active IS NULL THEN 'Rented but No Active Client'
                         ELSE 'Vacant' 
                     END as Status,
-                    -- Calculate ACTUAL occupancy days based on invoice dates
+                    -- Calculate ACTUAL occupancy days (100% for paid October invoices)
                     CASE 
                         WHEN s.Flow_Status = 'old' AND cs.active = 1 THEN
-                            -- Calculate days occupied in this month
-                            DATEDIFF(
-                                LEAST(?, i.EndDate),  -- Use today or end date, whichever is earlier
-                                GREATEST(?, i.InvoiceDate)  -- Use start of month or invoice date, whichever is later
-                            )
+                            -- If paid October invoice exists, full month occupancy
+                            CASE 
+                                WHEN EXISTS (
+                                    SELECT 1 FROM invoice i2 
+                                    WHERE i2.Space_ID = s.Space_ID 
+                                    AND i2.Status = 'paid' 
+                                    AND i2.EndDate BETWEEN ? AND ?
+                                ) THEN ?
+                                -- Otherwise calculate from unpaid invoice dates
+                                ELSE DATEDIFF(
+                                    LEAST(?, COALESCE(i.EndDate, ?)),
+                                    GREATEST(?, COALESCE(i.InvoiceDate, ?))
+                                )
+                            END
                         ELSE 0 
                     END as occupied_days,
                     -- Total days in month
@@ -124,12 +133,20 @@ public function getOccupancyData($startDate, $endDate) {
                     -- Utilization rate (occupied_days / month_days * 100)
                     CASE 
                         WHEN s.Flow_Status = 'old' AND cs.active = 1 THEN
-                            ROUND(
-                                (DATEDIFF(
-                                    LEAST(?, i.EndDate),
-                                    GREATEST(?, i.InvoiceDate)
-                                ) / ? * 100), 
-                            1)
+                            CASE 
+                                WHEN EXISTS (
+                                    SELECT 1 FROM invoice i2 
+                                    WHERE i2.Space_ID = s.Space_ID 
+                                    AND i2.Status = 'paid' 
+                                    AND i2.EndDate BETWEEN ? AND ?
+                                ) THEN 100
+                                ELSE ROUND(
+                                    (DATEDIFF(
+                                        LEAST(?, COALESCE(i.EndDate, ?)),
+                                        GREATEST(?, COALESCE(i.InvoiceDate, ?))
+                                    ) / ? * 100), 
+                                1)
+                            END
                         ELSE 0 
                     END as utilization_rate,
                     -- Revenue from payments made during the month
@@ -139,26 +156,36 @@ public function getOccupancyData($startDate, $endDate) {
                         WHERE i2.Space_ID = s.Space_ID 
                         AND i2.Status = 'paid'
                         AND i2.Created_At BETWEEN ? AND ?
-                    ), 0) as revenue,
-                    -- Invoice dates for reference
-                    i.InvoiceDate,
-                    i.EndDate
+                    ), 0) as revenue
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID AND cs.active = 1
                 LEFT JOIN client c ON cs.Client_ID = c.Client_ID
                 LEFT JOIN invoice i ON s.Space_ID = i.Space_ID 
-                    AND i.Status = 'unpaid'  -- Use current unpaid invoice for date calculation
-                    AND i.Flow_Status = 'new'
+                    AND i.Flow_Status = 'new'  -- Current invoice
                 ORDER BY st.SpaceTypeName, s.Name";
         
         $endDateWithTime = $endDate . ' 23:59:59';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            $today, $startDate,              // For occupied_days calculation
-            $monthDays,                      // month_days
-            $today, $startDate, $monthDays,  // For utilization_rate calculation
-            $startDate, $endDateWithTime     // For revenue calculation
+            // For paid October invoice check
+            $startDate, $endDate,
+            $monthDays,
+            
+            // For unpaid invoice calculation
+            $today, $endDate, $startDate, $startDate,
+            
+            // month_days
+            $monthDays,
+            
+            // For utilization rate paid check
+            $startDate, $endDate,
+            
+            // For utilization rate unpaid calculation  
+            $today, $endDate, $startDate, $startDate, $monthDays,
+            
+            // For revenue calculation
+            $startDate, $endDateWithTime
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
