@@ -160,26 +160,34 @@ public function getOccupancyData($startDate, $endDate) {
 
 public function getFinancialSummary($startDate, $endDate) {
     try {
+        $endDateWithTime = $endDate . ' 23:59:59';
+        
         $sql = "SELECT 
-                    -- Invoice counts
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_count,
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= CURDATE() THEN 1 END) as pending_count,
-                    COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_count,
+                    -- Invoice counts (for October period)
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as overdue_count,
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= CURDATE() AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as pending_count,
+                    COUNT(CASE WHEN Status = 'paid' AND Created_At BETWEEN ? AND ? THEN 1 END) as paid_count,
                     
-                    -- Revenue by space type
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
+                    -- Revenue by space type (payments MADE in October)
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
                     
-                    -- Total revenue
-                    COALESCE(SUM(CASE WHEN i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue,
+                    -- Total revenue (payments MADE in October)
+                    COALESCE(SUM(CASE WHEN i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue,
                     
-                    -- Potential revenue from unpaid invoices
-                    COALESCE(SUM(CASE WHEN i.Status = 'unpaid' THEN i.InvoiceTotal ELSE 0 END), 0) as potential_revenue,
+                    -- Potential revenue from unpaid invoices (DUE in October)
+                    COALESCE(SUM(CASE WHEN i.Status = 'unpaid' AND i.InvoiceDate BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as potential_revenue,
                     
-                    -- Average revenue per paid invoice
-                    COALESCE(AVG(CASE WHEN i.Status = 'paid' THEN i.InvoiceTotal END), 0) as avg_revenue_per_invoice,
+                    -- Average revenue per paid invoice (payments MADE in October)
+                    COALESCE(AVG(CASE WHEN i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal END), 0) as avg_revenue_per_invoice,
                     
-                    -- Occupancy rate calculation
+                    -- Collection rate for October
+                    ROUND(
+                        (COUNT(CASE WHEN i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN 1 END) * 100.0 / 
+                         NULLIF(COUNT(CASE WHEN i.InvoiceDate BETWEEN ? AND ? THEN 1 END), 0)), 
+                    2) as collection_rate,
+                    
+                    -- Occupancy rate calculation (current)
                     ROUND(
                         (SELECT COUNT(DISTINCT Space_ID) 
                          FROM clientspace 
@@ -190,10 +198,39 @@ public function getFinancialSummary($startDate, $endDate) {
                 FROM invoice i
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                WHERE i.InvoiceDate BETWEEN ? AND ?";
+                WHERE (i.Status = 'paid' AND i.Created_At BETWEEN ? AND ?)
+                   OR (i.Status = 'unpaid' AND i.InvoiceDate BETWEEN ? AND ?)";
         
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$startDate, $endDate]);
+        $stmt->execute([
+            // Overdue count (unpaid invoices dated in October that are overdue)
+            $startDate, $endDate,
+            $startDate, $endDate,
+            
+            // Paid count (payments made in October)
+            $startDate, $endDateWithTime,
+            
+            // Space revenue (payments made in October)
+            $startDate, $endDateWithTime,
+            $startDate, $endDateWithTime,
+            
+            // Total revenue (payments made in October)
+            $startDate, $endDateWithTime,
+            
+            // Potential revenue (unpaid invoices dated in October)
+            $startDate, $endDate,
+            
+            // Average revenue (payments made in October)
+            $startDate, $endDateWithTime,
+            
+            // Collection rate calculation
+            $startDate, $endDateWithTime,
+            $startDate, $endDate,
+            
+            // Final WHERE clause
+            $startDate, $endDateWithTime,
+            $startDate, $endDate
+        ]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
         error_log("Error getting financial summary: " . $e->getMessage());
