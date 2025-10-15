@@ -1548,7 +1548,7 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
                 ) AS new_messages_count
             FROM invoice i
             WHERE i.Status = 'paid'
-            AND i.Created_At BETWEEN ? AND ?";  -- changed from InvoiceDate to Created_At
+            AND i.Created_At BETWEEN ? AND ?";
 
     $result = $this->getRow($sql, [
         $startDate, $endDateWithTime,  // free_message range
