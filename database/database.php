@@ -1552,18 +1552,48 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
-        COALESCE(SUM(CASE WHEN Status = 'paid' THEN InvoiceTotal ELSE 0 END), 0) as total_earnings,
-        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        COUNT(CASE WHEN Status = 'unpaid' THEN 1 END) as unpaid_invoices_count,
-        COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_invoices_count,
-        COALESCE(AVG(CASE WHEN Status = 'paid' THEN InvoiceTotal END), 0) as average_payment,
+        -- Count payments MADE in October (using Created_At)
+        COALESCE(SUM(CASE WHEN Status = 'paid' AND Created_At BETWEEN ? AND ? THEN InvoiceTotal ELSE 0 END), 0) as total_earnings,
+        COUNT(CASE WHEN Status = 'paid' AND Created_At BETWEEN ? AND ? THEN 1 END) as paid_invoices_count,
+        
+        -- Count unpaid invoices that are DUE in October
+        COUNT(CASE WHEN Status = 'unpaid' AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as unpaid_invoices_count,
+        COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as overdue_invoices_count,
+        
+        -- Average payment amount for payments made in October
+        COALESCE(AVG(CASE WHEN Status = 'paid' AND Created_At BETWEEN ? AND ? THEN InvoiceTotal END), 0) as average_payment,
+        
+        -- Other metrics
         (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count,
-        (SELECT COUNT(*) FROM rentalrequest WHERE Requested_At BETWEEN ? AND ?) as new_rental_requests
+        (SELECT COUNT(*) FROM rentalrequest WHERE Requested_At BETWEEN ? AND ?) as new_rental_requests,
+        
+        -- Additional useful metrics
+        COUNT(*) as total_invoices_in_period,
+        COALESCE(SUM(CASE WHEN Status = 'unpaid' AND InvoiceDate BETWEEN ? AND ? THEN InvoiceTotal ELSE 0 END), 0) as potential_revenue
         FROM invoice 
-        WHERE InvoiceDate BETWEEN ? AND ?";
+        WHERE (Status = 'paid' AND Created_At BETWEEN ? AND ?)
+           OR (Status = 'unpaid' AND InvoiceDate BETWEEN ? AND ?)";
     
     return $this->getRow($sql, [
+        // For paid invoices (Created_At in October)
         $startDate, $endDateWithTime,
+        $startDate, $endDateWithTime,
+        
+        // For unpaid invoices (InvoiceDate in October)
+        $startDate, $endDate,
+        $startDate, $endDate,
+        
+        // For average payment (Created_At in October)
+        $startDate, $endDateWithTime,
+        
+        // For messages and rental requests
+        $startDate, $endDateWithTime,
+        $startDate, $endDateWithTime,
+        
+        // For additional metrics
+        $startDate, $endDate,
+        
+        // Final WHERE clause conditions
         $startDate, $endDateWithTime,
         $startDate, $endDate
     ]);
