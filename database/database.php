@@ -1687,7 +1687,7 @@ public function getDetailedMaintenanceData($startDate, $endDate) {
 
 public function getDetailedInvoiceData($startDate, $endDate) {
     try {
-        // Use InvoiceDate for accurate monthly filtering
+        // Use EndDate to reflect actual billing coverage
         $sql = "SELECT 
                     i.Invoice_ID,
                     i.Client_ID,
@@ -1702,14 +1702,14 @@ public function getDetailedInvoiceData($startDate, $endDate) {
                 FROM invoice i
                 JOIN client c ON i.Client_ID = c.Client_ID
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
-                WHERE i.InvoiceDate BETWEEN ? AND ?
-                ORDER BY i.InvoiceDate DESC";
+                WHERE i.EndDate BETWEEN ? AND ?
+                ORDER BY i.EndDate DESC";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$startDate, $endDate]);
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Format results for export (avoid nulls, clean data)
+        // Ensure no nulls for export
         foreach ($result as &$row) {
             $row['Status'] = ucfirst($row['Status'] ?? 'Unpaid');
             $row['UnitName'] = $row['UnitName'] ?: 'N/A';
@@ -1722,7 +1722,6 @@ public function getDetailedInvoiceData($startDate, $endDate) {
         return [];
     }
 }
-
 
     
 public function getLatestPendingRequests($limit = 5) {
