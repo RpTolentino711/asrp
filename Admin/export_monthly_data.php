@@ -174,22 +174,13 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     // INVOICE SUMMARY
     echo "<h4>Invoice Summary</h4>";
     echo "<table>";
-    echo "<tr><th>Invoice ID</th><th>Client</th><th>Unit</th><th>Amount</th><th>Issue Date</th><th>Due Date</th><th>Status</th><th>Days Overdue</th></tr>";
+    // REMOVED: Days Overdue column
+    echo "<tr><th>Invoice ID</th><th>Client</th><th>Unit</th><th>Amount</th><th>Issue Date</th><th>Due Date</th><th>Status</th></tr>";
     
-    $today = new DateTime();
-    foreach ($detailedInvoices as $invoice) {
-        $dueDate = new DateTime($invoice['EndDate']);
-        
-        // FIXED: Only calculate days overdue for UNPAID invoices that are actually overdue
-        $daysOverdue = 0;
-        if ($invoice['Status'] == 'unpaid' && $today > $dueDate) {
-            $daysOverdue = $today->diff($dueDate)->days;
-        }
-        
+    foreach ($detailedInvoices as $invoice) {        
         $statusClass = '';
         if ($invoice['Status'] == 'paid') $statusClass = 'positive';
-        if ($invoice['Status'] == 'unpaid' && $daysOverdue > 0) $statusClass = 'negative';
-        if ($invoice['Status'] == 'unpaid' && $daysOverdue == 0) $statusClass = 'warning';
+        if ($invoice['Status'] == 'unpaid') $statusClass = 'warning';
         
         echo "<tr>";
         echo "<td>INV-" . str_pad($invoice['Invoice_ID'], 4, '0', STR_PAD_LEFT) . "</td>";
@@ -199,7 +190,6 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
         echo "<td>" . date('M j, Y', strtotime($invoice['InvoiceDate'])) . "</td>";
         echo "<td>" . date('M j, Y', strtotime($invoice['EndDate'])) . "</td>";
         echo "<td class='$statusClass'>" . ucfirst($invoice['Status']) . "</td>";
-        // FIXED: Show days overdue ONLY for unpaid overdue invoices
         echo "</tr>";
     }
     echo "</table>";
