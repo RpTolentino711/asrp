@@ -24,7 +24,7 @@ function sendAdminMessageNotification($clientEmail, $clientFirstName, $adminMess
     $mail->SMTPSecure = 'tls';
     
     $mail->Username = 'management@asrt.space';
-    $mail->Password = '@Pogilameg10';
+    $mail->Password = '@Pogilameg1';
     
     $mail->Timeout = 30;
     $mail->SMTPOptions = [
@@ -220,8 +220,8 @@ function sendAdminMessageNotification($clientEmail, $clientFirstName, $adminMess
     return $mail->send();
 }
 
-// --- Enhanced Email notification for payment confirmation ---
-function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $invoiceId, $unitName, $paymentDate, $nextDueDate, $amountPaid, $issueDate) {
+// --- Email notification for payment confirmation ---
+function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $invoiceId, $unitName, $paymentDate, $nextDueDate) {
     $mail = new PHPMailer;
     $mail->CharSet = 'UTF-8';
     $mail->isSMTP();
@@ -252,9 +252,6 @@ function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $in
     
     $safeName = htmlspecialchars($clientFirstName, ENT_QUOTES, 'UTF-8');
     $safeUnitName = htmlspecialchars($unitName, ENT_QUOTES, 'UTF-8');
-    
-    // Format the amount as currency
-    $formattedAmount = '₱' . number_format($amountPaid, 2);
     
     $mail->Body = "
     <!DOCTYPE html>
@@ -300,16 +297,6 @@ function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $in
             .detail-row:last-child { border-bottom: none; margin-bottom: 0; }
             .detail-label { color: #64748b; font-weight: 500; }
             .detail-value { color: #1e293b; font-weight: 600; }
-            .amount-highlight {
-                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                color: white;
-                padding: 15px;
-                border-radius: 8px;
-                text-align: center;
-                margin: 15px 0;
-                font-size: 1.2rem;
-                font-weight: bold;
-            }
             .next-payment {
                 background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
                 border-left: 4px solid #f59e0b;
@@ -365,10 +352,6 @@ function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $in
                         <span class='detail-value'>{$safeUnitName}</span>
                     </div>
                     <div class='detail-row'>
-                        <span class='detail-label'>Issue Date:</span>
-                        <span class='detail-value'>{$issueDate}</span>
-                    </div>
-                    <div class='detail-row'>
                         <span class='detail-label'>Payment Date:</span>
                         <span class='detail-value'>{$paymentDate}</span>
                     </div>
@@ -376,11 +359,6 @@ function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $in
                         <span class='detail-label'>Payment Status:</span>
                         <span class='detail-value' style='color: #10b981; font-weight: bold;'>CONFIRMED</span>
                     </div>
-                </div>
-                
-                <div class='amount-highlight'>
-                    <div>Amount Paid</div>
-                    <div style='font-size: 1.8rem; margin-top: 5px;'>{$formattedAmount}</div>
                 </div>
                 
                 <div class='next-payment'>
@@ -406,7 +384,7 @@ function sendPaymentConfirmationNotification($clientEmail, $clientFirstName, $in
     </body>
     </html>";
     
-    $mail->AltBody = "PAYMENT CONFIRMED\n\nHello {$safeName}!\n\nYour rent payment has been confirmed successfully.\n\nPayment Details:\n- Payment Type: Monthly Rent Payment\n- Invoice ID: #{$invoiceId}\n- Unit: {$safeUnitName}\n- Issue Date: {$issueDate}\n- Payment Date: {$paymentDate}\n- Amount Paid: {$formattedAmount}\n- Status: CONFIRMED\n\nNext Payment Due: {$nextDueDate}\n\nPlease ensure your payment is made on or before the due date to avoid any late fees.\n\nIf you have any questions, contact: management@asrt.space\n\nThank you for choosing ASRT Spaces!\n\nThis is an automated message. Please do not reply.";
+    $mail->AltBody = "PAYMENT CONFIRMED\n\nHello {$safeName}!\n\nYour rent payment has been confirmed successfully.\n\nPayment Details:\n- Payment Type: Monthly Rent Payment\n- Invoice ID: #{$invoiceId}\n- Unit: {$safeUnitName}\n- Payment Date: {$paymentDate}\n- Status: CONFIRMED\n\nNext Payment Due: {$nextDueDate}\n\nPlease ensure your payment is made on or before the due date to avoid any late fees.\n\nIf you have any questions, contact: management@asrt.space\n\nThank you for choosing ASRT Spaces!\n\nThis is an automated message. Please do not reply.";
     
     return $mail->send();
 }
@@ -501,14 +479,12 @@ if (isset($_GET['toggle_status']) && isset($_GET['invoice_id'])) {
     // 3. Create next invoice with correct period (next month after the most recent invoice's EndDate)
     $new_invoice_id = $db->createNextRecurringInvoiceWithChat($invoice_id);
 
-    // 4. Send payment confirmation email to client with amount and issue date
+    // 4. Send payment confirmation email to client
     if ($new_invoice_id && !empty($invoice['Client_Email'])) {
         try {
             $new_invoice = $db->getSingleInvoiceForDisplay($new_invoice_id);
             $paymentDate = date('F j, Y');
             $nextDueDate = isset($new_invoice['EndDate']) ? date('F j, Y', strtotime($new_invoice['EndDate'])) : date('F j, Y', strtotime('+1 month'));
-            $amountPaid = $invoice['Amount'] ?? 0;
-            $issueDate = isset($invoice['InvoiceDate']) ? date('F j, Y', strtotime($invoice['InvoiceDate'])) : date('F j, Y');
             
             $emailSent = sendPaymentConfirmationNotification(
                 $invoice['Client_Email'],
@@ -516,13 +492,11 @@ if (isset($_GET['toggle_status']) && isset($_GET['invoice_id'])) {
                 $invoice_id,
                 $invoice['UnitName'] ?: 'Your Unit',
                 $paymentDate,
-                $nextDueDate,
-                $amountPaid,
-                $issueDate
+                $nextDueDate
             );
             
             if ($emailSent) {
-                error_log("Payment confirmation email sent to: " . $invoice['Client_Email'] . " for invoice ID: " . $invoice_id . " - Amount: " . $amountPaid);
+                error_log("Payment confirmation email sent to: " . $invoice['Client_Email'] . " for invoice ID: " . $invoice_id);
             } else {
                 error_log("Failed to send payment confirmation email to: " . $invoice['Client_Email'] . " for invoice ID: " . $invoice_id);
             }
@@ -533,7 +507,7 @@ if (isset($_GET['toggle_status']) && isset($_GET['invoice_id'])) {
 
     // --- Redirect to new invoice or show error ---
     if ($new_invoice_id) {
-        header("Location: generate_invoice.php?chat_invoice_id=$new_invoice_id&status=" . ($_GET['status'] ?? 'new') . "&success=1");
+        header("Location: generate_invoice.php?chat_invoice_id=$new_invoice_id&status=" . ($_GET['status'] ?? 'new'));
     } else {
         header("Location: generate_invoice.php?chat_invoice_id=$invoice_id&status=" . ($_GET['status'] ?? 'new') . "&error=recurring_invoice_failed");
     }
