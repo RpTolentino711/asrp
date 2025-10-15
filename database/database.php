@@ -129,23 +129,45 @@ public function getOccupancyData($startDate, $endDate) {
     }
 }
 
-
 public function getFinancialSummary($startDate, $endDate) {
     try {
         $endDateWithTime = $endDate . ' 23:59:59';
 
         $sql = "SELECT 
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) AS overdue_count,
-                    COALESCE(SUM(CASE WHEN COALESCE(st.SpaceTypeName, '') = 'Space' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) AS space_revenue,
-                    COALESCE(SUM(CASE WHEN COALESCE(st.SpaceTypeName, '') = 'Apartment' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) AS apartment_revenue,
-                    COALESCE(SUM(CASE WHEN Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) AS total_revenue
+                    COUNT(CASE 
+                        WHEN i.Status = 'unpaid' 
+                        AND i.DueDate < CURDATE() 
+                        THEN 1 
+                    END) AS overdue_count,
+
+                    COALESCE(SUM(CASE 
+                        WHEN COALESCE(st.SpaceTypeName, '') = 'Space' 
+                        AND i.Status = 'paid' 
+                        THEN i.InvoiceTotal 
+                        ELSE 0 
+                    END), 0) AS space_revenue,
+
+                    COALESCE(SUM(CASE 
+                        WHEN COALESCE(st.SpaceTypeName, '') = 'Apartment' 
+                        AND i.Status = 'paid' 
+                        THEN i.InvoiceTotal 
+                        ELSE 0 
+                    END), 0) AS apartment_revenue,
+
+                    COALESCE(SUM(CASE 
+                        WHEN i.Status = 'paid' 
+                        THEN i.InvoiceTotal 
+                        ELSE 0 
+                    END), 0) AS total_revenue
+
                 FROM invoice i
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                WHERE i.Created_At BETWEEN ? AND ?";
+                WHERE i.InvoiceDate BETWEEN ? AND ?";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$startDate, $endDateWithTime]);
+
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: [
             'overdue_count' => 0,
             'space_revenue' => 0,
@@ -162,6 +184,7 @@ public function getFinancialSummary($startDate, $endDate) {
         ];
     }
 }
+
 
 
 
