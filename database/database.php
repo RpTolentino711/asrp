@@ -95,7 +95,7 @@ public function executeQuery($sql, $params = []) {
 
 public function getOccupancyData($startDate, $endDate) {
     try {
-        $monthDays = date('t', strtotime($startDate));
+        $monthDays = date('t', strtotime($startDate)); // Gets days in month (31 for October)
         $endDateWithTime = $endDate . ' 23:59:59';
         
         $sql = "SELECT 
@@ -105,38 +105,31 @@ public function getOccupancyData($startDate, $endDate) {
                     st.SpaceTypeName,
                     c.Client_fn, 
                     c.Client_ln,
-                    c.Client_Email,
                     cs.active,
                     CASE 
                         WHEN cs.active = 1 THEN 'Occupied' 
                         ELSE 'Vacant' 
                     END as Status,
-                    -- Calculate October revenue (payments made in October)
-                    COALESCE((
-                        SELECT SUM(i.InvoiceTotal) 
-                        FROM invoice i 
-                        WHERE i.Space_ID = s.Space_ID 
-                        AND i.Status = 'paid'
-                        AND i.Created_At BETWEEN ? AND ?
-                    ), 0) as revenue,
-                    -- Occupancy days (always full month for active tenants)
+                    -- Occupancy days (full month for active tenants)
+                    CASE 
+                        WHEN cs.active = 1 THEN ?
+                        ELSE 0 
+                    END as occupied_days,
+                    -- Total days in month
                     ? as month_days,
                     -- Utilization rate (100% for occupied, 0% for vacant)
                     CASE 
                         WHEN cs.active = 1 THEN 100 
                         ELSE 0 
                     END as utilization_rate,
-                    -- October payment status
-                    CASE 
-                        WHEN EXISTS (
-                            SELECT 1 FROM invoice i 
-                            WHERE i.Space_ID = s.Space_ID 
-                            AND i.Status = 'paid'
-                            AND i.Created_At BETWEEN ? AND ?
-                        ) THEN 'Paid'
-                        WHEN cs.active = 1 THEN 'Unpaid'
-                        ELSE 'Vacant'
-                    END as payment_status
+                    -- Revenue from payments made during the month
+                    COALESCE((
+                        SELECT SUM(i.InvoiceTotal) 
+                        FROM invoice i 
+                        WHERE i.Space_ID = s.Space_ID 
+                        AND i.Status = 'paid'
+                        AND i.Created_At BETWEEN ? AND ?
+                    ), 0) as revenue
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID AND cs.active = 1
@@ -146,9 +139,9 @@ public function getOccupancyData($startDate, $endDate) {
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            $startDate, $endDateWithTime,  // For revenue calculation
-            $monthDays,                    // Month days
-            $startDate, $endDateWithTime   // For payment status
+            $monthDays,                    // occupied_days
+            $monthDays,                    // month_days  
+            $startDate, $endDateWithTime   // revenue date range
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
