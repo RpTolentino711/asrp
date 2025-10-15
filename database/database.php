@@ -123,7 +123,7 @@ public function getOccupancyData($startDate, $endDate) {
                                 -- Otherwise calculate from unpaid invoice dates (use today for overdue tenants)
                                 ELSE DATEDIFF(
                                     ?,  -- Use today's date (they're still occupying)
-                                    GREATEST(?, COALESCE(i.InvoiceDate, ?))
+                                    COALESCE(i.InvoiceDate, ?)  -- Use actual invoice start date
                                 )
                             END
                         ELSE 0 
@@ -143,7 +143,7 @@ public function getOccupancyData($startDate, $endDate) {
                                 ELSE ROUND(
                                     (DATEDIFF(
                                         ?,  -- Use today's date for overdue tenants
-                                        GREATEST(?, COALESCE(i.InvoiceDate, ?))
+                                        COALESCE(i.InvoiceDate, ?)  -- Use actual invoice start date
                                     ) / ? * 100), 
                                 1)
                             END
@@ -172,8 +172,8 @@ public function getOccupancyData($startDate, $endDate) {
             $startDate, $endDate,
             $monthDays,
             
-            // For unpaid invoice calculation (use today for both date calculations)
-            $today, $startDate, $startDate,
+            // For unpaid invoice calculation (use today and actual invoice date)
+            $today, $startDate,
             
             // month_days
             $monthDays,
@@ -181,8 +181,8 @@ public function getOccupancyData($startDate, $endDate) {
             // For utilization rate paid check
             $startDate, $endDate,
             
-            // For utilization rate unpaid calculation (use today for both date calculations)
-            $today, $startDate, $startDate, $monthDays,
+            // For utilization rate unpaid calculation (use today and actual invoice date)
+            $today, $startDate, $monthDays,
             
             // For revenue calculation
             $startDate, $endDateWithTime
@@ -193,7 +193,6 @@ public function getOccupancyData($startDate, $endDate) {
         return [];
     }
 }
-
 
 public function getFinancialSummary($startDate, $endDate) {
     try {
