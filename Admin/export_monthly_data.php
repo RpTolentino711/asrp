@@ -86,8 +86,6 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "<tr class='financial-summary'><td>Total Revenue</td><td class='right positive'>₱" . number_format($totalRevenue, 2) . "</td></tr>";
     echo "<tr class='financial-summary'><td>Paid Invoices</td><td class='right positive'>" . $paidInvoices . "</td></tr>";
     echo "<tr class='financial-summary'><td>Unpaid Invoices</td><td class='right warning'>" . $unpaidInvoices . "</td></tr>";
-    echo "<tr class='financial-summary'><td>Overdue Invoices</td><td class='right negative'>" . $overdueInvoices . "</td></tr>";
-    echo "<tr class='financial-summary'><td>Pending Invoices</td><td class='right warning'>" . $pendingInvoices . "</td></tr>";
     echo "<tr class='financial-summary'><td>Collection Rate</td><td class='right positive'>" . number_format($collectionRate, 1) . "%</td></tr>";
     echo "</table>";
     echo "<br>";
