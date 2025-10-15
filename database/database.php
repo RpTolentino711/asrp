@@ -1497,24 +1497,32 @@ public function getPendingRentalRequests() {
 
 
     
-
 public function getMonthlyEarningsStats($startDate, $endDate) {
-    // Include the time component to cover the entire end date
     $endDateWithTime = $endDate . ' 23:59:59';
-    
+
     $sql = "SELECT 
-        COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
-        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count
-        FROM invoice 
-        WHERE Status = 'paid' 
-        AND InvoiceDate BETWEEN ? AND ?"; // Use InvoiceDate instead of Created_At
-    
-    return $this->getRow($sql, [
-        $startDate, $endDateWithTime, 
-        $startDate, $endDate
+                COALESCE(SUM(InvoiceTotal), 0) AS total_earnings,
+                COUNT(CASE WHEN Status = 'paid' THEN 1 END) AS paid_invoices_count,
+                (SELECT COUNT(*) 
+                 FROM free_message 
+                 WHERE is_deleted = 0 
+                 AND Sent_At BETWEEN ? AND ?) AS new_messages_count
+            FROM invoice 
+            WHERE Status = 'paid'
+            AND Created_At BETWEEN ? AND ?";
+
+    $result = $this->getRow($sql, [
+        $startDate, $endDateWithTime,  // free_message
+        $startDate, $endDateWithTime   // invoice
     ]);
+
+    return $result ?: [
+        'total_earnings' => 0, 
+        'paid_invoices_count' => 0, 
+        'new_messages_count' => 0
+    ];
 }
+
 
 
 
