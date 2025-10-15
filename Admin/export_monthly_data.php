@@ -200,7 +200,6 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
         echo "<td>" . date('M j, Y', strtotime($invoice['EndDate'])) . "</td>";
         echo "<td class='$statusClass'>" . ucfirst($invoice['Status']) . "</td>";
         // FIXED: Show days overdue ONLY for unpaid overdue invoices
-        echo "<td class='center'>" . ($invoice['Status'] == 'unpaid' && $daysOverdue > 0 ? $daysOverdue : '-') . "</td>";
         echo "</tr>";
     }
     echo "</table>";
