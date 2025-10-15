@@ -2615,16 +2615,7 @@ public function fetchSingle($sql, $params = []) {
     $stmt->execute($params);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
-public function fetchSingle($sql, $params = []) {
-    try {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("fetchSingle Error: " . $e->getMessage());
-        return null;
-    }
-}
+
 
 // Add these methods to your Database class in database/database.php
 
