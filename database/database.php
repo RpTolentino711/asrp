@@ -91,12 +91,10 @@ public function executeQuery($sql, $params = []) {
 
 
 
-
-
 public function getOccupancyData($startDate, $endDate) {
     try {
-        $monthDays = date('t', strtotime($startDate)); // Gets days in month (31 for October)
-        $endDateWithTime = $endDate . ' 23:59:59';
+        $monthDays = date('t', strtotime($startDate)); // Days in month (31 for October)
+        $today = date('Y-m-d'); // Current date
         
         $sql = "SELECT 
                     s.Space_ID, 
@@ -105,43 +103,62 @@ public function getOccupancyData($startDate, $endDate) {
                     st.SpaceTypeName,
                     c.Client_fn, 
                     c.Client_ln,
-                    cs.active,
+                    -- Check both Flow_Status AND clientspace for accurate occupancy status
                     CASE 
-                        WHEN cs.active = 1 THEN 'Occupied' 
+                        WHEN s.Flow_Status = 'old' AND cs.active = 1 THEN 'Occupied'
+                        WHEN s.Flow_Status = 'old' AND cs.active IS NULL THEN 'Rented but No Active Client'
                         ELSE 'Vacant' 
                     END as Status,
-                    -- Occupancy days (full month for active tenants)
+                    -- Calculate ACTUAL occupancy days based on invoice dates
                     CASE 
-                        WHEN cs.active = 1 THEN ?
+                        WHEN s.Flow_Status = 'old' AND cs.active = 1 THEN
+                            -- Calculate days occupied in this month
+                            DATEDIFF(
+                                LEAST(?, i.EndDate),  -- Use today or end date, whichever is earlier
+                                GREATEST(?, i.InvoiceDate)  -- Use start of month or invoice date, whichever is later
+                            )
                         ELSE 0 
                     END as occupied_days,
                     -- Total days in month
                     ? as month_days,
-                    -- Utilization rate (100% for occupied, 0% for vacant)
+                    -- Utilization rate (occupied_days / month_days * 100)
                     CASE 
-                        WHEN cs.active = 1 THEN 100 
+                        WHEN s.Flow_Status = 'old' AND cs.active = 1 THEN
+                            ROUND(
+                                (DATEDIFF(
+                                    LEAST(?, i.EndDate),
+                                    GREATEST(?, i.InvoiceDate)
+                                ) / ? * 100), 
+                            1)
                         ELSE 0 
                     END as utilization_rate,
                     -- Revenue from payments made during the month
                     COALESCE((
-                        SELECT SUM(i.InvoiceTotal) 
-                        FROM invoice i 
-                        WHERE i.Space_ID = s.Space_ID 
-                        AND i.Status = 'paid'
-                        AND i.Created_At BETWEEN ? AND ?
-                    ), 0) as revenue
+                        SELECT SUM(i2.InvoiceTotal) 
+                        FROM invoice i2 
+                        WHERE i2.Space_ID = s.Space_ID 
+                        AND i2.Status = 'paid'
+                        AND i2.Created_At BETWEEN ? AND ?
+                    ), 0) as revenue,
+                    -- Invoice dates for reference
+                    i.InvoiceDate,
+                    i.EndDate
                 FROM space s
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
                 LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID AND cs.active = 1
                 LEFT JOIN client c ON cs.Client_ID = c.Client_ID
-                WHERE s.Flow_Status = 'old'
+                LEFT JOIN invoice i ON s.Space_ID = i.Space_ID 
+                    AND i.Status = 'unpaid'  -- Use current unpaid invoice for date calculation
+                    AND i.Flow_Status = 'new'
                 ORDER BY st.SpaceTypeName, s.Name";
         
+        $endDateWithTime = $endDate . ' 23:59:59';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            $monthDays,                    // occupied_days
-            $monthDays,                    // month_days  
-            $startDate, $endDateWithTime   // revenue date range
+            $today, $startDate,              // For occupied_days calculation
+            $monthDays,                      // month_days
+            $today, $startDate, $monthDays,  // For utilization_rate calculation
+            $startDate, $endDateWithTime     // For revenue calculation
         ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
