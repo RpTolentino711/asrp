@@ -238,6 +238,8 @@ public function getFinancialSummary($startDate, $endDate) {
 
 
 
+
+
 public function getUserByEmail($email) {
     $stmt = $this->pdo->prepare("SELECT * FROM client WHERE LOWER(Client_Email) = LOWER(?)");
     $stmt->execute([$email]);
