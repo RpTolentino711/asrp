@@ -80,7 +80,7 @@ public function executeStatement($sql, $params = []) {
     
 public function executeQuery($sql, $params = []) {
     try {
-        $stmt = $this->conn->prepare($sql);
+        $stmt = $this->pdo->prepare($sql); // Changed from $this->conn to $this->pdo
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -155,6 +155,8 @@ public function getOccupancyData($startDate, $endDate) {
         return [];
     }
 }
+
+
 public function getFinancialSummary($startDate, $endDate) {
     try {
         $sql = "SELECT 
@@ -1545,7 +1547,7 @@ public function getPendingRentalRequests() {
 
     
 
-ublic function getMonthlyEarningsStats($startDate, $endDate) {
+public function getMonthlyEarningsStats($startDate, $endDate) {
     $endDateWithTime = $endDate . ' 23:59:59';
     
     $sql = "SELECT 
@@ -2612,6 +2614,16 @@ public function fetchSingle($sql, $params = []) {
     $stmt = $this->pdo->prepare($sql);
     $stmt->execute($params);
     return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+public function fetchSingle($sql, $params = []) {
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("fetchSingle Error: " . $e->getMessage());
+        return null;
+    }
 }
 
 // Add these methods to your Database class in database/database.php
