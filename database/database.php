@@ -120,9 +120,9 @@ public function getOccupancyData($startDate, $endDate) {
                                     AND i2.Status = 'paid' 
                                     AND i2.EndDate BETWEEN ? AND ?
                                 ) THEN ?
-                                -- Otherwise calculate from unpaid invoice dates
+                                -- Otherwise calculate from unpaid invoice dates (use today for overdue tenants)
                                 ELSE DATEDIFF(
-                                    LEAST(?, COALESCE(i.EndDate, ?)),
+                                    ?,  -- Use today's date (they're still occupying)
                                     GREATEST(?, COALESCE(i.InvoiceDate, ?))
                                 )
                             END
@@ -142,7 +142,7 @@ public function getOccupancyData($startDate, $endDate) {
                                 ) THEN 100
                                 ELSE ROUND(
                                     (DATEDIFF(
-                                        LEAST(?, COALESCE(i.EndDate, ?)),
+                                        ?,  -- Use today's date for overdue tenants
                                         GREATEST(?, COALESCE(i.InvoiceDate, ?))
                                     ) / ? * 100), 
                                 1)
@@ -172,8 +172,8 @@ public function getOccupancyData($startDate, $endDate) {
             $startDate, $endDate,
             $monthDays,
             
-            // For unpaid invoice calculation
-            $today, $endDate, $startDate, $startDate,
+            // For unpaid invoice calculation (use today for both date calculations)
+            $today, $startDate, $startDate,
             
             // month_days
             $monthDays,
@@ -181,8 +181,8 @@ public function getOccupancyData($startDate, $endDate) {
             // For utilization rate paid check
             $startDate, $endDate,
             
-            // For utilization rate unpaid calculation  
-            $today, $endDate, $startDate, $startDate, $monthDays,
+            // For utilization rate unpaid calculation (use today for both date calculations)
+            $today, $startDate, $startDate, $monthDays,
             
             // For revenue calculation
             $startDate, $endDateWithTime
