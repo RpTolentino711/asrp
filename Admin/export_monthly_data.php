@@ -45,12 +45,13 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     header('Content-Type: application/vnd.ms-excel');
     header('Content-Disposition: attachment; filename="ASRT_Monthly_Report_' . str_replace(' ', '_', $monthName) . '.xls"');
     
-    $totalRevenue = $monthlyStats['total_earnings'] ?? 0;
-    $paidInvoices = $monthlyStats['paid_invoices_count'] ?? 0;
-    $totalInvoices = count($detailedInvoices);
-    $unpaidInvoices = $totalInvoices - $paidInvoices;
+    // CORRECTED FINANCIAL CALCULATIONS
+    $totalRevenue = $financialSummary['total_revenue'] ?? 0;
+    $paidInvoices = $financialSummary['paid_count'] ?? 0;
     $overdueInvoices = $financialSummary['overdue_count'] ?? 0;
-    $collectionRate = $totalInvoices > 0 ? ($paidInvoices / $totalInvoices) * 100 : 0;
+    $pendingInvoices = $financialSummary['pending_count'] ?? 0;
+    $unpaidInvoices = $overdueInvoices + $pendingInvoices;
+    $collectionRate = $financialSummary['collection_rate'] ?? 0;
     
     echo "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:x='urn:schemas-microsoft-com:office:excel' xmlns='http://www.w3.org/TR/REC-html40'>";
     echo "<head>";
@@ -79,13 +80,14 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "<p style='text-align: center;'>Generated on: " . date('F j, Y g:i A') . "</p>";
     echo "<hr>";
     
-    // FINANCIAL SUMMARY
+    // FINANCIAL SUMMARY - UPDATED
     echo "<h3>📊 FINANCIAL SUMMARY</h3>";
     echo "<table>";
     echo "<tr class='financial-summary'><td>Total Revenue</td><td class='right positive'>₱" . number_format($totalRevenue, 2) . "</td></tr>";
     echo "<tr class='financial-summary'><td>Paid Invoices</td><td class='right positive'>" . $paidInvoices . "</td></tr>";
     echo "<tr class='financial-summary'><td>Unpaid Invoices</td><td class='right warning'>" . $unpaidInvoices . "</td></tr>";
     echo "<tr class='financial-summary'><td>Overdue Invoices</td><td class='right negative'>" . $overdueInvoices . "</td></tr>";
+    echo "<tr class='financial-summary'><td>Pending Invoices</td><td class='right warning'>" . $pendingInvoices . "</td></tr>";
     echo "<tr class='financial-summary'><td>Collection Rate</td><td class='right positive'>" . number_format($collectionRate, 1) . "%</td></tr>";
     echo "</table>";
     echo "<br>";
@@ -200,19 +202,19 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "</table>";
     echo "<br>";
     
-    // REVENUE BREAKDOWN
+    // REVENUE BREAKDOWN - UPDATED
     echo "<h4>Revenue Breakdown</h4>";
     echo "<table>";
     echo "<tr class='metric-header'><td>Category</td><td class='right'>Amount</td><td class='right'>Percentage</td></tr>";
     
     $spaceRevenue = $financialSummary['space_revenue'] ?? 0;
     $apartmentRevenue = $financialSummary['apartment_revenue'] ?? 0;
-    $lateFees = $financialSummary['late_fees'] ?? 0;
+    $potentialRevenue = $financialSummary['potential_revenue'] ?? 0;
     
     echo "<tr><td>Space Rentals</td><td class='right positive'>₱" . number_format($spaceRevenue, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($spaceRevenue/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
     echo "<tr><td>Apartment Rentals</td><td class='right positive'>₱" . number_format($apartmentRevenue, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($apartmentRevenue/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
-    echo "<tr><td>Late Fees & Other</td><td class='right positive'>₱" . number_format($lateFees, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($lateFees/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
-    echo "<tr class='metric-header'><td><strong>Total Revenue</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td><td class='right'><strong>100%</strong></td></tr>";
+    echo "<tr><td>Potential Revenue (Unpaid)</td><td class='right warning'>₱" . number_format($potentialRevenue, 2) . "</td><td class='right'>N/A</td></tr>";
+    echo "<tr class='metric-header'><td><strong>Total Collected Revenue</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td><td class='right'><strong>100%</strong></td></tr>";
     echo "</table>";
     echo "<br><br>";
     
@@ -254,7 +256,7 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     // OCCUPANCY SUMMARY
     echo "<h4>Occupancy Summary</h4>";
     echo "<table>";
-    $occupancyRate = $totalUnits > 0 ? ($occupiedUnits / $totalUnits) * 100 : 0;
+    $occupancyRate = $financialSummary['occupancy_rate'] ?? 0;
     $avgUtilization = $totalUnits > 0 ? $totalUtilization / $totalUnits : 0;
     
     echo "<tr class='metric-header'><td>Total Units</td><td class='right'>" . $totalUnits . "</td></tr>";
@@ -296,8 +298,10 @@ function exportToPDF($monthName, $monthlyStats, $rentalRequestsData, $maintenanc
         
         <h3>Executive Summary</h3>
         <table>
-            <tr class='summary'><td>Total Revenue</td><td>₱" . number_format($monthlyStats['total_earnings'] ?? 0, 2) . "</td></tr>
-            <tr class='summary'><td>Paid Invoices</td><td>" . ($monthlyStats['paid_invoices_count'] ?? 0) . "</td></tr>
+            <tr class='summary'><td>Total Revenue</td><td>₱" . number_format($financialSummary['total_revenue'] ?? 0, 2) . "</td></tr>
+            <tr class='summary'><td>Paid Invoices</td><td>" . ($financialSummary['paid_count'] ?? 0) . "</td></tr>
+            <tr class='summary'><td>Overdue Invoices</td><td>" . ($financialSummary['overdue_count'] ?? 0) . "</td></tr>
+            <tr class='summary'><td>Collection Rate</td><td>" . number_format($financialSummary['collection_rate'] ?? 0, 1) . "%</td></tr>
             <tr class='summary'><td>Total Rental Requests</td><td>" . ($rentalRequestsData['total'] ?? 0) . "</td></tr>
             <tr class='summary'><td>Total Maintenance Requests</td><td>" . ($maintenanceRequestsData['total'] ?? 0) . "</td></tr>
         </table>
