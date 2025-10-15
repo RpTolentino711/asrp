@@ -224,12 +224,10 @@ public function getFinancialSummary($startDate, $endDate) {
                          NULLIF(COUNT(CASE WHEN i.EndDate BETWEEN ? AND ? THEN 1 END), 0)), 
                     2) as collection_rate,
                     
-                    -- Occupancy rate calculation (current)
+                    -- CORRECTED: Occupancy rate calculation (Rented units / Total units)
                     ROUND(
-                        (SELECT COUNT(DISTINCT Space_ID) 
-                         FROM clientspace 
-                         WHERE active = 1) * 100.0 / 
-                        NULLIF((SELECT COUNT(*) FROM space WHERE Flow_Status = 'old'), 0), 
+                        (SELECT COUNT(*) FROM space WHERE Flow_Status = 'old') * 100.0 / 
+                        NULLIF((SELECT COUNT(*) FROM space), 0), 
                     2) as occupancy_rate
                     
                 FROM invoice i
@@ -274,7 +272,6 @@ public function getFinancialSummary($startDate, $endDate) {
         return [];
     }
 }
-
 
 
 
