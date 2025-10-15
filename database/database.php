@@ -160,32 +160,31 @@ public function getOccupancyData($startDate, $endDate) {
 
 public function getFinancialSummary($startDate, $endDate) {
     try {
-        $endDateWithTime = $endDate . ' 23:59:59';
         $today = date('Y-m-d');
         
         $sql = "SELECT 
-                    -- Invoice counts (for October period)
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < ? AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as overdue_count,
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= ? AND InvoiceDate BETWEEN ? AND ? THEN 1 END) as pending_count,
-                    COUNT(CASE WHEN Status = 'paid' AND Created_At BETWEEN ? AND ? THEN 1 END) as paid_count,
+                    -- Invoice counts (invoices DUE in October)
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < ? AND EndDate BETWEEN ? AND ? THEN 1 END) as overdue_count,
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate >= ? AND EndDate BETWEEN ? AND ? THEN 1 END) as pending_count,
+                    COUNT(CASE WHEN Status = 'paid' AND EndDate BETWEEN ? AND ? THEN 1 END) as paid_count,
                     
-                    -- Revenue by space type (payments MADE in October)
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
+                    -- Revenue by space type (invoices DUE in October that are paid)
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND i.Status = 'paid' AND i.EndDate BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND i.Status = 'paid' AND i.EndDate BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
                     
-                    -- Total revenue (payments MADE in October)
-                    COALESCE(SUM(CASE WHEN i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue,
+                    -- Total revenue (invoices DUE in October that are paid)
+                    COALESCE(SUM(CASE WHEN i.Status = 'paid' AND i.EndDate BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue,
                     
                     -- Potential revenue from unpaid invoices (DUE in October)
-                    COALESCE(SUM(CASE WHEN i.Status = 'unpaid' AND i.InvoiceDate BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as potential_revenue,
+                    COALESCE(SUM(CASE WHEN i.Status = 'unpaid' AND i.EndDate BETWEEN ? AND ? THEN i.InvoiceTotal ELSE 0 END), 0) as potential_revenue,
                     
-                    -- Average revenue per paid invoice (payments MADE in October)
-                    COALESCE(AVG(CASE WHEN i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN i.InvoiceTotal END), 0) as avg_revenue_per_invoice,
+                    -- Average revenue per paid invoice (DUE in October)
+                    COALESCE(AVG(CASE WHEN i.Status = 'paid' AND i.EndDate BETWEEN ? AND ? THEN i.InvoiceTotal END), 0) as avg_revenue_per_invoice,
                     
-                    -- Collection rate for October
+                    -- Collection rate for October (invoices DUE in October)
                     ROUND(
-                        (COUNT(CASE WHEN i.Status = 'paid' AND i.Created_At BETWEEN ? AND ? THEN 1 END) * 100.0 / 
-                         NULLIF(COUNT(CASE WHEN i.InvoiceDate BETWEEN ? AND ? THEN 1 END), 0)), 
+                        (COUNT(CASE WHEN i.Status = 'paid' AND i.EndDate BETWEEN ? AND ? THEN 1 END) * 100.0 / 
+                         NULLIF(COUNT(CASE WHEN i.EndDate BETWEEN ? AND ? THEN 1 END), 0)), 
                     2) as collection_rate,
                     
                     -- Occupancy rate calculation (current)
@@ -199,39 +198,35 @@ public function getFinancialSummary($startDate, $endDate) {
                 FROM invoice i
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                WHERE (i.Status = 'paid' AND i.Created_At BETWEEN ? AND ?)
-                   OR (i.Status = 'unpaid' AND i.InvoiceDate BETWEEN ? AND ?)";
+                WHERE i.EndDate BETWEEN ? AND ?";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([
-            // Overdue count (unpaid invoices dated in October that are overdue)
+            // Overdue count (unpaid invoices DUE in October that are overdue)
+            $today, $startDate, $endDate,
             $today, $startDate, $endDate,
             
-            // Pending count (unpaid invoices dated in October that are not overdue)
-            $today, $startDate, $endDate,
-            
-            // Paid count (payments made in October)
-            $startDate, $endDateWithTime,
-            
-            // Space revenue (payments made in October)
-            $startDate, $endDateWithTime,
-            $startDate, $endDateWithTime,
-            
-            // Total revenue (payments made in October)
-            $startDate, $endDateWithTime,
-            
-            // Potential revenue (unpaid invoices dated in October)
+            // Paid count (invoices DUE in October that are paid)
             $startDate, $endDate,
             
-            // Average revenue (payments made in October)
-            $startDate, $endDateWithTime,
+            // Space revenue (invoices DUE in October that are paid)
+            $startDate, $endDate,
+            $startDate, $endDate,
+            
+            // Total revenue (invoices DUE in October that are paid)
+            $startDate, $endDate,
+            
+            // Potential revenue (unpaid invoices DUE in October)
+            $startDate, $endDate,
+            
+            // Average revenue (invoices DUE in October that are paid)
+            $startDate, $endDate,
             
             // Collection rate calculation
-            $startDate, $endDateWithTime,
+            $startDate, $endDate,
             $startDate, $endDate,
             
             // Final WHERE clause
-            $startDate, $endDateWithTime,
             $startDate, $endDate
         ]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
