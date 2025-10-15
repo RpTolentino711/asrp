@@ -94,77 +94,60 @@ public function executeQuery($sql, $params = []) {
 
 
 public function getOccupancyData($startDate, $endDate) {
-    $monthDays = date('t', strtotime($startDate));
-    
-    $sql = "SELECT 
-        s.Space_ID, s.Name, s.Price, st.SpaceTypeName,
-        c.Client_fn, c.Client_ln,
-        CASE WHEN cs.Client_ID IS NOT NULL THEN 'Occupied' ELSE 'Vacant' END as Status,
-        ? as month_days,
-        COALESCE(
-            (SELECT DATEDIFF(
-                LEAST(?, i.EndDate), 
-                GREATEST(?, i.InvoiceDate)
-            ) + 1 
-            FROM invoice i 
-            WHERE i.Space_ID = s.Space_ID 
-            AND i.Status = 'paid'
-            AND i.InvoiceDate <= ? 
-            AND i.EndDate >= ?), 0
-        ) as occupied_days,
-        (COALESCE(
-            (SELECT DATEDIFF(
-                LEAST(?, i.EndDate), 
-                GREATEST(?, i.InvoiceDate)
-            ) + 1 
-            FROM invoice i 
-            WHERE i.Space_ID = s.Space_ID 
-            AND i.Status = 'paid'
-            AND i.InvoiceDate <= ? 
-            AND i.EndDate >= ?), 0
-        ) / ? * 100) as utilization_rate,
-        COALESCE(
-            (SELECT SUM(i.InvoiceTotal) 
-             FROM invoice i 
-             WHERE i.Space_ID = s.Space_ID 
-             AND i.Status = 'paid'
-             AND i.InvoiceDate BETWEEN ? AND ?), 0
-        ) as revenue
-    FROM space s
-    LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-    LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID AND cs.active = 1
-    LEFT JOIN client c ON cs.Client_ID = c.Client_ID
-    WHERE s.Flow_Status = 'old'";
-    
-    $stmt = $this->conn->prepare($sql);
-    $params = array_fill(0, 13, $endDate);
-    $params[0] = $monthDays;
-    $params[6] = $startDate;
-    $params[7] = $startDate;
-    $params[8] = $endDate;
-    $params[9] = $startDate;
-    $params[10] = $monthDays;
-    $params[11] = $startDate;
-    $params[12] = $endDate;
-    
-    $stmt->execute($params);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $monthDays = date('t', strtotime($startDate));
+        
+        $sql = "SELECT 
+                    s.Space_ID, s.Name, s.Price, st.SpaceTypeName,
+                    c.Client_fn, c.Client_ln,
+                    cs.active,
+                    CASE WHEN cs.active = 1 THEN 'Occupied' ELSE 'Vacant' END as Status,
+                    DATEDIFF(LEAST(?, i.EndDate), GREATEST(?, i.InvoiceDate)) as occupied_days,
+                    ? as month_days,
+                    (DATEDIFF(LEAST(?, i.EndDate), GREATEST(?, i.InvoiceDate)) / ? * 100) as utilization_rate,
+                    i.InvoiceTotal as revenue
+                FROM space s
+                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+                LEFT JOIN clientspace cs ON s.Space_ID = cs.Space_ID AND cs.active = 1
+                LEFT JOIN client c ON cs.Client_ID = c.Client_ID
+                LEFT JOIN invoice i ON s.Space_ID = i.Space_ID 
+                    AND i.Status = 'paid' 
+                    AND i.InvoiceDate BETWEEN ? AND ?
+                WHERE s.Flow_Status = 'old'
+                ORDER BY s.SpaceType_ID, s.Name";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([
+            $endDate, $startDate, $monthDays,
+            $endDate, $startDate, $monthDays,
+            $startDate, $endDate
+        ]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting occupancy data: " . $e->getMessage());
+        return [];
+    }
 }
 
 public function getFinancialSummary($startDate, $endDate) {
-    $sql = "SELECT 
-        COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_count,
-        COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
-        COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND i.Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
-        COALESCE(SUM(CASE WHEN i.Status = 'paid' AND i.EndDate < i.InvoiceDate THEN i.InvoiceTotal * 0.1 ELSE 0 END), 0) as late_fees
-    FROM invoice i
-    LEFT JOIN space s ON i.Space_ID = s.Space_ID
-    LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-    WHERE i.InvoiceDate BETWEEN ? AND ?";
-    
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $sql = "SELECT 
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_count,
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
+                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
+                    COALESCE(SUM(CASE WHEN Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue
+                FROM invoice i
+                LEFT JOIN space s ON i.Space_ID = s.Space_ID
+                LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+                WHERE i.InvoiceDate BETWEEN ? AND ?";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting financial summary: " . $e->getMessage());
+        return [];
+    }
 }
 
 
@@ -1516,20 +1499,22 @@ public function getPendingRentalRequests() {
     
 
 public function getMonthlyEarningsStats($startDate, $endDate) {
-    $sql = "SELECT 
-        COALESCE(SUM(CASE WHEN Status = 'paid' THEN InvoiceTotal ELSE 0 END), 0) as total_earnings,
-        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
-        COUNT(CASE WHEN Status = 'unpaid' THEN 1 END) as unpaid_invoices_count,
-        (SELECT COUNT(*) FROM free_message WHERE DATE(Sent_At) BETWEEN ? AND ?) as new_messages_count
-    FROM invoice 
-    WHERE InvoiceDate BETWEEN ? AND ?";
+    // Include the time component to cover the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
     
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate, $startDate, $endDate]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    $sql = "SELECT 
+        COALESCE(SUM(InvoiceTotal), 0) as total_earnings,
+        COUNT(CASE WHEN Status = 'paid' THEN 1 END) as paid_invoices_count,
+        (SELECT COUNT(*) FROM free_message WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?) as new_messages_count
+        FROM invoice 
+        WHERE Status = 'paid' 
+        AND InvoiceDate BETWEEN ? AND ?"; // Use InvoiceDate instead of Created_At
+    
+    return $this->getRow($sql, [
+        $startDate, $endDateWithTime, 
+        $startDate, $endDate
+    ]);
 }
-
-
 
 
 
@@ -1568,33 +1553,25 @@ public function getMaintenanceStats($startDate, $endDate) {
     return $this->getRow($sql, [$startDate, $endDate]);
 }
 
-
 public function getTotalRentalRequests($startDate, $endDate) {
-    $sql = "SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending,
-        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted,
-        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected
-    FROM rentalrequest 
-    WHERE DATE(Requested_At) BETWEEN ? AND ?";
+    // Include the time component to cover the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
     
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-
-public function getTotalMaintenanceRequests($startDate, $endDate) {
     $sql = "SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN Status = 'Submitted' THEN 1 END) as submitted,
-        COUNT(CASE WHEN Status = 'In Progress' THEN 1 END) as in_progress,
-        COUNT(CASE WHEN Status = 'Completed' THEN 1 END) as completed
-    FROM maintenancerequest 
-    WHERE DATE(RequestDate) BETWEEN ? AND ?";
+        COUNT(*) as total_rental_requests,
+        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
+        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
+        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
+        FROM rentalrequest 
+        WHERE Requested_At BETWEEN ? AND ?";
     
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
+    return [
+        'total' => $result['total_rental_requests'] ?? 0,
+        'pending' => $result['pending_rentals'] ?? 0,
+        'accepted' => $result['accepted_rentals'] ?? 0,
+        'rejected' => $result['rejected_rentals'] ?? 0
+    ];
 }
 
 
@@ -1621,61 +1598,62 @@ public function getTotalMaintenanceRequests($startDate, $endDate) {
 
 
 public function getDetailedRentalData($startDate, $endDate) {
-    $sql = "SELECT 
-        rr.*,
-        c.Client_fn, c.Client_ln, c.Client_Email,
-        s.Name as UnitName, s.Price
-    FROM rentalrequest rr
-    LEFT JOIN client c ON rr.Client_ID = c.Client_ID
-    LEFT JOIN space s ON rr.Space_ID = s.Space_ID
-    WHERE DATE(rr.Requested_At) BETWEEN ? AND ?
-    ORDER BY rr.Requested_At DESC";
-    
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $sql = "SELECT rr.*, c.Client_fn, c.Client_ln, c.Client_Email, s.Name as UnitName, s.Price
+                FROM rentalrequest rr
+                JOIN client c ON rr.Client_ID = c.Client_ID
+                LEFT JOIN space s ON rr.Space_ID = s.Space_ID
+                WHERE rr.Requested_At BETWEEN ? AND ?
+                ORDER BY rr.Requested_At DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting detailed rental data: " . $e->getMessage());
+        return [];
+    }
 }
 
-
 public function getDetailedMaintenanceData($startDate, $endDate) {
-    $sql = "SELECT 
-        mr.*,
-        c.Client_fn, c.Client_ln,
-        s.Name as UnitName,
-        h.Handyman_fn, h.Handyman_ln,
-        (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory 
-         WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate
-    FROM maintenancerequest mr
-    LEFT JOIN client c ON mr.Client_ID = c.Client_ID
-    LEFT JOIN space s ON mr.Space_ID = s.Space_ID
-    LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
-    WHERE DATE(mr.RequestDate) BETWEEN ? AND ?
-    ORDER BY mr.RequestDate DESC";
-    
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $sql = "SELECT mr.*, c.Client_fn, c.Client_ln, s.Name as UnitName, 
+                       h.Handyman_fn, h.Handyman_ln,
+                       (SELECT MAX(StatusChangeDate) FROM maintenancerequeststatushistory 
+                        WHERE Request_ID = mr.Request_ID AND NewStatus = 'Completed') as CompletionDate
+                FROM maintenancerequest mr
+                JOIN client c ON mr.Client_ID = c.Client_ID
+                LEFT JOIN space s ON mr.Space_ID = s.Space_ID
+                LEFT JOIN handyman h ON mr.Handyman_ID = h.Handyman_ID
+                WHERE mr.RequestDate BETWEEN ? AND ?
+                ORDER BY mr.RequestDate DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting detailed maintenance data: " . $e->getMessage());
+        return [];
+    }
 }
 
 public function getDetailedInvoiceData($startDate, $endDate) {
-    $sql = "SELECT 
-        i.*,
-        c.Client_fn, c.Client_ln,
-        s.Name as UnitName
-    FROM invoice i
-    LEFT JOIN client c ON i.Client_ID = c.Client_ID
-    LEFT JOIN space s ON i.Space_ID = s.Space_ID
-    WHERE i.InvoiceDate BETWEEN ? AND ?
-    ORDER BY i.InvoiceDate DESC";
-    
-    $stmt = $this->conn->prepare($sql);
-    $stmt->execute([$startDate, $endDate]);
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $sql = "SELECT i.*, c.Client_fn, c.Client_ln, s.Name as UnitName
+                FROM invoice i
+                JOIN client c ON i.Client_ID = c.Client_ID
+                LEFT JOIN space s ON i.Space_ID = s.Space_ID
+                WHERE i.InvoiceDate BETWEEN ? AND ?
+                ORDER BY i.InvoiceDate DESC";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$startDate, $endDate]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Error getting detailed invoice data: " . $e->getMessage());
+        return [];
+    }
 }
-
-
-
-
     
 public function getLatestPendingRequests($limit = 5) {
     $sql = "SELECT rr.Request_ID, rr.Requested_At, rr.Status, rr.admin_seen, rr.Flow_Status,
