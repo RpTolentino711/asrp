@@ -1537,27 +1537,30 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
     $endDateWithTime = $endDate . ' 23:59:59';
 
     $sql = "SELECT 
-                COALESCE(SUM(InvoiceTotal), 0) AS total_earnings,
-                COUNT(CASE WHEN Status = 'paid' THEN 1 END) AS paid_invoices_count,
-                (SELECT COUNT(*) 
-                 FROM free_message 
-                 WHERE is_deleted = 0 
-                 AND Sent_At BETWEEN ? AND ?) AS new_messages_count
-            FROM invoice 
-            WHERE Status = 'paid'
-            AND Created_At BETWEEN ? AND ?";
+                COALESCE(SUM(i.InvoiceTotal), 0) AS total_earnings,
+                COUNT(CASE WHEN i.Status = 'paid' THEN 1 END) AS paid_invoices_count,
+                (
+                    SELECT COUNT(*) 
+                    FROM free_message fm
+                    WHERE fm.is_deleted = 0
+                    AND fm.Sent_At BETWEEN ? AND ?
+                ) AS new_messages_count
+            FROM invoice i
+            WHERE i.Status = 'paid'
+            AND i.InvoiceDate BETWEEN ? AND ?";
 
     $result = $this->getRow($sql, [
-        $startDate, $endDateWithTime,  // free_message
-        $startDate, $endDateWithTime   // invoice
+        $startDate, $endDateWithTime,  // free_message range
+        $startDate, $endDateWithTime   // invoice range
     ]);
 
     return $result ?: [
-        'total_earnings' => 0, 
-        'paid_invoices_count' => 0, 
+        'total_earnings' => 0,
+        'paid_invoices_count' => 0,
         'new_messages_count' => 0
     ];
 }
+
 
 
 
@@ -1598,21 +1601,22 @@ public function getMaintenanceStats($startDate, $endDate) {
 }
 
 public function getTotalRentalRequests($startDate, $endDate) {
-    // Include the time component to cover the entire end date
     $endDateWithTime = $endDate . ' 23:59:59';
-    
+
     $sql = "SELECT 
-        COUNT(*) as total_rental_requests,
-        COUNT(CASE WHEN Status = 'Pending' THEN 1 END) as pending_rentals,
-        COUNT(CASE WHEN Status = 'Accepted' THEN 1 END) as accepted_rentals,
-        COUNT(CASE WHEN Status = 'Rejected' THEN 1 END) as rejected_rentals
-        FROM rentalrequest 
-        WHERE Requested_At BETWEEN ? AND ?";
-    
+                COUNT(*) AS total_rental_requests,
+                COUNT(CASE WHEN r.Status = 'Pending' THEN 1 END) AS pending_rentals,
+                COUNT(CASE WHEN r.Status = 'Accepted' THEN 1 END) AS accepted_rentals,
+                COUNT(CASE WHEN r.Status = 'Rejected' THEN 1 END) AS rejected_rentals
+            FROM rentalrequest r
+            WHERE r.Requested_At BETWEEN ? AND ?";
+
     $result = $this->getRow($sql, [$startDate, $endDateWithTime]);
+
+    // Return safe defaults if query returned no data
     return [
-        'total' => $result['total_rental_requests'] ?? 0,
-        'pending' => $result['pending_rentals'] ?? 0,
+        'total'    => $result['total_rental_requests'] ?? 0,
+        'pending'  => $result['pending_rentals'] ?? 0,
         'accepted' => $result['accepted_rentals'] ?? 0,
         'rejected' => $result['rejected_rentals'] ?? 0
     ];
@@ -1683,7 +1687,7 @@ public function getDetailedMaintenanceData($startDate, $endDate) {
 
 public function getDetailedInvoiceData($startDate, $endDate) {
     try {
-        // Use EndDate to reflect actual billing coverage
+        // Use InvoiceDate for accurate monthly filtering
         $sql = "SELECT 
                     i.Invoice_ID,
                     i.Client_ID,
@@ -1698,14 +1702,14 @@ public function getDetailedInvoiceData($startDate, $endDate) {
                 FROM invoice i
                 JOIN client c ON i.Client_ID = c.Client_ID
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
-                WHERE i.EndDate BETWEEN ? AND ?
-                ORDER BY i.EndDate DESC";
+                WHERE i.InvoiceDate BETWEEN ? AND ?
+                ORDER BY i.InvoiceDate DESC";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$startDate, $endDate]);
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Ensure no nulls for export
+        // Format results for export (avoid nulls, clean data)
         foreach ($result as &$row) {
             $row['Status'] = ucfirst($row['Status'] ?? 'Unpaid');
             $row['UnitName'] = $row['UnitName'] ?: 'N/A';
@@ -1718,6 +1722,7 @@ public function getDetailedInvoiceData($startDate, $endDate) {
         return [];
     }
 }
+
 
     
 public function getLatestPendingRequests($limit = 5) {
