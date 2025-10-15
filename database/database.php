@@ -129,24 +129,37 @@ public function getOccupancyData($startDate, $endDate) {
     }
 }
 
+
 public function getFinancialSummary($startDate, $endDate) {
     try {
+        $endDateWithTime = $endDate . ' 23:59:59';
+
         $sql = "SELECT 
-                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) as overdue_count,
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Space' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as space_revenue,
-                    COALESCE(SUM(CASE WHEN st.SpaceTypeName = 'Apartment' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as apartment_revenue,
-                    COALESCE(SUM(CASE WHEN Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) as total_revenue
+                    COUNT(CASE WHEN Status = 'unpaid' AND EndDate < CURDATE() THEN 1 END) AS overdue_count,
+                    COALESCE(SUM(CASE WHEN COALESCE(st.SpaceTypeName, '') = 'Space' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) AS space_revenue,
+                    COALESCE(SUM(CASE WHEN COALESCE(st.SpaceTypeName, '') = 'Apartment' AND Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) AS apartment_revenue,
+                    COALESCE(SUM(CASE WHEN Status = 'paid' THEN i.InvoiceTotal ELSE 0 END), 0) AS total_revenue
                 FROM invoice i
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                WHERE i.InvoiceDate BETWEEN ? AND ?";
-        
+                WHERE i.Created_At BETWEEN ? AND ?";
+
         $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$startDate, $endDate]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->execute([$startDate, $endDateWithTime]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: [
+            'overdue_count' => 0,
+            'space_revenue' => 0,
+            'apartment_revenue' => 0,
+            'total_revenue' => 0
+        ];
     } catch (Exception $e) {
         error_log("Error getting financial summary: " . $e->getMessage());
-        return [];
+        return [
+            'overdue_count' => 0,
+            'space_revenue' => 0,
+            'apartment_revenue' => 0,
+            'total_revenue' => 0
+        ];
     }
 }
 
