@@ -1835,8 +1835,8 @@ public function getDetailedInvoiceData($startDate, $endDate) {
                 JOIN client c ON i.Client_ID = c.Client_ID
                 LEFT JOIN space s ON i.Space_ID = s.Space_ID
                 LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-                WHERE i.InvoiceDate BETWEEN ? AND ?
-                ORDER BY i.InvoiceDate DESC";
+                WHERE i.EndDate BETWEEN ? AND ?
+                ORDER BY i.EndDate ASC, i.InvoiceDate DESC";
         
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$startDate, $endDate]);
