@@ -1359,26 +1359,7 @@ public function getAllSpacesWithDetails() {
     }
 }
     
-
-// In your Database class - ADD THIS NEW FUNCTION
-public function updateSpaceFeatures($space_id, $features) {
-    try {
-        $sql = "UPDATE space SET Features = :features WHERE Space_ID = :space_id";
-        $params = [
-            ':features' => json_encode($features),
-            ':space_id' => $space_id
-        ];
-        return $this->executeStatement($sql, $params);
-    } catch (PDOException $e) {
-        error_log("Error updating space features: " . $e->getMessage());
-        return false;
-    }
-}
-
-
-// --- Overdue Rentals For Kicking ---
-
-
+                                                                                                                                                                        
 
 
   public function getAllActiveRenters() {
