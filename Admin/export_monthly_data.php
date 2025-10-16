@@ -1,6 +1,7 @@
 <?php
 session_start();
 require '../database/database.php';
+date_default_timezone_set('Asia/Manila');
 
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header('Location: login.php');
