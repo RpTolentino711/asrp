@@ -614,8 +614,124 @@ $testimonials = $db->getHomepageTestimonials(20);
     white-space: pre-wrap;
     text-align: left;
     padding: 8px 12px;
+
+
+    
 }
 
+.rented-units {
+  background: #f8f9fa;
+  padding: 80px 0;
+}
+
+.rented-units .section-title h2 {
+  font-weight: 700;
+  color: #222;
+  font-size: 2.2rem;
+}
+
+.rented-units .section-title p {
+  color: #555;
+}
+
+.unit-card {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
+
+.unit-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+}
+
+.unit-card img {
+  height: 260px;
+  width: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.unit-card:hover img {
+  transform: scale(1.05);
+}
+
+/* Airbnb-style overlay tag */
+.rented-badge {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  background: rgba(34, 197, 94, 0.9);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 3;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  color: #222;
+  margin-bottom: 0.5rem;
+}
+
+.unit-type {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.unit-location {
+  color: #777;
+  font-size: 0.9rem;
+}
+
+/* Photo badge (count indicator) */
+.badge.bg-success {
+  background-color: #22c55e !important;
+}
+
+/* Airbnb-like button */
+.btn-outline-success {
+  border-radius: 50px;
+  border-width: 2px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-success:hover {
+  background: #22c55e;
+  color: #fff;
+  border-color: #22c55e;
+}
+
+/* Modal improvements */
+.modal-content {
+  border-radius: 15px;
+}
+
+.modal-header.bg-success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.modal-body ul.list-group li {
+  border: none;
+  padding: 0.75rem 0;
+}
+
+.carousel-item img {
+  border-radius: 10px;
+}
 
 
   </style>
