@@ -741,7 +741,7 @@ foreach ($photo_history as $history) {
         
         .dashboard-header {
             display: flex;
-            justify-content: space-between;
+            justify-content: between;
             align-items: center;
             margin-bottom: 2rem;
             padding-bottom: 1rem;
@@ -3368,7 +3368,7 @@ foreach ($photo_history as $history) {
                     }
                 });
             }
-        });
+        }
 
         // Prevent double submission on forms
         document.querySelectorAll('form').forEach(form => {
