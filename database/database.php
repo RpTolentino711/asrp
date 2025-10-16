@@ -1364,7 +1364,7 @@ public function getAllSpacesWithDetails() {
  // In your Database class
 public function getSpaceUtilities($space_id) {
     $sql = "SELECT * FROM space_utilities WHERE Space_ID = ?";
-    $stmt = $this->connection->prepare($sql);
+    $stmt = $this->pdo->prepare($sql); // Changed from $this->connection
     $stmt->execute([$space_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
