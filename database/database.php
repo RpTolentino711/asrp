@@ -1360,11 +1360,10 @@ public function getAllSpacesWithDetails() {
 }
     
     
-    
 public function getSpaceUtilities($space_id) {
     $sql = "SELECT * FROM space_utilities WHERE Space_ID = ?";
     try {
-        $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute([$space_id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -1372,6 +1371,7 @@ public function getSpaceUtilities($space_id) {
         return null;
     }
 }
+
 
 public function updateSpaceUtilities($space_id, $utilities_data) {
     // Check if utilities record exists
@@ -1386,7 +1386,7 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
                 WHERE Space_ID = ?";
         
         try {
-            $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+            $stmt = $this->pdo->prepare($sql);
             return $stmt->execute([
                 $utilities_data['bedrooms'],
                 $utilities_data['toilets'],
@@ -1411,7 +1411,7 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         try {
-            $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+            $stmt = $this->pdo->prepare($sql);
             return $stmt->execute([
                 $space_id,
                 $utilities_data['bedrooms'],
@@ -1439,7 +1439,7 @@ public function addSpaceUtilities($space_id, $utilities_data) {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     try {
-        $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+        $stmt = $this->pdo->prepare($sql);
         return $stmt->execute([
             $space_id,
             $utilities_data['bedrooms'],
@@ -1458,6 +1458,7 @@ public function addSpaceUtilities($space_id, $utilities_data) {
     }
 }
 
+
 public function getAllSpacesWithUtilities() {
     $sql = "SELECT s.*, st.SpaceTypeName,
                    su.Bedrooms, su.Toilets, su.Has_Water, su.Has_Electricity,
@@ -1469,7 +1470,7 @@ public function getAllSpacesWithUtilities() {
             ORDER BY s.Space_ID DESC";
     
     try {
-        $stmt = $this->pdo->prepare($sql); // Use $this->pdo instead of $this->connection
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
