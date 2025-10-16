@@ -71,8 +71,8 @@ $testimonials = $db->getHomepageTestimonials(20);
       --primary-light: #3b82f6;
       --primary-dark: #1e3a8a;
       --secondary: #0f172a;
-      --accent: #ff385c;
-      --accent-light: #ff6b81;
+      --accent: #ef4444;
+      --accent-light: #f87171;
       --success: #059669;
       --warning: #d97706;
       --light: #f8fafc;
@@ -288,42 +288,42 @@ $testimonials = $db->getHomepageTestimonials(20);
       margin: 0 auto;
     }
 
-    /* Airbnb-style Unit Cards */
-    .unit-card {
+    /* Cards */
+    .card {
       border: none;
-      border-radius: 16px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-md);
+      background: var(--lighter);
+      transition: var(--transition);
       overflow: hidden;
-      background: #fff;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
+      height: 100%;
     }
 
-    .unit-card:hover {
-      transform: translateY(-6px);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow-xl);
     }
 
     .card-img-top {
-      height: 260px;
+      height: 250px;
       object-fit: cover;
-      transition: transform 0.4s ease;
+      transition: var(--transition);
     }
 
-    .unit-card:hover .card-img-top {
+    .card:hover .card-img-top {
       transform: scale(1.05);
     }
 
     /* Unit Cards */
+    .unit-card {
+      position: relative;
+      overflow: hidden;
+    }
+
     .unit-price {
       font-size: 1.25rem;
       font-weight: 700;
-      color: var(--secondary);
-    }
-
-    .unit-price-amount {
-      color: var(--accent);
-      font-weight: 800;
+      color: var(--success);
     }
 
     .unit-type {
@@ -352,37 +352,16 @@ $testimonials = $db->getHomepageTestimonials(20);
       background: var(--light);
     }
 
-    /* Airbnb-style Badges */
     .rented-badge {
       position: absolute;
       top: 1rem;
-      left: 1rem;
-      background: linear-gradient(135deg, #059669, #10b981);
+      right: 1rem;
+      background: var(--gradient-success);
       color: white;
       padding: 0.5rem 1rem;
-      border-radius: 8px;
+      border-radius: 20px;
       font-size: 0.875rem;
       font-weight: 600;
-      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .photo-count-badge {
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      background: rgba(255, 255, 255, 0.95);
-      color: var(--secondary);
-      padding: 0.4rem 0.8rem;
-      border-radius: 20px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      z-index: 2;
-      backdrop-filter: blur(10px);
     }
 
     /* Handyman Section */
@@ -601,132 +580,160 @@ $testimonials = $db->getHomepageTestimonials(20);
       border-top: 1px solid var(--gray-light);
     }
 
-    /* Airbnb-style Utilities */
-    .utilities-overlay {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      background: rgba(255, 255, 255, 0.95);
-      backdrop-filter: blur(10px);
-      color: var(--secondary);
-      padding: 8px 12px;
-      border-radius: 12px;
-      font-size: 0.8rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      z-index: 2;
-    }
 
-    .utility-icon {
-      font-size: 0.8rem;
-      color: var(--primary);
-    }
 
-    .utility-count {
-      font-weight: 600;
-      margin-right: 4px;
-    }
-
-    .utilities-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 1rem;
-    }
-
-    .utility-badge {
-      background: rgba(99, 102, 241, 0.08);
-      color: #6366f1;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      border: 1px solid rgba(99, 102, 241, 0.2);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-weight: 500;
-    }
-
-    /* Description text */
     .description-text {
-      line-height: 1.5;
-      word-wrap: break-word;
-      white-space: pre-wrap;
-    }
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
 
-    /* Tooltip customization */
-    .tooltip {
-      max-width: 400px !important;
-    }
+.carousel-indicators button:hover::before {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    max-width: 300px;
+    z-index: 1000;
+}
 
-    .tooltip-inner {
-      max-width: 400px;
-      white-space: pre-wrap;
-      text-align: left;
-      padding: 8px 12px;
-    }
+/* Tooltip customization for long descriptions */
+.tooltip {
+    max-width: 400px !important;
+}
 
-    /* Airbnb-style buttons */
-    .btn-airbnb {
-      background: var(--gradient-accent);
-      color: white;
-      font-weight: 600;
-      border-radius: 8px;
-      padding: 12px 24px;
-      border: none;
-      transition: all 0.3s ease;
-    }
+.tooltip-inner {
+    max-width: 400px;
+    white-space: pre-wrap;
+    text-align: left;
+    padding: 8px 12px;
 
-    .btn-airbnb:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(255, 56, 92, 0.3);
-    }
 
-    /* Card body improvements */
-    .card-body {
-      padding: 1.5rem;
-    }
+    
+}
 
-    .card-title {
-      font-size: 1.25rem;
-      color: #222;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-    }
+.rented-units {
+  background: #f8f9fa;
+  padding: 80px 0;
+}
 
-    /* Photo modal improvements */
-    .carousel-indicators button {
-      width: 60px;
-      height: 40px;
-      margin: 0 2px;
-      border: none;
-      background-size: cover;
-      background-position: center;
-    }
+.rented-units .section-title h2 {
+  font-weight: 700;
+  color: #222;
+  font-size: 2.2rem;
+}
 
-    /* Enhanced rented units styling */
-    .rented-unit-card {
-      position: relative;
-      overflow: hidden;
-    }
+.rented-units .section-title p {
+  color: #555;
+}
 
-    .rented-unit-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(135deg, rgba(5, 150, 105, 0.1), rgba(16, 185, 129, 0.05));
-      z-index: 1;
-      pointer-events: none;
-    }
+.unit-card {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+}
 
-    .rented-unit-card .card-img-top {
-      filter: brightness(0.95);
-    }
+.unit-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 25px rgba(0,0,0,0.15);
+}
+
+.unit-card img {
+  height: 260px;
+  width: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.unit-card:hover img {
+  transform: scale(1.05);
+}
+
+/* Airbnb-style overlay tag */
+.rented-badge {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  background: rgba(34, 197, 94, 0.9);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 3;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  color: #222;
+  margin-bottom: 0.5rem;
+}
+
+.unit-type {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.unit-location {
+  color: #777;
+  font-size: 0.9rem;
+}
+
+/* Photo badge (count indicator) */
+.badge.bg-success {
+  background-color: #22c55e !important;
+}
+
+/* Airbnb-like button */
+.btn-outline-success {
+  border-radius: 50px;
+  border-width: 2px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-outline-success:hover {
+  background: #22c55e;
+  color: #fff;
+  border-color: #22c55e;
+}
+
+/* Modal improvements */
+.modal-content {
+  border-radius: 15px;
+}
+
+.modal-header.bg-success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.modal-body ul.list-group li {
+  border: none;
+  padding: 0.75rem 0;
+}
+
+.carousel-item img {
+  border-radius: 10px;
+}
+
+
   </style>
 </head>
 
@@ -814,426 +821,683 @@ if (isset($_SESSION['login_error'])) {
     </div>
   </section>
 
-  <!-- Available Units Section -->
-  <section id="units" class="available-units">
-    <div class="container">
-      <div class="section-title animate-on-scroll">
-        <h2>Available Units</h2>
-        <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
-      </div>
+ <!-- Available Units Section -->
+<!-- Available Units Section -->
+<section id="units" class="available-units">
+  <div class="container">
+    <div class="section-title animate-on-scroll">
+      <h2>Available Units</h2>
+      <p>Choose from our carefully selected commercial spaces, each designed to meet your unique business needs.</p>
+    </div>
 
-      <div class="row g-4">
-        <?php
-        if (!empty($available_units)) {
-            $modal_counter = 0;
-            $modals = '';
-            foreach ($available_units as $space) {
-                if (in_array($space['Space_ID'], $hide_client_rented_unit_ids)) continue;
-                $modal_counter++;
-                $modal_id = "unitModal" . $modal_counter;
-                $photo_modal_id = "photoModal" . $modal_counter;
+    <div class="row g-4">
+      <?php
+      if (!empty($available_units)) {
+          $modal_counter = 0;
+          $modals = '';
+          foreach ($available_units as $space) {
+              if (in_array($space['Space_ID'], $hide_client_rented_unit_ids)) continue;
+              $modal_counter++;
+              $modal_id = "unitModal" . $modal_counter;
+              $photo_modal_id = "photoModal" . $modal_counter;
 
-                // Get photos with descriptions from photo_history table
-                $photos_with_descriptions = [];
-                
-                // Get active photos from photo_history table
-                $current_photos = $db->getCurrentSpacePhotos($space['Space_ID']);
-                if (!empty($current_photos)) {
-                    foreach ($current_photos as $photo) {
-                        if (!empty($photo['Photo_Path']) && $photo['Status'] === 'active') {
-                            $photos_with_descriptions[] = [
-                                'url' => "uploads/unit_photos/" . htmlspecialchars($photo['Photo_Path']),
-                                'description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : 'Unit Photo',
-                                'full_description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : ''
-                            ];
-                        }
-                    }
-                }
-                
-                // Fallback for backward compatibility
-                $photo_fields = ['Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
-                foreach ($photo_fields as $photo_field) {
-                    if (!empty($space[$photo_field])) {
-                        $photos_with_descriptions[] = [
-                            'url' => "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]),
-                            'description' => 'Unit Photo',
-                            'full_description' => ''
-                        ];
-                    }
-                }
-                
-                // Limit to maximum 6 photos for display
-                $photos_with_descriptions = array_slice($photos_with_descriptions, 0, 6);
-                $photo_count = count($photos_with_descriptions);
-                $first_photo_url = !empty($photos_with_descriptions) ? $photos_with_descriptions[0]['url'] : null;
+              // Get photos with descriptions from photo_history table (supports 1000 characters)
+              $photos_with_descriptions = [];
+              
+              // Get active photos from photo_history table
+              $current_photos = $db->getCurrentSpacePhotos($space['Space_ID']);
+              if (!empty($current_photos)) {
+                  foreach ($current_photos as $photo) {
+                      if (!empty($photo['Photo_Path']) && $photo['Status'] === 'active') {
+                          $photos_with_descriptions[] = [
+                              'url' => "uploads/unit_photos/" . htmlspecialchars($photo['Photo_Path']),
+                              'description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : 'Unit Photo',
+                              'full_description' => !empty($photo['description']) ? htmlspecialchars($photo['description']) : ''
+                          ];
+                      }
+                  }
+              }
+              
+              // Fallback for backward compatibility - check if old photo columns exist
+              $photo_fields = ['Photo1', 'Photo2', 'Photo3', 'Photo4', 'Photo5'];
+              foreach ($photo_fields as $photo_field) {
+                  if (!empty($space[$photo_field])) {
+                      $photos_with_descriptions[] = [
+                          'url' => "uploads/unit_photos/" . htmlspecialchars($space[$photo_field]),
+                          'description' => 'Unit Photo',
+                          'full_description' => ''
+                      ];
+                  }
+              }
+              
+              // Limit to maximum 6 photos for display
+              $photos_with_descriptions = array_slice($photos_with_descriptions, 0, 6);
+              $photo_count = count($photos_with_descriptions);
+              $first_photo_url = !empty($photos_with_descriptions) ? $photos_with_descriptions[0]['url'] : null;
 
-                // Get utilities data for this space
-                $utilities = $db->getSpaceUtilities($space['Space_ID']);
-                
-                // If no utilities found in space_utilities table, check if utilities exist in the space array itself
-                if (empty($utilities)) {
-                    $utilities = [
-                        'Bedrooms' => $space['Bedrooms'] ?? 0,
-                        'Toilets' => $space['Toilets'] ?? 0,
-                        'Square_Meters' => $space['Square_Meters'] ?? null,
-                        'Has_Water' => $space['Has_Water'] ?? 0,
-                        'Has_Electricity' => $space['Has_Electricity'] ?? 0,
-                        'Furnished' => $space['Furnished'] ?? 0,
-                        'Air_Conditioning' => $space['Air_Conditioning'] ?? 0,
-                        'Parking' => $space['Parking'] ?? 0,
-                        'Internet' => $space['Internet'] ?? 0
-                    ];
-                }
-                ?>
-                <div class="col-lg-4 col-md-6 animate-on-scroll">
-                  <div class="card unit-card">
-                    <?php if (!empty($first_photo_url)): ?>
-                      <div style="position:relative;">
-                        <img src="<?= $first_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 260px; object-fit: cover;" 
-                             data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>" 
-                             data-bs-slide-to="0">
-                        
-                        <!-- Utilities Overlay on Photo -->
-                        <div class="utilities-overlay">
-                          <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
-                            <i class="fas fa-bed utility-icon"></i>
-                            <span class="utility-count"><?= $utilities['Bedrooms'] ?></span>
-                          <?php endif; ?>
-                          <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
-                            <i class="fas fa-bath utility-icon"></i>
-                            <span class="utility-count"><?= $utilities['Toilets'] ?></span>
-                          <?php endif; ?>
-                          <?php if (!empty($utilities['Square_Meters'])): ?>
-                            <i class="fas fa-ruler-combined utility-icon"></i>
-                            <span class="utility-count"><?= $utilities['Square_Meters'] ?>m²</span>
-                          <?php endif; ?>
-                        </div>
-
-                        <?php if ($photo_count > 1): ?>
-                          <span class="photo-count-badge">
-                            <i class="bi bi-images me-1"></i><?= $photo_count ?>
-                          </span>
-                        <?php endif; ?>
-                      </div>
-                    <?php else: ?>
-                      <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 260px;">
-                        <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
-                      </div>
-                    <?php endif; ?>
-
-                    <div class="card-body">
-                      <h5 class="card-title"><?= htmlspecialchars($space['Name']) ?></h5>
-                      <p class="unit-price">
-                        <span class="unit-price-amount">₱<?= number_format($space['Price'], 0) ?></span> / month
-                      </p>
-                      <p class="card-text text-muted mb-3"><?= htmlspecialchars($space['Street']) ?>, <?= htmlspecialchars($space['City']) ?></p>
+              // Get utilities data for this space - using the new method that joins space_utilities table
+              $utilities = $db->getSpaceUtilities($space['Space_ID']);
+              
+              // If no utilities found in space_utilities table, check if utilities exist in the space array itself
+              if (empty($utilities)) {
+                  $utilities = [
+                      'Bedrooms' => $space['Bedrooms'] ?? 0,
+                      'Toilets' => $space['Toilets'] ?? 0,
+                      'Square_Meters' => $space['Square_Meters'] ?? null,
+                      'Has_Water' => $space['Has_Water'] ?? 0,
+                      'Has_Electricity' => $space['Has_Electricity'] ?? 0,
+                      'Furnished' => $space['Furnished'] ?? 0,
+                      'Air_Conditioning' => $space['Air_Conditioning'] ?? 0,
+                      'Parking' => $space['Parking'] ?? 0,
+                      'Internet' => $space['Internet'] ?? 0
+                  ];
+              }
+              ?>
+              <div class="col-lg-4 col-md-6 animate-on-scroll">
+                <div class="card unit-card">
+                  <?php if (!empty($first_photo_url)): ?>
+                    <div style="position:relative;">
+                      <img src="<?= $first_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" 
+                           data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>" 
+                           data-bs-slide-to="0">
                       
-                      <!-- Utilities Badges -->
-                      <div class="utilities-badges mb-3">
+                      <!-- ENHANCED: Utilities Overlay on Photo -->
+                      <div class="utilities-overlay" style="position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.7); color: white; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);">
                         <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
-                          <span class="utility-badge">
-                            <i class="fas fa-bed"></i> <?= $utilities['Bedrooms'] ?> BR
-                          </span>
+                          <i class="fas fa-bed utility-icon"></i>
+                          <span class="utility-count"><?= $utilities['Bedrooms'] ?></span>
                         <?php endif; ?>
                         <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
-                          <span class="utility-badge">
-                            <i class="fas fa-bath"></i> <?= $utilities['Toilets'] ?> Bath
-                          </span>
+                          <i class="fas fa-bath utility-icon"></i>
+                          <span class="utility-count"><?= $utilities['Toilets'] ?></span>
                         <?php endif; ?>
                         <?php if (!empty($utilities['Square_Meters'])): ?>
-                          <span class="utility-badge">
-                            <i class="fas fa-ruler-combined"></i> <?= $utilities['Square_Meters'] ?>m²
-                          </span>
+                          <i class="fas fa-ruler-combined utility-icon"></i>
+                          <span class="utility-count"><?= $utilities['Square_Meters'] ?>m²</span>
+                        <?php endif; ?>
+                        <!-- Additional utility icons in overlay -->
+                        <?php if (!empty($utilities['Air_Conditioning'])): ?>
+                          <i class="fas fa-snowflake utility-icon" title="Air Conditioning"></i>
+                        <?php endif; ?>
+                        <?php if (!empty($utilities['Parking'])): ?>
+                          <i class="fas fa-car utility-icon" title="Parking"></i>
+                        <?php endif; ?>
+                        <?php if (!empty($utilities['Internet'])): ?>
+                          <i class="fas fa-wifi utility-icon" title="Internet"></i>
                         <?php endif; ?>
                       </div>
 
-                      <div class="d-flex justify-content-between align-items-center mb-3">
-                        <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
-                      </div>
-                      
-                      <?php if ($is_logged_in && !$client_is_inactive): ?>
-                        <button class="btn btn-airbnb w-100" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">
-                          <i class="bi bi-key me-2"></i>Rent Now
-                        </button>
-                      <?php elseif ($is_logged_in && $client_is_inactive): ?>
-                        <button class="btn btn-secondary w-100" disabled>
-                          Account Inactive
-                        </button>
+                      <?php if ($photo_count > 1): ?>
+                        <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= $photo_count ?> photos </span>
+                      <?php endif; ?>
+                    </div>
+                  <?php else: ?>
+                    <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+                      <i class="fa-solid fa-house text-primary" style="font-size: 4rem;"></i>
+                    </div>
+                  <?php endif; ?>
+
+                  <div class="card-body">
+                    <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
+                    <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
+                    <p class="card-text text-muted">Premium commercial space in a strategic location Click to see details.</p>
+                    
+                    <!-- ENHANCED: Utilities Badges with more comprehensive display -->
+                    <div class="utilities-badges mb-3" style="display: flex; flex-wrap: wrap; gap: 4px;">
+                      <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
+                        <span class="utility-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(99, 102, 241, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-bed"></i> <?= $utilities['Bedrooms'] ?> BR
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
+                        <span class="utility-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(99, 102, 241, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-bath"></i> <?= $utilities['Toilets'] ?> Bath
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Square_Meters'])): ?>
+                        <span class="utility-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(99, 102, 241, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-ruler-combined"></i> <?= $utilities['Square_Meters'] ?>m²
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Has_Water'])): ?>
+                        <span class="utility-badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(16, 185, 129, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-tint"></i> Water
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Has_Electricity'])): ?>
+                        <span class="utility-badge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(245, 158, 11, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-bolt"></i> Electricity
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Furnished'])): ?>
+                        <span class="utility-badge" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(59, 130, 246, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-couch"></i> Furnished
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Air_Conditioning'])): ?>
+                        <span class="utility-badge" style="background: rgba(6, 182, 212, 0.1); color: #06b6d4; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(6, 182, 212, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-snowflake"></i> AC
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Parking'])): ?>
+                        <span class="utility-badge" style="background: rgba(107, 114, 128, 0.1); color: #6b7280; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(107, 114, 128, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-car"></i> Parking
+                        </span>
+                      <?php endif; ?>
+                      <?php if (!empty($utilities['Internet'])): ?>
+                        <span class="utility-badge" style="background: rgba(168, 85, 247, 0.1); color: #a855f7; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(168, 85, 247, 0.2); display: inline-flex; align-items: center; gap: 4px;">
+                          <i class="fas fa-wifi"></i> Internet
+                        </span>
+                      <?php endif; ?>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
+                      <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
+                    </div>
+                    
+                    <?php if ($is_logged_in && !$client_is_inactive): ?>
+                      <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">
+                        <i class="bi bi-key me-2"></i>Rent Now
+                      </button>
+                    <?php elseif ($is_logged_in && $client_is_inactive): ?>
+                      <button class="btn btn-secondary w-100" disabled>
+                        Account Inactive
+                      </button>
+                    <?php else: ?>
+                      <button class="btn btn-accent w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <i class="bi bi-key me-2"></i>Login to Rent
+                      </button>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Photo Modal with Enhanced Descriptions (1000 characters support) -->
+              <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-xl">
+                  <div class="modal-content bg-dark">
+                    <div class="modal-header border-0">
+                      <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
+                        <?= htmlspecialchars($space['Name']) ?>
+                        
+                        <!-- ENHANCED: Utilities in Modal Header with more details -->
+                        <div class="utilities-header mt-1" style="font-size: 0.9rem; opacity: 0.9;">
+                          <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
+                            <span class="me-3"><i class="fas fa-bed me-1"></i><?= $utilities['Bedrooms'] ?> BR</span>
+                          <?php endif; ?>
+                          <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
+                            <span class="me-3"><i class="fas fa-bath me-1"></i><?= $utilities['Toilets'] ?> Bath</span>
+                          <?php endif; ?>
+                          <?php if (!empty($utilities['Square_Meters'])): ?>
+                            <span class="me-3"><i class="fas fa-ruler-combined me-1"></i><?= $utilities['Square_Meters'] ?>m²</span>
+                          <?php endif; ?>
+                          <?php if (!empty($utilities['Air_Conditioning'])): ?>
+                            <span class="me-2"><i class="fas fa-snowflake text-info"></i></span>
+                          <?php endif; ?>
+                          <?php if (!empty($utilities['Parking'])): ?>
+                            <span class="me-2"><i class="fas fa-car text-secondary"></i></span>
+                          <?php endif; ?>
+                          <?php if (!empty($utilities['Internet'])): ?>
+                            <span class="me-2"><i class="fas fa-wifi text-purple"></i></span>
+                          <?php endif; ?>
+                        </div>
+                      </h5>
+                      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                      <?php if (count($photos_with_descriptions) === 1): ?>
+                        <img src="<?= $photos_with_descriptions[0]['url'] ?>" alt="<?= $photos_with_descriptions[0]['description'] ?>" class="img-fluid rounded shadow" style="max-height:60vh; object-fit: contain;">
+                        <?php if (!empty($photos_with_descriptions[0]['full_description']) && $photos_with_descriptions[0]['full_description'] !== 'Unit Photo'): ?>
+                          <div class="mt-3">
+                            <p class="text-white fw-semibold mb-2"></p>
+                            <div class="bg-dark bg-opacity-50 p-3 rounded text-start">
+                              <p class="text-white mb-0 description-text" style="max-height: 120px; overflow-y: auto; line-height: 1.5;">
+                                <?= $photos_with_descriptions[0]['full_description'] ?>
+                              </p>
+                            </div>
+                          </div>
+                        <?php endif; ?>
+                      <?php elseif (count($photos_with_descriptions) > 1): ?>
+                        <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
+                          <div class="carousel-inner">
+                            <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
+                              <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>" data-slide-index="<?= $idx ?>">
+                                <img src="<?= $photo_data['url'] ?>" class="d-block mx-auto img-fluid rounded shadow" alt="<?= $photo_data['description'] ?>" style="max-height:60vh; object-fit: contain;">
+                                <?php if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo'): ?>
+                                  <div class="mt-3">
+                                    <p class="text-white fw-semibold mb-2"></p>
+                                    <div class="bg-dark bg-opacity-50 p-3 rounded text-start">
+                                      <p class="text-white mb-0 description-text" style="max-height: 120px; overflow-y: auto; line-height: 1.5;">
+                                        <?= $photo_data['full_description'] ?>
+                                      </p>
+                                    </div>
+                                  </div>
+                                <?php endif; ?>
+                              </div>
+                            <?php endforeach; ?>
+                          </div>
+                          <button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="prev">
+                              <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                              <span class="visually-hidden">Previous</span>
+                          </button>
+                          <button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="next">
+                              <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                              <span class="visually-hidden">Next</span>
+                          </button>
+                          
+                          <!-- Carousel Indicators with Tooltips for Descriptions -->
+                          <div class="carousel-indicators" style="bottom: -50px;">
+                            <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
+                              <button type="button" 
+                                      data-bs-target="#zoomCarousel<?= $modal_counter ?>" 
+                                      data-bs-slide-to="<?= $idx ?>" 
+                                      class="<?= $idx === 0 ? 'active' : '' ?>" 
+                                      aria-label="Slide <?= $idx + 1 ?>"
+                                      <?php if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo'): ?>
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top" 
+                                        title="<?= htmlspecialchars($photo_data['full_description']) ?>"
+                                      <?php endif; ?>
+                                      style="width: 60px; height: 40px; margin: 0 2px; border: none; background-size: cover; background-position: center; background-image: url('<?= $photo_data['url'] ?>');">
+                              </button>
+                            <?php endforeach; ?>
+                          </div>
+                        </div>
                       <?php else: ?>
-                        <button class="btn btn-airbnb w-100" data-bs-toggle="modal" data-bs-target="#loginModal">
-                          <i class="bi bi-key me-2"></i>Login to Rent
-                        </button>
+                        <div class="text-center mb-3" style="font-size:56px;color:#2563eb;">
+                          <i class="fa-solid fa-house"></i>
+                        </div>
+                        <p class="text-white">No photos available for this unit</p>
+                      <?php endif; ?>
+                    </div>
+                    <div class="modal-footer border-0">
+                      <small class="text-muted"><?= $photo_count ?> photo<?= $photo_count !== 1 ? 's' : '' ?> available</small>
+                      <?php if (!empty($photos_with_descriptions) && array_filter($photos_with_descriptions, function($photo) { 
+                          return !empty($photo['full_description']) && $photo['full_description'] !== 'Unit Photo'; 
+                      })): ?>
+                        
                       <?php endif; ?>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                <!-- Photo Modal -->
-                <div class="modal fade" id="<?= $photo_modal_id ?>" tabindex="-1" aria-labelledby="<?= $photo_modal_id ?>Label" aria-hidden="true">
-                  <div class="modal-dialog modal-dialog-centered modal-xl">
-                    <div class="modal-content bg-dark">
-                      <div class="modal-header border-0">
-                        <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
-                          <?= htmlspecialchars($space['Name']) ?>
-                        </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                      </div>
-                      <div class="modal-body text-center">
-                        <?php if (count($photos_with_descriptions) === 1): ?>
-                          <img src="<?= $photos_with_descriptions[0]['url'] ?>" alt="<?= $photos_with_descriptions[0]['description'] ?>" class="img-fluid rounded shadow" style="max-height:60vh; object-fit: contain;">
-                        <?php elseif (count($photos_with_descriptions) > 1): ?>
-                          <div id="zoomCarousel<?= $modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
-                            <div class="carousel-inner">
-                              <?php foreach ($photos_with_descriptions as $idx => $photo_data): ?>
-                                <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>" data-slide-index="<?= $idx ?>">
-                                  <img src="<?= $photo_data['url'] ?>" class="d-block mx-auto img-fluid rounded shadow" alt="<?= $photo_data['description'] ?>" style="max-height:60vh; object-fit: contain;">
-                                </div>
-                              <?php endforeach; ?>
-                            </div>
-                            <button class="carousel-control-prev" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Previous</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#zoomCarousel<?= $modal_counter ?>" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Next</span>
-                            </button>
+              <?php
+              // Build rental modal
+              if ($is_logged_in && !$client_is_inactive) {
+                  $modals .= '
+                  <div class="modal fade" id="' . $modal_id . '" tabindex="-1" aria-labelledby="' . $modal_id . 'Label" aria-hidden="true">
+                      <div class="modal-dialog modal-dialog-centered modal-lg">
+                          <div class="modal-content">
+                              <div class="modal-header">
+                                  <h5 class="modal-title" id="' . $modal_id . 'Label">Contact Admin to Rent: ' . htmlspecialchars($space['Name']) . '</h5>
+                                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                              </div>
+                              <div class="modal-body">
+                                  <div class="alert alert-info">
+                                      <i class="bi bi-info-circle me-2"></i>
+                                        To rent this unit and join our community, please submit your rental request. The admin will review your application and contact you to guide you through the next steps.
+                                  </div>
+                                  
+                                  <!-- ENHANCED: Comprehensive Utilities Display in Rental Modal -->
+                                  <div class="mb-4">
+                                      <h6 class="fw-bold mb-3">Unit Features & Utilities:</h6>
+                                      <div class="row g-3">';
+                  
+                  // Add comprehensive utilities information
+                  if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-bed text-primary me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">' . $utilities['Bedrooms'] . ' Bedroom' . ($utilities['Bedrooms'] > 1 ? 's' : '') . '</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-bath text-primary me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">' . $utilities['Toilets'] . ' Toilet' . ($utilities['Toilets'] > 1 ? 's' : '') . '</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  if (!empty($utilities['Square_Meters'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-ruler-combined text-primary me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">' . $utilities['Square_Meters'] . ' m² Area</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  // Basic utilities
+                  if (!empty($utilities['Has_Water'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-tint text-success me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">Water Supply</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  if (!empty($utilities['Has_Electricity'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-bolt text-warning me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">Electricity</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  // Additional premium utilities
+                  if (!empty($utilities['Furnished'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-couch text-info me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">Furnished</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  if (!empty($utilities['Air_Conditioning'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-snowflake text-primary me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">Air Conditioning</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  if (!empty($utilities['Parking'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-car text-secondary me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">Parking Space</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  if (!empty($utilities['Internet'])) {
+                      $modals .= '
+                                          <div class="col-md-4">
+                                              <div class="d-flex align-items-center">
+                                                  <i class="fas fa-wifi text-purple me-2"></i>
+                                                  <div>
+                                                      <div class="fw-semibold">Internet Ready</div>
+                                                  </div>
+                                              </div>
+                                          </div>';
+                  }
+                  
+                  $modals .= '
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- Unit Photos Preview in Rental Modal with Enhanced Descriptions -->
+                                  ' . (count($photos_with_descriptions) > 0 ? '
+                                  <div class="mb-4">
+                                      <h6 class="fw-bold mb-3">Unit Photos:</h6>
+                                      <div class="row g-2">' : '') . '
+                                      ';
+                                  
+                  // Add photo thumbnails to rental modal with description tooltips
+                  $thumb_counter = 0;
+                  foreach ($photos_with_descriptions as $idx => $photo_data) {
+                      if ($thumb_counter < 4) { // Show max 4 thumbnails
+                          $tooltip_attr = '';
+                          if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo') {
+                              $tooltip_attr = 'data-bs-toggle="tooltip" data-bs-placement="top" title="' . htmlspecialchars($photo_data['full_description']) . '"';
+                          }
+                          
+                          $modals .= '
+                          <div class="col-3">
+                              <div class="position-relative">
+                                  <img src="' . $photo_data['url'] . '" class="img-thumbnail" alt="Unit Photo" style="width: 100%; height: 80px; object-fit: cover; cursor: pointer;" 
+                                       data-bs-toggle="modal" data-bs-target="#' . $photo_modal_id . '" 
+                                       data-bs-slide-to="' . $idx . '" ' . $tooltip_attr . '>
+                                  ' . (!empty($photo_data['description']) && $photo_data['description'] !== 'Unit Photo' ? '
+                                  <div class="position-absolute bottom-0 start-0 end-0 bg-dark bg-opacity-75 text-white p-1" style="font-size: 0.7rem; line-height: 1.2; max-height: 30px; overflow: hidden;">
+                                      ' . (strlen($photo_data['description']) > 30 ? substr($photo_data['description'], 0, 27) . '...' : $photo_data['description']) . '
+                                  </div>' : '') . '
+                              </div>
+                          </div>';
+                          $thumb_counter++;
+                      }
+                  }
+                  
+                  if (count($photos_with_descriptions) > 4) {
+                      $modals .= '
+                          <div class="col-3">
+                              <div class="img-thumbnail d-flex align-items-center justify-content-center bg-light" style="width: 100%; height: 80px;">
+                                  <small class="text-muted">+' . (count($photos_with_descriptions) - 4) . ' more</small>
+                              </div>
+                          </div>';
+                  }
+                  
+                  $modals .= (count($photos_with_descriptions) > 0 ? '
+                                      </div>
+                                      <small class="text-muted mt-2 d-block">
+                                          <i class="bi bi-info-circle me-1"></i>Click on photos to view full gallery with detailed descriptions
+                                      </small>
+                                  </div>' : '') . '
+                                  
+                                  <div class="row">
+                                      <div class="col-md-6">
+                                          <h6 class="fw-bold">Admin Contact:</h6>
+                                          <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:management@asrt.space">management@asrt.space</a></p>
+                                          <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+63 9451357685">+63 9451357685</a></p>
+                                      </div>
+                                      <div class="col-md-6">
+                                          <div class="alert alert-warning">
+                                              <strong>Direct Contact:</strong><br>
+                                                 If you would like to contact the admin directly regarding this unit, please use the contact information provided.
+                                          </div>
+                                      </div>
+                                  </div>
+                                  <ul class="list-group list-group-flush">
+                                      <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
+                                      <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
+                                      <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
+                                  </ul>
+                              </div>
+                              <div class="modal-footer">
+                                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                  <a href="rent_request.php?space_id=' . urlencode($space['Space_ID']) . '" class="btn btn-success">
+                                      <i class="bi bi-receipt me-2"></i>Request Invoice
+                                  </a>
+                              </div>
                           </div>
-                        <?php else: ?>
-                          <div class="text-center mb-3" style="font-size:56px;color:#2563eb;">
-                            <i class="fa-solid fa-house"></i>
-                          </div>
-                          <p class="text-white">No photos available for this unit</p>
-                        <?php endif; ?>
                       </div>
-                    </div>
-                  </div>
-                </div>
-
-                <?php
-                // Build rental modal
-                if ($is_logged_in && !$client_is_inactive) {
-                    $modals .= '
-                    <div class="modal fade" id="' . $modal_id . '" tabindex="-1" aria-labelledby="' . $modal_id . 'Label" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="' . $modal_id . 'Label">Rent: ' . htmlspecialchars($space['Name']) . '</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-info-circle me-2"></i>
-                                        To rent this unit, please submit your rental request. The admin will review your application and contact you.
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <h6 class="fw-bold">Contact Information:</h6>
-                                            <p class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:management@asrt.space">management@asrt.space</a></p>
-                                            <p class="mb-3"><i class="bi bi-telephone me-2"></i><a href="tel:+639451357685">+63 9451357685</a></p>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="alert alert-warning">
-                                                <strong>Direct Contact:</strong><br>
-                                                Contact the admin directly for immediate assistance.
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <ul class="list-group list-group-flush">
-                                        <li class="list-group-item"><strong>Price:</strong> ₱' . number_format($space['Price'], 0) . ' per month</li>
-                                        <li class="list-group-item"><strong>Unit Type:</strong> ' . htmlspecialchars($space['SpaceTypeName']) . '</li>
-                                        <li class="list-group-item"><strong>Location:</strong> ' . htmlspecialchars($space['Street']) . ', ' . htmlspecialchars($space['Brgy']) . ', ' . htmlspecialchars($space['City']) . '</li>
-                                    </ul>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                    <a href="rent_request.php?space_id=' . urlencode($space['Space_ID']) . '" class="btn btn-success">
-                                        <i class="bi bi-receipt me-2"></i>Request Invoice
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>';
-                }
-            }
-            
-            // Output all modals at the end
-            echo $modals;
-        } else {
-            echo '<div class="col-12 text-center">
-                    <div class="alert alert-info">No units currently available.</div>
                   </div>';
-        }
-        ?>
-      </div>
-
-      <div class="text-center mt-5">
-        <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
-      </div>
+              }
+          }
+          
+          // Output all modals at the end
+          echo $modals;
+      } else {
+          echo '<div class="col-12 text-center">
+                  <div class="alert alert-info">No units currently available.</div>
+                </div>';
+      }
+      ?>
     </div>
-  </section>
 
-  <!-- Rented Units Section -->
-  <section class="rented-units">
-    <div class="container">
-      <div class="section-title animate-on-scroll">
-        <h2>Currently Rented</h2>
-        <p>See our successful partnerships with businesses across various industries.</p>
-      </div>
+    <div class="text-center mt-5">
+      <button id="moreUnitsBtn" class="btn btn-outline-primary btn-lg">View More Units</button>
+    </div>
+  </div>
+</section>
+  <!-- All rental modals rendered here -->
+<?php if (!empty($modals)) echo $modals; ?>
 
-      <div class="row g-4">
-        <?php
-        if (!empty($rented_units_display)) {
-          $rented_modal_counter = 0;
-          // Get all rented unit photos for the units being displayed
-          $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
-          $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
-          foreach ($rented_units_display as $rent) {
-            $rented_modal_counter++;
-            $rented_modal_id = "rentedModal" . $rented_modal_counter;
-            
-            // Get photos from JSON array instead of multiple columns
-            $rented_photo_urls = [];
-            if (!empty($rented_unit_photos[$rent['Space_ID']])) {
-              foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
-                if (!empty($photo)) {
-                  $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo);
-                }
+<!-- Rented Units Section -->
+<section class="rented-units">
+  <div class="container">
+    <div class="section-title animate-on-scroll">
+      <h2>Currently Rented</h2>
+      <p>See our successful partnerships with businesses across various industries.</p>
+    </div>
+
+    <div class="row g-4">
+      <?php
+      if (!empty($rented_units_display)) {
+        $rented_modal_counter = 0;
+        // Get all rented unit photos for the units being displayed
+        $rented_unit_ids = array_column($rented_units_display, 'Space_ID');
+        $rented_unit_photos = $db->getAllUnitPhotosForUnits($rented_unit_ids);
+        foreach ($rented_units_display as $rent) {
+          $rented_modal_counter++;
+          $rented_modal_id = "rentedModal" . $rented_modal_counter;
+          
+          // UPDATED: Get photos from JSON array instead of multiple columns
+          $rented_photo_urls = [];
+          if (!empty($rented_unit_photos[$rent['Space_ID']])) {
+            foreach ($rented_unit_photos[$rent['Space_ID']] as $photo) {
+              if (!empty($photo)) {
+                $rented_photo_urls[] = "uploads/unit_photos/" . htmlspecialchars($photo);
               }
             }
-            ?>
-            <div class="col-lg-4 col-md-6 animate-on-scroll">
-              <div class="card unit-card rented-unit-card">
-                <div class="rented-badge">
-                  <i class="bi bi-check-circle me-1"></i>Currently Rented
+          }
+          ?>
+          <div class="col-lg-4 col-md-6 animate-on-scroll">
+            <div class="card unit-card">
+              <div class="rented-badge">
+                <i class="bi bi-check-circle me-1"></i>Rented
+              </div>
+              <?php if (!empty($rented_photo_urls)): ?>
+                <div style="position:relative;">
+                  <img src="<?= $rented_photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
+                  <span class="badge bg-success position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= count($rented_photo_urls) ?>/6 </span>
                 </div>
-                <?php if (!empty($rented_photo_urls)): ?>
-                  <div style="position:relative;">
-                    <img src="<?= $rented_photo_urls[0] ?>" class="card-img-top" alt="<?= htmlspecialchars($rent['Name']) ?>" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>_photo">
-                    <?php if (count($rented_photo_urls) > 1): ?>
-                      <span class="photo-count-badge">
-                        <i class="bi bi-images me-1"></i><?= count($rented_photo_urls) ?>
-                      </span>
-                    <?php endif; ?>
-                  </div>
-                <?php else: ?>
-                  <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 260px;">
-                    <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
-                  </div>
-                <?php endif; ?>
-                <div class="card-body">
-                  <h5 class="card-title"><?= htmlspecialchars($rent['Name']) ?></h5>
-                  <p class="unit-price">
-                    <span class="unit-price-amount">₱<?= number_format($rent['Price'], 0) ?></span> / month
-                  </p>
-                  <p class="card-text text-muted mb-3"><?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['City']) ?></p>
-                  
-                  <div class="utilities-badges mb-3">
-                    <?php if (!empty($rent['Bedrooms']) && $rent['Bedrooms'] > 0): ?>
-                      <span class="utility-badge">
-                        <i class="fas fa-bed"></i> <?= $rent['Bedrooms'] ?> BR
-                      </span>
-                    <?php endif; ?>
-                    <?php if (!empty($rent['Toilets']) && $rent['Toilets'] > 0): ?>
-                      <span class="utility-badge">
-                        <i class="fas fa-bath"></i> <?= $rent['Toilets'] ?> Bath
-                      </span>
-                    <?php endif; ?>
-                  </div>
-
-                  <div class="d-flex justify-content-between align-items-center mb-3">
-                    <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
-                  </div>
-                  <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
-                    <i class="bi bi-eye me-2"></i>View Details
-                  </button>
+              <?php else: ?>
+                <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 250px;">
+                  <i class="fa-solid fa-house-user text-success" style="font-size: 4rem;"></i>
                 </div>
+              <?php endif; ?>
+              <div class="card-body">
+                <h5 class="card-title fw-bold"><?= htmlspecialchars($rent['Name']) ?></h5>
+                <!-- <p class="unit-price">₱<?= number_format($rent['Price'], 0) ?> / month</p> -->
+                <p class="card-text text-muted">Currently occupied commercial space.</p>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <span class="unit-type"><?= htmlspecialchars($rent['SpaceTypeName']) ?></span>
+                  <small class="unit-location"><?= htmlspecialchars($rent['City']) ?></small>
+                </div>
+                <button class="btn btn-outline-success w-100" data-bs-toggle="modal" data-bs-target="#<?= $rented_modal_id ?>">
+                  <i class="bi bi-eye me-2"></i>View Details
+                </button>
               </div>
             </div>
+          </div>
 
-            <!-- Rented Unit Photo Modal -->
-            <div class="modal fade" id="<?= $rented_modal_id ?>_photo" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>_photoLabel" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered modal-xl">
-                <div class="modal-content bg-dark">
-                  <div class="modal-header border-0">
-                    <h5 class="modal-title text-white" id="<?= $rented_modal_id ?>_photoLabel">
-                      <?= htmlspecialchars($rent['Name']) ?>
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                  </div>
-                  <div class="modal-body text-center">
-                    <?php if (count($rented_photo_urls) === 1): ?>
-                      <img src="<?= $rented_photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
-                    <?php elseif (count($rented_photo_urls) > 1): ?>
-                      <div id="rentedZoomCarousel<?= $rented_modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
-                        <div class="carousel-inner">
-                          <?php foreach ($rented_photo_urls as $idx => $url): ?>
-                            <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
-                              <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
-                            </div>
-                          <?php endforeach; ?>
-                        </div>
-                        <button class="carousel-control-prev" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="prev">
-                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Previous</span>
-                        </button>
-                        <button class="carousel-control-next" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="next">
-                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                            <span class="visually-hidden">Next</span>
-                        </button>
-                      </div>
-                    <?php else: ?>
-                      <div class="text-center mb-3" style="font-size:56px;color:#059669;">
-                        <i class="fa-solid fa-house-user"></i>
-                      </div>
-                    <?php endif; ?>
-                  </div>
+          <!-- Rented Unit Photo Modal -->
+          <div class="modal fade" id="<?= $rented_modal_id ?>_photo" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>_photoLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-xl">
+              <div class="modal-content bg-dark">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title text-white" id="<?= $rented_modal_id ?>_photoLabel">
+                    Photo Gallery: <?= htmlspecialchars($rent['Name']) ?>
+                  </h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-              </div>
-            </div>
-
-            <!-- Rented Unit Modal -->
-            <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
-              <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                  <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title fw-bold" id="<?= $rented_modal_id ?>Label">
-                      <?= htmlspecialchars($rent['Name']) ?>
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                  </div>
-                  <div class="modal-body">
+                <div class="modal-body text-center">
+                  <?php if (count($rented_photo_urls) === 1): ?>
+                    <img src="<?= $rented_photo_urls[0] ?>" alt="Unit Photo Zoom" class="img-fluid rounded shadow" style="max-height:60vh;">
+                  <?php elseif (count($rented_photo_urls) > 1): ?>
+                    <div id="rentedZoomCarousel<?= $rented_modal_counter ?>" class="carousel slide" data-bs-ride="carousel">
+                      <div class="carousel-inner">
+                        <?php foreach ($rented_photo_urls as $idx => $url): ?>
+                          <div class="carousel-item<?= $idx === 0 ? ' active' : '' ?>">
+                            <img src="<?= $url ?>" class="d-block mx-auto img-fluid rounded shadow" alt="Zoom Photo <?= $idx+1 ?>" style="max-height:60vh;">
+                          </div>
+                        <?php endforeach; ?>
+                      </div>
+                      <button class="carousel-control-prev" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="prev">
+                          <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                          <span class="visually-hidden">Previous</span>
+                      </button>
+                      <button class="carousel-control-next" type="button" data-bs-target="#rentedZoomCarousel<?= $rented_modal_counter ?>" data-bs-slide="next">
+                          <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                          <span class="visually-hidden">Next</span>
+                      </button>
+                    </div>
+                  <?php else: ?>
                     <div class="text-center mb-3" style="font-size:56px;color:#059669;">
                       <i class="fa-solid fa-house-user"></i>
                     </div>
-                    <ul class="list-group list-group-flush">
-                      <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li>
-                      <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
-                      <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
-                      <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>
-                    </ul>
-                  </div>
-                  <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-                  </div>
+                  <?php endif; ?>
                 </div>
               </div>
             </div>
-            <?php
-          }
-        } else {
-          echo '<div class="col-12 text-center">
-                  <div class="alert alert-info">No units currently rented.</div>
-                </div>';
+          </div>
+
+          <!-- Rented Unit Modal -->
+          <div class="modal fade" id="<?= $rented_modal_id ?>" tabindex="-1" aria-labelledby="<?= $rented_modal_id ?>Label" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                  <h5 class="modal-title fw-bold" id="<?= $rented_modal_id ?>Label">
+                    <?= htmlspecialchars($rent['Name']) ?> - Rented Unit Details
+                  </h5>
+                  <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <div class="text-center mb-3" style="font-size:56px;color:#059669;">
+                    <i class="fa-solid fa-house-user"></i>
+                  </div>
+                  <ul class="list-group list-group-flush">
+                    <!-- <li class="list-group-item"><strong>Price:</strong> ₱<?= number_format($rent['Price'], 0) ?> / month</li> -->
+                    <li class="list-group-item"><strong>Unit Type:</strong> <?= htmlspecialchars($rent['SpaceTypeName']) ?></li>
+                    <li class="list-group-item"><strong>Location:</strong> <?= htmlspecialchars($rent['Street']) ?>, <?= htmlspecialchars($rent['Brgy']) ?>, <?= htmlspecialchars($rent['City']) ?></li>
+                    <li class="list-group-item"><strong>Renter:</strong> <?= htmlspecialchars($rent['Client_fn'].' '.$rent['Client_ln']) ?></li>
+                  </ul>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <?php
         }
-        ?>
-      </div>
+      } else {
+        echo '<div class="col-12 text-center">
+                <div class="alert alert-info">No units currently rented.</div>
+              </div>';
+      }
+      ?>
     </div>
-  </section>
+  </div>
+</section>
 
   <!-- Handyman Services Section -->
-  <section id="services" class="handyman-section">
+ <section id="services" class="handyman-section">
     <div class="container">
       <div class="section-title animate-on-scroll">
         <h2>Professional Services</h2>
@@ -1306,7 +1570,6 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
-
   <!-- Testimonials Section -->
   <section id="testimonials" class="testimonials-section">
     <div class="container">
@@ -1380,7 +1643,7 @@ if (isset($_SESSION['login_error'])) {
                 </div>
                 <h5 class="fw-bold">Call Us</h5>
                 <p class="text-muted mb-2">Speak with our leasing specialists</p>
-                <a href="tel:+639451357685" class="text-decoration-none">+63 9451357685</a>
+                <a href="tel:+639123456789" class="text-decoration-none">+63 9451357685</a>
               </div>
             </div>
 
@@ -1391,7 +1654,7 @@ if (isset($_SESSION['login_error'])) {
                 </div>
                 <h5 class="fw-bold">Email Us</h5>
                 <p class="text-muted mb-2">Get detailed information</p>
-                <a href="mailto:management@asrt.space" class="text-decoration-none">management@asrt.space</a>
+                <a href="mailto:info@asrt.com" class="text-decoration-none">management@asrt.space</a>
               </div>
             </div>
 
@@ -1410,6 +1673,7 @@ if (isset($_SESSION['login_error'])) {
       </div>
     </div>
   </section>
+
 
   <!-- Floating Message Button (only for non-logged-in users) -->
   <?php if (!$is_logged_in): ?>
@@ -1494,7 +1758,6 @@ if (isset($_SESSION['login_error'])) {
   <?php require('footer.php'); ?>
 
   <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   
   <!-- Swiper JS -->
   <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
@@ -1575,7 +1838,7 @@ if (isset($_SESSION['login_error'])) {
     // Add hover effects to cards
     document.querySelectorAll('.card').forEach(card => {
       card.addEventListener('mouseenter', function() {
-        this.style.transform = 'translateY(-6px)';
+        this.style.transform = 'translateY(-8px)';
       });
       
       card.addEventListener('mouseleave', function() {
@@ -1583,36 +1846,51 @@ if (isset($_SESSION['login_error'])) {
       });
     });
 
-    // Handle direct photo navigation when clicking thumbnails in rental modal
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('[data-bs-slide-to]').forEach(element => {
-            element.addEventListener('click', function() {
-                const slideTo = this.getAttribute('data-bs-slide-to');
-                const targetModal = this.getAttribute('data-bs-target');
-                
-                // Wait for the photo modal to be fully shown
-                const photoModal = document.querySelector(targetModal);
-                if (photoModal) {
-                    photoModal.addEventListener('shown.bs.modal', function() {
-                        // Find the carousel within this modal
-                        const carousel = this.querySelector('.carousel');
-                        if (carousel && slideTo !== null) {
-                            const bsCarousel = bootstrap.Carousel.getOrCreateInstance(carousel);
-                            bsCarousel.to(parseInt(slideTo));
-                        }
-                    }, { once: true });
-                }
-            });
-        });
 
-        // Initialize tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl, {
-                delay: {show: 500, hide: 100}
-            });
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            delay: {show: 500, hide: 100},
+            customClass: 'enhanced-tooltip'
         });
     });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle direct photo navigation when clicking thumbnails in rental modal
+    document.querySelectorAll('[data-bs-slide-to]').forEach(element => {
+        element.addEventListener('click', function() {
+            const slideTo = this.getAttribute('data-bs-slide-to');
+            const targetModal = this.getAttribute('data-bs-target');
+            
+            // Wait for the photo modal to be fully shown
+            const photoModal = document.querySelector(targetModal);
+            if (photoModal) {
+                photoModal.addEventListener('shown.bs.modal', function() {
+                    // Find the carousel within this modal
+                    const carousel = this.querySelector('.carousel');
+                    if (carousel && slideTo !== null) {
+                        const bsCarousel = bootstrap.Carousel.getOrCreateInstance(carousel);
+                        bsCarousel.to(parseInt(slideTo));
+                    }
+                }, { once: true });
+            }
+        });
+    });
+
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            delay: {show: 500, hide: 100}
+        });
+    });
+});
+
   </script>
 </body>
 </html>
+
