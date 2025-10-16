@@ -198,7 +198,7 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "</table>";
     echo "<br>";
     
-    // REVENUE BREAKDOWN - FIXED CALCULATION
+    // REVENUE BREAKDOWN - CORRECTED PERCENTAGE CALCULATION
     echo "<h4>Revenue Breakdown</h4>";
     echo "<table>";
     echo "<tr class='metric-header'><td>Category</td><td class='right'>Amount</td><td class='right'>Percentage</td></tr>";
@@ -207,27 +207,27 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     $apartmentRevenue = $financialSummary['apartment_revenue'] ?? 0;
     $potentialRevenue = $financialSummary['potential_revenue'] ?? 0;
 
-    // Calculate total including potential revenue for percentage calculation
-    $totalIncludingPotential = $totalRevenue + $potentialRevenue;
+    // Calculate total potential revenue (collected + unpaid)
+    $totalPotentialRevenue = $totalRevenue + $potentialRevenue;
 
-    // Only show percentages if we have actual revenue
-    if ($totalRevenue > 0) {
-        $spacePercentage = ($spaceRevenue / $totalRevenue) * 100;
-        $apartmentPercentage = ($apartmentRevenue / $totalRevenue) * 100;
+    // Calculate percentages based on TOTAL POTENTIAL REVENUE
+    if ($totalPotentialRevenue > 0) {
+        $spacePercentage = ($spaceRevenue / $totalPotentialRevenue) * 100;
+        $apartmentPercentage = ($apartmentRevenue / $totalPotentialRevenue) * 100;
+        $potentialPercentage = ($potentialRevenue / $totalPotentialRevenue) * 100;
+        $collectedPercentage = ($totalRevenue / $totalPotentialRevenue) * 100;
     } else {
         $spacePercentage = 0;
         $apartmentPercentage = 0;
+        $potentialPercentage = 0;
+        $collectedPercentage = 0;
     }
 
     echo "<tr><td>Space Rentals (Collected)</td><td class='right positive'>₱" . number_format($spaceRevenue, 2) . "</td><td class='right'>" . number_format($spacePercentage, 1) . "%</td></tr>";
     echo "<tr><td>Apartment Rentals (Collected)</td><td class='right positive'>₱" . number_format($apartmentRevenue, 2) . "</td><td class='right'>" . number_format($apartmentPercentage, 1) . "%</td></tr>";
-    echo "<tr><td>Potential Revenue (Unpaid)</td><td class='right warning'>₱" . number_format($potentialRevenue, 2) . "</td><td class='right'>N/A</td></tr>";
-    echo "<tr class='metric-header'><td><strong>Total Collected Revenue</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td><td class='right'><strong>100%</strong></td></tr>";
-
-    // Add total potential line
-    if ($potentialRevenue > 0) {
-        echo "<tr class='metric-header'><td><strong>Total Potential Revenue</strong></td><td class='right warning'><strong>₱" . number_format($totalIncludingPotential, 2) . "</strong></td><td class='right'><strong>N/A</strong></td></tr>";
-    }
+    echo "<tr><td>Potential Revenue (Unpaid)</td><td class='right warning'>₱" . number_format($potentialRevenue, 2) . "</td><td class='right'>" . number_format($potentialPercentage, 1) . "%</td></tr>";
+    echo "<tr class='metric-header'><td><strong>Total Collected Revenue</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td><td class='right'><strong>" . number_format($collectedPercentage, 1) . "%</strong></td></tr>";
+    echo "<tr class='metric-header'><td><strong>Total Potential Revenue</strong></td><td class='right'><strong>₱" . number_format($totalPotentialRevenue, 2) . "</strong></td><td class='right'><strong>100%</strong></td></tr>";
     echo "</table>";
     echo "<br><br>";
     
