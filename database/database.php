@@ -1360,6 +1360,82 @@ public function getAllSpacesWithDetails() {
 }
     
                          
+public function addSpaceUtilities($space_id, $utilities_data) {
+    $sql = "INSERT INTO space_utilities (Space_ID, Bedrooms, Toilets, Has_Water, Has_Electricity, Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
+            VALUES (:space_id, :bedrooms, :toilets, :has_water, :has_electricity, :square_meters, :furnished, :air_conditioning, :parking, :internet)";
+    
+    $params = [
+        'space_id' => $space_id,
+        'bedrooms' => $utilities_data['bedrooms'] ?? 0,
+        'toilets' => $utilities_data['toilets'] ?? 0,
+        'has_water' => $utilities_data['has_water'] ?? 1,
+        'has_electricity' => $utilities_data['has_electricity'] ?? 1,
+        'square_meters' => $utilities_data['square_meters'] ?? null,
+        'furnished' => $utilities_data['furnished'] ?? 0,
+        'air_conditioning' => $utilities_data['air_conditioning'] ?? 0,
+        'parking' => $utilities_data['parking'] ?? 0,
+        'internet' => $utilities_data['internet'] ?? 0
+    ];
+    
+    return $this->executeStatement($sql, $params);
+}
+
+/**
+ * Update space utilities in the database
+ */
+public function updateSpaceUtilities($space_id, $utilities_data) {
+    // Check if utilities record exists
+    $existing = $this->getSpaceUtilities($space_id);
+    
+    if ($existing) {
+        $sql = "UPDATE space_utilities SET 
+                Bedrooms = :bedrooms, Toilets = :toilets, Has_Water = :has_water, Has_Electricity = :has_electricity, 
+                Square_Meters = :square_meters, Furnished = :furnished, Air_Conditioning = :air_conditioning, 
+                Parking = :parking, Internet = :internet, Updated_At = CURRENT_TIMESTAMP 
+                WHERE Space_ID = :space_id";
+        
+        $params = [
+            'bedrooms' => $utilities_data['bedrooms'] ?? 0,
+            'toilets' => $utilities_data['toilets'] ?? 0,
+            'has_water' => $utilities_data['has_water'] ?? 1,
+            'has_electricity' => $utilities_data['has_electricity'] ?? 1,
+            'square_meters' => $utilities_data['square_meters'] ?? null,
+            'furnished' => $utilities_data['furnished'] ?? 0,
+            'air_conditioning' => $utilities_data['air_conditioning'] ?? 0,
+            'parking' => $utilities_data['parking'] ?? 0,
+            'internet' => $utilities_data['internet'] ?? 0,
+            'space_id' => $space_id
+        ];
+        
+        return $this->executeStatement($sql, $params);
+    } else {
+        return $this->addSpaceUtilities($space_id, $utilities_data);
+    }
+}
+
+/**
+ * Get space utilities by space ID
+ */
+public function getSpaceUtilities($space_id) {
+    $sql = "SELECT * FROM space_utilities WHERE Space_ID = :space_id";
+    return $this->getRow($sql, ['space_id' => $space_id]);
+}
+
+/**
+ * Get all spaces with their utilities data
+ */
+public function getAllSpacesWithUtilities() {
+    $sql = "SELECT s.*, st.SpaceTypeName, 
+                   su.Bedrooms, su.Toilets, su.Has_Water, su.Has_Electricity,
+                   su.Square_Meters, su.Furnished, su.Air_Conditioning, 
+                   su.Parking, su.Internet
+            FROM space s
+            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
+            LEFT JOIN space_utilities su ON s.Space_ID = su.Space_ID
+            ORDER BY s.Space_ID DESC";
+    
+    return $this->getRows($sql);
+}
 
 
 

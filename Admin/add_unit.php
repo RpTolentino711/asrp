@@ -52,7 +52,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $history_id = intval($_POST['history_id'] ?? 0);
     $description = trim($_POST['photo_description'] ?? '');
     
-    // Validate description length (1000 characters max)
     if (strlen($description) > 1000) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                       <i class="fas fa-exclamation-circle me-2"></i>
@@ -82,7 +81,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $photo_path = trim($_POST['photo_path'] ?? '');
     
     if ($space_id >= 1 && !empty($photo_path)) {
-        // Mark photo as inactive in history
         if ($db->deactivatePhoto($space_id, $photo_path)) {
             $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                             <i class="fas fa-check-circle me-2"></i>
@@ -102,9 +100,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Handle photo upload with history tracking ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'upload_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
-    $photo_description = trim($_POST['photo_description'] ?? ''); // Get description from form
+    $photo_description = trim($_POST['photo_description'] ?? '');
     
-    // Validate description length
     if (strlen($photo_description) > 1000) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                       <i class="fas fa-exclamation-circle me-2"></i>
@@ -112,10 +109,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } elseif ($space_id && isset($_FILES['new_photo']) && $_FILES['new_photo']['error'] == UPLOAD_ERR_OK) {
-        // Get current active photos to check limit
         $current_photos = $db->getCurrentSpacePhotos($space_id);
         
-        // Check limit
         if (count($current_photos) >= $max_photos_per_unit) {
             $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                           <i class="fas fa-exclamation-circle me-2"></i>
@@ -145,7 +140,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 $filepath = $upload_dir . $filename;
                 
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                    // Log the upload in history with description
                     if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id, $photo_description)) {
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
@@ -175,9 +169,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo') {
     $space_id = intval($_POST['space_id'] ?? 0);
     $old_photo_path = trim($_POST['old_photo_path'] ?? '');
-    $photo_description = trim($_POST['photo_description'] ?? ''); // Get description from form
+    $photo_description = trim($_POST['photo_description'] ?? '');
     
-    // Validate description length
     if (strlen($photo_description) > 1000) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                       <i class="fas fa-exclamation-circle me-2"></i>
@@ -207,10 +200,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             $filepath = $upload_dir . $new_filename;
             
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                // Mark old photo as inactive
                 $db->deactivatePhoto($space_id, $old_photo_path);
                 
-                // Add new photo as update with description
                 if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id, $photo_description)) {
                     $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                     <i class="fas fa-check-circle me-2"></i>
@@ -240,8 +231,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $name = trim($_POST['name'] ?? '');
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
+    
+    // Collect utilities data
+    $utilities_data = [
+        'bedrooms' => intval($_POST['bedrooms'] ?? 0),
+        'toilets' => intval($_POST['toilets'] ?? 0),
+        'has_water' => isset($_POST['has_water']) ? 1 : 0,
+        'has_electricity' => isset($_POST['has_electricity']) ? 1 : 0,
+        'square_meters' => !empty($_POST['square_meters']) ? floatval($_POST['square_meters']) : null,
+        'furnished' => isset($_POST['furnished']) ? 1 : 0,
+        'air_conditioning' => isset($_POST['air_conditioning']) ? 1 : 0,
+        'parking' => isset($_POST['parking']) ? 1 : 0,
+        'internet' => isset($_POST['internet']) ? 1 : 0
+    ];
 
-    // Handle file upload first to get filename
+    // Handle file upload
     $upload_dir = __DIR__ . "/../uploads/unit_photos/";
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0777, true);
 
@@ -298,11 +302,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } else {
-        // Add space without photo column
         if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price)) {
-            // Get the newly created space by name to get its ID
-            // Get all spaces and find the newly created one
-            $all_spaces = $db->getAllSpacesWithDetails();
+            $all_spaces = $db->getAllSpacesWithUtilities();
             $new_space = null;
             foreach ($all_spaces as $space) {
                 if ($space['Name'] === $name) {
@@ -311,16 +312,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 }
             }
             
-            if ($new_space && $uploaded_photo_filename) {
-                // Add the photo to photo_history
-                $db->addPhotoToHistory($new_space['Space_ID'], $uploaded_photo_filename, 'uploaded', null, $ua_id);
+            if ($new_space) {
+                if ($db->addSpaceUtilities($new_space['Space_ID'], $utilities_data)) {
+                    if ($uploaded_photo_filename) {
+                        $db->addPhotoToHistory($new_space['Space_ID'], $uploaded_photo_filename, 'uploaded', null, $ua_id);
+                    }
+                    
+                    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Space/unit added successfully!' . ($uploaded_photo_filename ? ' (Photo added to history)' : '') . '
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>';
+                } else {
+                    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                                  <i class="fas fa-exclamation-circle me-2"></i>
+                                  Space added but failed to save utilities data.
+                                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                  </div>';
+                }
             }
-            
-            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Space/unit added successfully!' . ($uploaded_photo_filename ? ' (Photo added to history)' : '') . '
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
         } else {
             $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                           <i class="fas fa-exclamation-circle me-2"></i>
@@ -382,7 +392,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } else {
-        // Check if the new name already exists (excluding current type)
         $existing_types = $db->getAllSpaceTypes();
         $existing = array_filter($existing_types, function($type) use ($new_name, $type_id) {
             return strtolower(trim($type['SpaceTypeName'])) === strtolower(trim($new_name)) && $type['SpaceType_ID'] != $type_id;
@@ -437,6 +446,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $name = trim($_POST['name'] ?? '');
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
+    
+    // Collect utilities data for update
+    $utilities_data = [
+        'bedrooms' => intval($_POST['bedrooms'] ?? 0),
+        'toilets' => intval($_POST['toilets'] ?? 0),
+        'has_water' => isset($_POST['has_water']) ? 1 : 0,
+        'has_electricity' => isset($_POST['has_electricity']) ? 1 : 0,
+        'square_meters' => !empty($_POST['square_meters']) ? floatval($_POST['square_meters']) : null,
+        'furnished' => isset($_POST['furnished']) ? 1 : 0,
+        'air_conditioning' => isset($_POST['air_conditioning']) ? 1 : 0,
+        'parking' => isset($_POST['parking']) ? 1 : 0,
+        'internet' => isset($_POST['internet']) ? 1 : 0
+    ];
 
     if (empty($name) || empty($spacetype_id) || $price === null) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
@@ -451,8 +473,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } else {
-        // Check if name already exists (excluding current space)
-        $existing_spaces = $db->getAllSpacesWithDetails();
+        $existing_spaces = $db->getAllSpacesWithUtilities();
         $existing = array_filter($existing_spaces, function($space) use ($name, $space_id) {
             return strtolower(trim($space['Name'])) === strtolower(trim($name)) && $space['Space_ID'] != $space_id;
         });
@@ -465,11 +486,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                           </div>';
         } else {
             if ($db->updateSpace($space_id, $name, $spacetype_id, $price)) {
-                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Space/unit updated successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
+                // Update utilities
+                if ($db->updateSpaceUtilities($space_id, $utilities_data)) {
+                    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Space/unit updated successfully!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>';
+                } else {
+                    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                                  <i class="fas fa-exclamation-circle me-2"></i>
+                                  Space updated but failed to save utilities data.
+                                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                  </div>';
+                }
             } else {
                 $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                               <i class="fas fa-exclamation-circle me-2"></i>
@@ -483,7 +513,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 
 // --- Fetch Data for Display ---
 $spacetypes = $db->getAllSpaceTypes();
-$spaces = $db->getAllSpacesWithDetails();
+$spaces = $db->getAllSpacesWithUtilities();
 
 // Get current active photos for each space
 $space_photos = [];
@@ -1463,6 +1493,122 @@ foreach ($photo_history as $history) {
             margin-bottom: 1.5rem;
             border: 1px solid #e5e7eb;
         }
+
+        /* NEW: Utilities Icons Overlay on Photos */
+        .photo-with-utilities {
+            position: relative;
+        }
+
+        .utilities-overlay {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .utility-icon {
+            font-size: 0.6rem;
+            opacity: 0.9;
+        }
+
+        .utility-count {
+            font-weight: 600;
+            margin: 0 2px;
+        }
+
+        /* NEW: Utilities Section Styling */
+        .utilities-section {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb;
+        }
+
+        .utilities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .utility-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            text-align: center;
+        }
+
+        .utility-icon-large {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .utility-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--dark);
+        }
+
+        .utility-label {
+            font-size: 0.8rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+
+        /* NEW: Utilities Badges */
+        .utilities-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 0.5rem;
+        }
+
+        .utility-badge {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .utility-badge i {
+            font-size: 0.6rem;
+        }
+
+        /* NEW: Compact utilities display for table */
+        .compact-utilities {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            max-width: 200px;
+        }
+
+        .compact-utility {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            color: #6b7280;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
     </style>
 </head>
 <body>
@@ -1596,10 +1742,13 @@ foreach ($photo_history as $history) {
                     <div class="card-body">
                         <form method="post" enctype="multipart/form-data" class="row g-3" autocomplete="off">
                             <input type="hidden" name="form_type" value="unit" />
+                            
+                            <!-- Basic Information -->
                             <div class="col-12">
                                 <label for="name" class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
                                 <input id="name" type="text" class="form-control" name="name" placeholder="Unit name" required />
                             </div>
+                            
                             <div class="col-12">
                                 <label for="spacetype_id" class="form-label fw-semibold">Space Type <span class="text-danger">*</span></label>
                                 <select id="spacetype_id" name="spacetype_id" class="form-select" required>
@@ -1609,10 +1758,91 @@ foreach ($photo_history as $history) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            
                             <div class="col-12">
                                 <label for="price" class="form-label fw-semibold">Price (PHP) <span class="text-danger">*</span></label>
                                 <input id="price" type="number" step="100" min="0" class="form-control" name="price" placeholder="0.00" required />
                                 <div id="priceDisplay" class="price-display"></div>
+                            </div>
+                            
+                            <!-- NEW: Utilities Section -->
+                            <div class="col-12">
+                                <div class="utilities-section">
+                                    <h6 class="fw-semibold mb-3">
+                                        <i class="fas fa-home me-2"></i>Unit Utilities & Features
+                                    </h6>
+                                    
+                                    <div class="row g-2">
+                                        <div class="col-md-6">
+                                            <label for="bedrooms" class="form-label small fw-semibold">Bedrooms</label>
+                                            <select class="form-select form-select-sm" id="bedrooms" name="bedrooms">
+                                                <option value="0">0 Bedrooms</option>
+                                                <option value="1">1 Bedroom</option>
+                                                <option value="2">2 Bedrooms</option>
+                                                <option value="3">3 Bedrooms</option>
+                                                <option value="4">4 Bedrooms</option>
+                                                <option value="5">5+ Bedrooms</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="toilets" class="form-label small fw-semibold">Toilets</label>
+                                            <select class="form-select form-select-sm" id="toilets" name="toilets">
+                                                <option value="0">0 Toilets</option>
+                                                <option value="1">1 Toilet</option>
+                                                <option value="2">2 Toilets</option>
+                                                <option value="3">3 Toilets</option>
+                                                <option value="4">4+ Toilets</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label for="square_meters" class="form-label small fw-semibold">Area (Square Meters)</label>
+                                            <input type="number" class="form-control form-control-sm" id="square_meters" name="square_meters" min="0" step="0.5" placeholder="e.g., 25.5">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row mt-3">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="has_water" id="has_water" value="1" checked>
+                                                <label class="form-check-label small" for="has_water">
+                                                    <i class="fas fa-tint me-1 text-primary"></i>Water
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="has_electricity" id="has_electricity" value="1" checked>
+                                                <label class="form-check-label small" for="has_electricity">
+                                                    <i class="fas fa-bolt me-1 text-warning"></i>Electricity
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="furnished" id="furnished" value="1">
+                                                <label class="form-check-label small" for="furnished">
+                                                    <i class="fas fa-couch me-1 text-success"></i>Furnished
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="air_conditioning" id="air_conditioning" value="1">
+                                                <label class="form-check-label small" for="air_conditioning">
+                                                    <i class="fas fa-snowflake me-1 text-info"></i>Air Conditioning
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="parking" id="parking" value="1">
+                                                <label class="form-check-label small" for="parking">
+                                                    <i class="fas fa-car me-1 text-secondary"></i>Parking
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="internet" id="internet" value="1">
+                                                <label class="form-check-label small" for="internet">
+                                                    <i class="fas fa-wifi me-1 text-purple"></i>Internet
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- Photo Upload Field -->
@@ -1681,6 +1911,7 @@ foreach ($photo_history as $history) {
                                     <th>Name</th>
                                     <th>Type</th>
                                     <th>Price (PHP)</th>
+                                    <th>Utilities</th>
                                     <th>Photos (Max: <?= $max_photos_per_unit ?>)</th>
                                     <th>Actions</th>
                                 </tr>
@@ -1702,6 +1933,35 @@ foreach ($photo_history as $history) {
                                         <td><?= htmlspecialchars($space['SpaceTypeName']) ?></td>
                                         <td>₱<?= number_format($space['Price'], 2) ?></td>
                                         <td>
+                                            <div class="compact-utilities">
+                                                <?php if ($space['Bedrooms'] > 0): ?>
+                                                    <span class="compact-utility">
+                                                        <i class="fas fa-bed"></i> <?= $space['Bedrooms'] ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if ($space['Toilets'] > 0): ?>
+                                                    <span class="compact-utility">
+                                                        <i class="fas fa-bath"></i> <?= $space['Toilets'] ?>
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if ($space['Square_Meters']): ?>
+                                                    <span class="compact-utility">
+                                                        <i class="fas fa-ruler-combined"></i> <?= $space['Square_Meters'] ?>m²
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if ($space['Has_Water']): ?>
+                                                    <span class="compact-utility">
+                                                        <i class="fas fa-tint text-primary"></i>
+                                                    </span>
+                                                <?php endif; ?>
+                                                <?php if ($space['Has_Electricity']): ?>
+                                                    <span class="compact-utility">
+                                                        <i class="fas fa-bolt text-warning"></i>
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                        <td>
                                             <div class="photo-management">
                                                 <!-- Photo Counter -->
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1718,7 +1978,26 @@ foreach ($photo_history as $history) {
                                                     <div class="photo-grid">
                                                         <?php foreach ($current_photos as $photo): ?>
                                                             <div class="photo-item">
-                                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" class="photo-preview" alt="Space Photo">
+                                                                <div class="photo-with-utilities">
+                                                                    <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" class="photo-preview" alt="Space Photo">
+                                                                    
+                                                                    <!-- NEW: Utilities Overlay -->
+                                                                    <div class="utilities-overlay">
+                                                                        <?php if ($space['Bedrooms'] > 0): ?>
+                                                                            <i class="fas fa-bed utility-icon"></i>
+                                                                            <span class="utility-count"><?= $space['Bedrooms'] ?></span>
+                                                                        <?php endif; ?>
+                                                                        <?php if ($space['Toilets'] > 0): ?>
+                                                                            <i class="fas fa-bath utility-icon"></i>
+                                                                            <span class="utility-count"><?= $space['Toilets'] ?></span>
+                                                                        <?php endif; ?>
+                                                                        <?php if ($space['Square_Meters']): ?>
+                                                                            <i class="fas fa-ruler-combined utility-icon"></i>
+                                                                            <span class="utility-count"><?= $space['Square_Meters'] ?>m²</span>
+                                                                        <?php endif; ?>
+                                                                    </div>
+                                                                </div>
+                                                                
                                                                 <div class="photo-actions">
                                                                     <!-- Update Photo Form with Description -->
                                                                     <form method="post" enctype="multipart/form-data">
@@ -1837,7 +2116,16 @@ foreach ($photo_history as $history) {
                                                         data-space-id="<?= $space['Space_ID'] ?>" 
                                                         data-space-name="<?= htmlspecialchars($space['Name']) ?>" 
                                                         data-space-type="<?= $space['SpaceType_ID'] ?>" 
-                                                        data-space-price="<?= $space['Price'] ?>">
+                                                        data-space-price="<?= $space['Price'] ?>"
+                                                        data-bedrooms="<?= $space['Bedrooms'] ?? 0 ?>"
+                                                        data-toilets="<?= $space['Toilets'] ?? 0 ?>"
+                                                        data-square-meters="<?= $space['Square_Meters'] ?? '' ?>"
+                                                        data-has-water="<?= $space['Has_Water'] ?? 0 ?>"
+                                                        data-has-electricity="<?= $space['Has_Electricity'] ?? 0 ?>"
+                                                        data-furnished="<?= $space['Furnished'] ?? 0 ?>"
+                                                        data-air-conditioning="<?= $space['Air_Conditioning'] ?? 0 ?>"
+                                                        data-parking="<?= $space['Parking'] ?? 0 ?>"
+                                                        data-internet="<?= $space['Internet'] ?? 0 ?>">
                                                     <i class="fas fa-edit me-1"></i> Edit
                                                 </button>
                                             </div>
@@ -1876,12 +2164,76 @@ foreach ($photo_history as $history) {
                                     <span class="value">₱<?= number_format($space['Price'], 2) ?></span>
                                 </div>
 
+                                <div class="mobile-card-detail">
+                                    <span class="label">Utilities:</span>
+                                    <span class="value">
+                                        <div class="compact-utilities">
+                                            <?php if ($space['Bedrooms'] > 0): ?>
+                                                <span class="compact-utility">
+                                                    <i class="fas fa-bed"></i> <?= $space['Bedrooms'] ?> BR
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Toilets'] > 0): ?>
+                                                <span class="compact-utility">
+                                                    <i class="fas fa-bath"></i> <?= $space['Toilets'] ?> Bath
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Square_Meters']): ?>
+                                                <span class="compact-utility">
+                                                    <i class="fas fa-ruler-combined"></i> <?= $space['Square_Meters'] ?>m²
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="utilities-badges mt-1">
+                                            <?php if ($space['Has_Water']): ?>
+                                                <span class="utility-badge">
+                                                    <i class="fas fa-tint"></i> Water
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Has_Electricity']): ?>
+                                                <span class="utility-badge">
+                                                    <i class="fas fa-bolt"></i> Electricity
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Furnished']): ?>
+                                                <span class="utility-badge">
+                                                    <i class="fas fa-couch"></i> Furnished
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Air_Conditioning']): ?>
+                                                <span class="utility-badge">
+                                                    <i class="fas fa-snowflake"></i> AC
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Parking']): ?>
+                                                <span class="utility-badge">
+                                                    <i class="fas fa-car"></i> Parking
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($space['Internet']): ?>
+                                                <span class="utility-badge">
+                                                    <i class="fas fa-wifi"></i> Internet
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </span>
+                                </div>
+
                                 <div class="space-actions mt-2">
                                     <button type="button" class="btn-edit-space" data-bs-toggle="modal" data-bs-target="#editSpaceModal" 
                                             data-space-id="<?= $space['Space_ID'] ?>" 
                                             data-space-name="<?= htmlspecialchars($space['Name']) ?>" 
                                             data-space-type="<?= $space['SpaceType_ID'] ?>" 
-                                            data-space-price="<?= $space['Price'] ?>">
+                                            data-space-price="<?= $space['Price'] ?>"
+                                            data-bedrooms="<?= $space['Bedrooms'] ?? 0 ?>"
+                                            data-toilets="<?= $space['Toilets'] ?? 0 ?>"
+                                            data-square-meters="<?= $space['Square_Meters'] ?? '' ?>"
+                                            data-has-water="<?= $space['Has_Water'] ?? 0 ?>"
+                                            data-has-electricity="<?= $space['Has_Electricity'] ?? 0 ?>"
+                                            data-furnished="<?= $space['Furnished'] ?? 0 ?>"
+                                            data-air-conditioning="<?= $space['Air_Conditioning'] ?? 0 ?>"
+                                            data-parking="<?= $space['Parking'] ?? 0 ?>"
+                                            data-internet="<?= $space['Internet'] ?? 0 ?>">
                                         <i class="fas fa-edit me-1"></i> Edit Space
                                     </button>
                                 </div>
@@ -1889,7 +2241,21 @@ foreach ($photo_history as $history) {
                                 <div class="mobile-photo-grid">
                                     <?php foreach ($current_photos as $photo): ?>
                                         <div class="mobile-photo-item">
-                                            <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" alt="Space Photo">
+                                            <div class="photo-with-utilities">
+                                                <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" alt="Space Photo">
+                                                
+                                                <!-- NEW: Utilities Overlay for Mobile -->
+                                                <div class="utilities-overlay">
+                                                    <?php if ($space['Bedrooms'] > 0): ?>
+                                                        <i class="fas fa-bed utility-icon"></i>
+                                                        <span class="utility-count"><?= $space['Bedrooms'] ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if ($space['Toilets'] > 0): ?>
+                                                        <i class="fas fa-bath utility-icon"></i>
+                                                        <span class="utility-count"><?= $space['Toilets'] ?></span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
                                             <div class="mobile-photo-actions">
                                                 <!-- Update Photo Form with Description -->
                                                 <form method="post" enctype="multipart/form-data">
@@ -2253,9 +2619,9 @@ foreach ($photo_history as $history) {
         </div>
     </div>
 
-    <!-- Edit Space Modal -->
+    <!-- Edit Space Modal with Utilities -->
     <div class="modal fade" id="editSpaceModal" tabindex="-1" aria-labelledby="editSpaceModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="editSpaceModalLabel">Edit Space/Unit</h5>
@@ -2265,10 +2631,12 @@ foreach ($photo_history as $history) {
                     <div class="modal-body">
                         <input type="hidden" name="form_type" value="update_space">
                         <input type="hidden" name="space_id" id="edit_space_id">
+                        
                         <div class="mb-3">
                             <label for="edit_space_name" class="form-label">Space/Unit Name</label>
                             <input type="text" class="form-control" id="edit_space_name" name="name" required>
                         </div>
+                        
                         <div class="mb-3">
                             <label for="edit_space_type" class="form-label">Space Type</label>
                             <select class="form-select" id="edit_space_type" name="spacetype_id" required>
@@ -2278,9 +2646,88 @@ foreach ($photo_history as $history) {
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                        
                         <div class="mb-3">
                             <label for="edit_space_price" class="form-label">Price (PHP)</label>
                             <input type="number" step="100" min="0" class="form-control" id="edit_space_price" name="price" required>
+                        </div>
+
+                        <!-- NEW: Utilities Section in Edit Modal -->
+                        <div class="utilities-section">
+                            <h6 class="fw-semibold mb-3">
+                                <i class="fas fa-home me-2"></i>Unit Utilities & Features
+                            </h6>
+                            
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label for="edit_bedrooms" class="form-label small fw-semibold">Bedrooms</label>
+                                    <select class="form-select form-select-sm" id="edit_bedrooms" name="bedrooms">
+                                        <option value="0">0 Bedrooms</option>
+                                        <option value="1">1 Bedroom</option>
+                                        <option value="2">2 Bedrooms</option>
+                                        <option value="3">3 Bedrooms</option>
+                                        <option value="4">4 Bedrooms</option>
+                                        <option value="5">5+ Bedrooms</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="edit_toilets" class="form-label small fw-semibold">Toilets</label>
+                                    <select class="form-select form-select-sm" id="edit_toilets" name="toilets">
+                                        <option value="0">0 Toilets</option>
+                                        <option value="1">1 Toilet</option>
+                                        <option value="2">2 Toilets</option>
+                                        <option value="3">3 Toilets</option>
+                                        <option value="4">4+ Toilets</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label for="edit_square_meters" class="form-label small fw-semibold">Area (Square Meters)</label>
+                                    <input type="number" class="form-control form-control-sm" id="edit_square_meters" name="square_meters" min="0" step="0.5" placeholder="e.g., 25.5">
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="has_water" id="edit_has_water" value="1">
+                                        <label class="form-check-label small" for="edit_has_water">
+                                            <i class="fas fa-tint me-1 text-primary"></i>Water
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="has_electricity" id="edit_has_electricity" value="1">
+                                        <label class="form-check-label small" for="edit_has_electricity">
+                                            <i class="fas fa-bolt me-1 text-warning"></i>Electricity
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="furnished" id="edit_furnished" value="1">
+                                        <label class="form-check-label small" for="edit_furnished">
+                                            <i class="fas fa-couch me-1 text-success"></i>Furnished
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="air_conditioning" id="edit_air_conditioning" value="1">
+                                        <label class="form-check-label small" for="edit_air_conditioning">
+                                            <i class="fas fa-snowflake me-1 text-info"></i>Air Conditioning
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="parking" id="edit_parking" value="1">
+                                        <label class="form-check-label small" for="edit_parking">
+                                            <i class="fas fa-car me-1 text-secondary"></i>Parking
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="internet" id="edit_internet" value="1">
+                                        <label class="form-check-label small" for="edit_internet">
+                                            <i class="fas fa-wifi me-1 text-purple"></i>Internet
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -2730,7 +3177,7 @@ foreach ($photo_history as $history) {
             });
         }
 
-        // Edit Space Modal
+        // Edit Space Modal with Utilities
         const editSpaceModal = document.getElementById('editSpaceModal');
         if (editSpaceModal) {
             editSpaceModal.addEventListener('show.bs.modal', function (event) {
@@ -2740,11 +3187,33 @@ foreach ($photo_history as $history) {
                 const spaceType = button.getAttribute('data-space-type');
                 const spacePrice = button.getAttribute('data-space-price');
                 
+                // NEW: Get utilities data
+                const bedrooms = button.getAttribute('data-bedrooms') || '0';
+                const toilets = button.getAttribute('data-toilets') || '0';
+                const squareMeters = button.getAttribute('data-square-meters') || '';
+                const hasWater = button.getAttribute('data-has-water') === '1';
+                const hasElectricity = button.getAttribute('data-has-electricity') === '1';
+                const furnished = button.getAttribute('data-furnished') === '1';
+                const airConditioning = button.getAttribute('data-air-conditioning') === '1';
+                const parking = button.getAttribute('data-parking') === '1';
+                const internet = button.getAttribute('data-internet') === '1';
+                
                 const modal = this;
                 modal.querySelector('#edit_space_id').value = spaceId;
                 modal.querySelector('#edit_space_name').value = spaceName;
                 modal.querySelector('#edit_space_type').value = spaceType;
                 modal.querySelector('#edit_space_price').value = spacePrice;
+                
+                // NEW: Set utilities values
+                modal.querySelector('#edit_bedrooms').value = bedrooms;
+                modal.querySelector('#edit_toilets').value = toilets;
+                modal.querySelector('#edit_square_meters').value = squareMeters;
+                modal.querySelector('#edit_has_water').checked = hasWater;
+                modal.querySelector('#edit_has_electricity').checked = hasElectricity;
+                modal.querySelector('#edit_furnished').checked = furnished;
+                modal.querySelector('#edit_air_conditioning').checked = airConditioning;
+                modal.querySelector('#edit_parking').checked = parking;
+                modal.querySelector('#edit_internet').checked = internet;
             });
         }
 
