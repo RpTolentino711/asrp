@@ -195,21 +195,35 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "</table>";
     echo "<br>";
     
-    // REVENUE BREAKDOWN - UPDATED
-    echo "<h4>Revenue Breakdown</h4>";
-    echo "<table>";
-    echo "<tr class='metric-header'><td>Category</td><td class='right'>Amount</td><td class='right'>Percentage</td></tr>";
-    
-    $spaceRevenue = $financialSummary['space_revenue'] ?? 0;
-    $apartmentRevenue = $financialSummary['apartment_revenue'] ?? 0;
-    $potentialRevenue = $financialSummary['potential_revenue'] ?? 0;
-    
-    echo "<tr><td>Space Rentals</td><td class='right positive'>₱" . number_format($spaceRevenue, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($spaceRevenue/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
-    echo "<tr><td>Apartment Rentals</td><td class='right positive'>₱" . number_format($apartmentRevenue, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($apartmentRevenue/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
-    echo "<tr><td>Potential Revenue (Unpaid)</td><td class='right warning'>₱" . number_format($potentialRevenue, 2) . "</td><td class='right'>N/A</td></tr>";
-    echo "<tr class='metric-header'><td><strong>Total Collected Revenue</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td><td class='right'><strong>100%</strong></td></tr>";
-    echo "</table>";
-    echo "<br><br>";
+// REVENUE BREAKDOWN - UPDATED TO SHOW COLLECTION RATES
+echo "<h4>Revenue & Collection Summary</h4>";
+echo "<table>";
+echo "<tr class='metric-header'><td>Category</td><td class='right'>Total Units</td><td class='right'>Paid Units</td><td class='right'>Collection Rate</td><td class='right'>Revenue</td></tr>";
+
+// Count spaces and apartments
+$totalSpaces = 0;
+$paidSpaces = 0;
+$totalApartments = 0;
+$paidApartments = 0;
+
+foreach ($occupancyData as $unit) {
+    if ($unit['SpaceTypeName'] == 'Space') {
+        $totalSpaces++;
+        if ($unit['revenue'] > 0) $paidSpaces++;
+    } else if ($unit['SpaceTypeName'] == 'Apartment') {
+        $totalApartments++;
+        if ($unit['revenue'] > 0) $paidApartments++;
+    }
+}
+
+$spaceCollectionRate = $totalSpaces > 0 ? ($paidSpaces / $totalSpaces) * 100 : 0;
+$apartmentCollectionRate = $totalApartments > 0 ? ($paidApartments / $totalApartments) * 100 : 0;
+
+echo "<tr><td>Space Rentals</td><td class='right'>" . $totalSpaces . "</td><td class='right positive'>" . $paidSpaces . "</td><td class='right'>" . number_format($spaceCollectionRate, 1) . "%</td><td class='right positive'>₱" . number_format($spaceRevenue, 2) . "</td></tr>";
+echo "<tr><td>Apartment Rentals</td><td class='right'>" . $totalApartments . "</td><td class='right positive'>" . $paidApartments . "</td><td class='right'>" . number_format($apartmentCollectionRate, 1) . "%</td><td class='right positive'>₱" . number_format($apartmentRevenue, 2) . "</td></tr>";
+echo "<tr><td>Potential Revenue (Unpaid)</td><td class='right'>-</td><td class='right'>-</td><td class='right'>-</td><td class='right warning'>₱" . number_format($potentialRevenue, 2) . "</td></tr>";
+echo "<tr class='metric-header'><td><strong>Overall Summary</strong></td><td class='right'><strong>" . ($totalSpaces + $totalApartments) . "</strong></td><td class='right positive'><strong>" . ($paidSpaces + $paidApartments) . "</strong></td><td class='right positive'><strong>" . number_format($collectionRate, 1) . "%</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td></tr>";
+echo "</table>";
     
     // ==================== SHEET 5: OCCUPANCY & UTILIZATION ====================
     echo "<h3 class='section-title'>📈 OCCUPANCY & UTILIZATION</h3>";
