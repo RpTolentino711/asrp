@@ -832,7 +832,7 @@ if (isset($_SESSION['login_error'])) {
                                 <img src="<?= $photo_data['url'] ?>" class="d-block mx-auto img-fluid rounded shadow" alt="<?= $photo_data['description'] ?>" style="max-height:60vh; object-fit: contain;">
                                 <?php if (!empty($photo_data['full_description']) && $photo_data['full_description'] !== 'Unit Photo'): ?>
                                   <div class="mt-3">
-                                    <p class="text-white fw-semibold mb-2">Unit Details:</p>
+                                    <p class="text-white fw-semibold mb-2"></p>
                                     <div class="bg-dark bg-opacity-50 p-3 rounded text-start">
                                       <p class="text-white mb-0 description-text" style="max-height: 120px; overflow-y: auto; line-height: 1.5;">
                                         <?= $photo_data['full_description'] ?>
