@@ -90,7 +90,6 @@ public function executeQuery($sql, $params = []) {
 }
 
 
-
 public function getOccupancyData($startDate, $endDate) {
     try {
         $monthDays = date('t', strtotime($startDate)); // Days in month (31 for October)
