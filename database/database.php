@@ -1366,7 +1366,8 @@ public function addSpaceUtilities($space_id, $utilities_data) {
              Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
-    $stmt = $this->connection->prepare($sql);
+    // Use $this->pdo
+    $stmt = $this->pdo->prepare($sql);
     return $stmt->execute([
         $space_id,
         $utilities_data['bedrooms'],
@@ -1409,7 +1410,8 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
                 Parking = ?, Internet = ?, Updated_At = CURRENT_TIMESTAMP 
                 WHERE Space_ID = ?";
         
-        $stmt = $this->connection->prepare($sql);
+        // Use $this->pdo
+        $stmt = $this->pdo->prepare($sql);
         return $stmt->execute([
             $utilities_data['bedrooms'],
             $utilities_data['toilets'],
@@ -1423,25 +1425,8 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
             $space_id
         ]);
     } else {
-        // Insert new record
-        $sql = "INSERT INTO space_utilities 
-                (Space_ID, Bedrooms, Toilets, Has_Water, Has_Electricity, 
-                 Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        
-        $stmt = $this->connection->prepare($sql);
-        return $stmt->execute([
-            $space_id,
-            $utilities_data['bedrooms'],
-            $utilities_data['toilets'],
-            $utilities_data['has_water'],
-            $utilities_data['has_electricity'],
-            $utilities_data['square_meters'],
-            $utilities_data['furnished'],
-            $utilities_data['air_conditioning'],
-            $utilities_data['parking'],
-            $utilities_data['internet']
-        ]);
+        // Insert new record using the addSpaceUtilities method
+        return $this->addSpaceUtilities($space_id, $utilities_data);
     }
 }
 
@@ -1450,14 +1435,35 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
  */
 public function getSpaceUtilities($space_id) {
     $sql = "SELECT * FROM space_utilities WHERE Space_ID = ?";
-    $stmt = $this->connection->prepare($sql);
+    // Use $this->pdo
+    $stmt = $this->pdo->prepare($sql);
     $stmt->execute([$space_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
-
 /**
  * Get all spaces with their utilities data
  */
+
+public function __construct() {
+    $dsn = "mysql:host={$this->host};dbname={$this->dbname};charset=utf8mb4";
+    $options = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES   => false,
+    ];
+    try {
+        $this->pdo = new PDO($dsn, $this->user, $this->pass, $options);
+        $this->pdo->exec("SET time_zone = '+08:00'");
+        
+        // Add this line to set the connection property
+        $this->connection = $this->pdo;
+        
+    } catch (PDOException $e) {
+        die("Database connection failed: " . $e->getMessage());
+    }
+}
+
+
 public function getAllSpacesWithUtilities() {
     $sql = "SELECT s.*, st.SpaceTypeName,
                    su.Bedrooms, su.Toilets, su.Has_Water, su.Has_Electricity,
@@ -1468,14 +1474,11 @@ public function getAllSpacesWithUtilities() {
             LEFT JOIN space_utilities su ON s.Space_ID = su.Space_ID
             ORDER BY s.Space_ID DESC";
     
-    $stmt = $this->connection->prepare($sql);
+    // Use $this->pdo instead of $this->connection
+    $stmt = $this->pdo->prepare($sql);
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
-
-
-
 
 
   public function getAllActiveRenters() {
