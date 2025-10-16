@@ -240,6 +240,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $name = trim($_POST['name'] ?? '');
     $spacetype_id = intval($_POST['spacetype_id'] ?? 0);
     $price = isset($_POST['price']) && is_numeric($_POST['price']) ? floatval($_POST['price']) : null;
+    $bedrooms = intval($_POST['bedrooms'] ?? 1);
+    $bathrooms = intval($_POST['bathrooms'] ?? 1);
+    $amenities = $_POST['amenities'] ?? [];
+
+    // Prepare features JSON
+    $features = [
+        'bedrooms' => $bedrooms,
+        'bathrooms' => $bathrooms,
+        'amenities' => $amenities
+    ];
+    $features_json = json_encode($features);
 
     // Handle file upload first to get filename
     $upload_dir = __DIR__ . "/../uploads/unit_photos/";
@@ -298,33 +309,47 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                       </div>';
     } else {
-        // Add space without photo column
-        if ($db->addNewSpace($name, $spacetype_id, $ua_id, $price)) {
-            // Get the newly created space by name to get its ID
-            // Get all spaces and find the newly created one
-            $all_spaces = $db->getAllSpacesWithDetails();
-            $new_space = null;
-            foreach ($all_spaces as $space) {
-                if ($space['Name'] === $name) {
-                    $new_space = $space;
-                    break;
+        try {
+            // Add space with features using PDO
+            $sql = "INSERT INTO space (Name, SpaceType_ID, UA_ID, Street, Brgy, City, Price, Features) 
+                    VALUES (:name, :spacetype_id, :ua_id, :street, :brgy, :city, :price, :features)";
+            
+            $params = [
+                ':name' => $name,
+                ':spacetype_id' => $spacetype_id,
+                ':ua_id' => $ua_id,
+                ':street' => 'General Luna Strt',
+                ':brgy' => '10',
+                ':city' => 'Lipa City',
+                ':price' => $price,
+                ':features' => $features_json
+            ];
+            
+            if ($db->executeStatement($sql, $params)) {
+                // Get the newly created space ID
+                $space_id = $db->getLastInsertId();
+                
+                if ($space_id && $uploaded_photo_filename) {
+                    // Add the photo to photo_history
+                    $db->addPhotoToHistory($space_id, $uploaded_photo_filename, 'uploaded', null, $ua_id);
                 }
+                
+                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Space/unit added successfully!' . ($uploaded_photo_filename ? ' (Photo added to history)' : '') . '
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            } else {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              A database error occurred. The unit could not be added.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
             }
-            
-            if ($new_space && $uploaded_photo_filename) {
-                // Add the photo to photo_history
-                $db->addPhotoToHistory($new_space['Space_ID'], $uploaded_photo_filename, 'uploaded', null, $ua_id);
-            }
-            
-            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Space/unit added successfully!' . ($uploaded_photo_filename ? ' (Photo added to history)' : '') . '
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
-        } else {
+        } catch (PDOException $e) {
             $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                           <i class="fas fa-exclamation-circle me-2"></i>
-                          A database error occurred. The unit could not be added.
+                          Database error: ' . htmlspecialchars($e->getMessage()) . '
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         }
@@ -353,16 +378,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         } else {
-            if ($db->addSpaceType($spacetype_name)) {
-                $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Space type added successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
-            } else {
+            try {
+                $sql = "INSERT INTO spacetype (SpaceTypeName) VALUES (:name)";
+                if ($db->executeStatement($sql, [':name' => $spacetype_name])) {
+                    $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Space type added successfully!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>';
+                } else {
+                    $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                                  <i class="fas fa-exclamation-circle me-2"></i>
+                                  A database error occurred. Space type could not be added.
+                                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                  </div>';
+                }
+            } catch (PDOException $e) {
                 $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                               <i class="fas fa-exclamation-circle me-2"></i>
-                              A database error occurred. Space type could not be added.
+                              Database error: ' . htmlspecialchars($e->getMessage()) . '
                               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                               </div>';
             }
@@ -395,16 +429,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         } else {
-            if ($db->updateSpaceType($type_id, $new_name)) {
-                $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Space type updated successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
-            } else {
+            try {
+                $sql = "UPDATE spacetype SET SpaceTypeName = :name WHERE SpaceType_ID = :id";
+                $params = [':name' => $new_name, ':id' => $type_id];
+                
+                if ($db->executeStatement($sql, $params)) {
+                    $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Space type updated successfully!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>';
+                } else {
+                    $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                                  <i class="fas fa-exclamation-circle me-2"></i>
+                                  Failed to update space type.
+                                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                  </div>';
+                }
+            } catch (PDOException $e) {
                 $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                               <i class="fas fa-exclamation-circle me-2"></i>
-                              Failed to update space type.
+                              Database error: ' . htmlspecialchars($e->getMessage()) . '
                               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                               </div>';
             }
@@ -416,13 +461,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'delete_type') {
     $type_id = intval($_POST['type_id'] ?? 0);
     
-    if ($db->deleteSpaceType($type_id)) {
-        $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>
-                        Space type deleted successfully!
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>';
-    } else {
+    try {
+        $sql = "DELETE FROM spacetype WHERE SpaceType_ID = :id";
+        if ($db->executeStatement($sql, [':id' => $type_id])) {
+            $success_type = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Space type deleted successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Cannot delete space type. It may be in use by existing spaces.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        }
+    } catch (PDOException $e) {
         $error_type = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                       <i class="fas fa-exclamation-circle me-2"></i>
                       Cannot delete space type. It may be in use by existing spaces.
@@ -464,16 +518,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                           </div>';
         } else {
-            if ($db->updateSpace($space_id, $name, $spacetype_id, $price)) {
-                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                                <i class="fas fa-check-circle me-2"></i>
-                                Space/unit updated successfully!
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>';
-            } else {
+            try {
+                $sql = "UPDATE space SET Name = :name, SpaceType_ID = :spacetype_id, Price = :price WHERE Space_ID = :id";
+                $params = [
+                    ':name' => $name,
+                    ':spacetype_id' => $spacetype_id,
+                    ':price' => $price,
+                    ':id' => $space_id
+                ];
+                
+                if ($db->executeStatement($sql, $params)) {
+                    $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                    <i class="fas fa-check-circle me-2"></i>
+                                    Space/unit updated successfully!
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>';
+                } else {
+                    $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                                  <i class="fas fa-exclamation-circle me-2"></i>
+                                  Failed to update space/unit.
+                                  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                  </div>';
+                }
+            } catch (PDOException $e) {
                 $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                               <i class="fas fa-exclamation-circle me-2"></i>
-                              Failed to update space/unit.
+                              Database error: ' . htmlspecialchars($e->getMessage()) . '
                               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                               </div>';
             }
@@ -1162,6 +1232,80 @@ foreach ($photo_history as $history) {
             margin-top: 0.25rem;
         }
 
+        /* Amenities Section Styling */
+        .amenities-section {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border: 1px solid #e5e7eb;
+        }
+
+        .amenities-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .amenities-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--dark);
+            margin: 0;
+        }
+
+        .amenities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .amenity-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            background: white;
+        }
+
+        .amenity-checkbox:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.02);
+        }
+
+        .amenity-checkbox.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .amenity-checkbox input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .amenity-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--dark);
+            font-weight: 500;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .amenity-icon {
+            width: 16px;
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
         /* Notification Styles */
         .notification-badge {
             animation: pulse 2s infinite;
@@ -1267,6 +1411,10 @@ foreach ($photo_history as $history) {
             
             .description-timeline {
                 font-size: 0.8rem;
+            }
+
+            .amenities-grid {
+                grid-template-columns: 1fr;
             }
         }
         
@@ -1596,10 +1744,12 @@ foreach ($photo_history as $history) {
                     <div class="card-body">
                         <form method="post" enctype="multipart/form-data" class="row g-3" autocomplete="off">
                             <input type="hidden" name="form_type" value="unit" />
+                            
                             <div class="col-12">
                                 <label for="name" class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
                                 <input id="name" type="text" class="form-control" name="name" placeholder="Unit name" required />
                             </div>
+                            
                             <div class="col-12">
                                 <label for="spacetype_id" class="form-label fw-semibold">Space Type <span class="text-danger">*</span></label>
                                 <select id="spacetype_id" name="spacetype_id" class="form-select" required>
@@ -1609,10 +1759,134 @@ foreach ($photo_history as $history) {
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            
                             <div class="col-12">
                                 <label for="price" class="form-label fw-semibold">Price (PHP) <span class="text-danger">*</span></label>
                                 <input id="price" type="number" step="100" min="0" class="form-control" name="price" placeholder="0.00" required />
                                 <div id="priceDisplay" class="price-display"></div>
+                            </div>
+
+                            <!-- Basic Features -->
+                            <div class="col-12">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label for="bedrooms" class="form-label fw-semibold">Bedrooms</label>
+                                        <select id="bedrooms" name="bedrooms" class="form-select">
+                                            <option value="1">1 bedroom</option>
+                                            <option value="2">2 bedrooms</option>
+                                            <option value="3">3 bedrooms</option>
+                                            <option value="4">4 bedrooms</option>
+                                            <option value="5">5+ bedrooms</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="bathrooms" class="form-label fw-semibold">Bathrooms</label>
+                                        <select id="bathrooms" name="bathrooms" class="form-select">
+                                            <option value="1">1 bathroom</option>
+                                            <option value="2">2 bathrooms</option>
+                                            <option value="3">3 bathrooms</option>
+                                            <option value="4">4+ bathrooms</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Amenities Section -->
+                            <div class="col-12">
+                                <div class="amenities-section">
+                                    <div class="amenities-header">
+                                        <h6 class="amenities-title">What this place offers</h6>
+                                    </div>
+                                    
+                                    <div class="amenities-grid">
+                                        <!-- Row 1 -->
+                                        <div class="amenity-checkbox" data-amenity="wifi">
+                                            <input type="checkbox" name="amenities[]" value="wifi" class="form-check-input" id="wifi">
+                                            <label class="form-check-label amenity-label" for="wifi">
+                                                <i class="fas fa-wifi amenity-icon"></i> Wifi
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="kitchen">
+                                            <input type="checkbox" name="amenities[]" value="kitchen" class="form-check-input" id="kitchen">
+                                            <label class="form-check-label amenity-label" for="kitchen">
+                                                <i class="fas fa-utensils amenity-icon"></i> Kitchen
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="parking">
+                                            <input type="checkbox" name="amenities[]" value="parking" class="form-check-input" id="parking">
+                                            <label class="form-check-label amenity-label" for="parking">
+                                                <i class="fas fa-car amenity-icon"></i> Free parking
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="washer">
+                                            <input type="checkbox" name="amenities[]" value="washer" class="form-check-input" id="washer">
+                                            <label class="form-check-label amenity-label" for="washer">
+                                                <i class="fas fa-soap amenity-icon"></i> Washer
+                                            </label>
+                                        </div>
+
+                                        <!-- Row 2 -->
+                                        <div class="amenity-checkbox" data-amenity="ac">
+                                            <input type="checkbox" name="amenities[]" value="ac" class="form-check-input" id="ac">
+                                            <label class="form-check-label amenity-label" for="ac">
+                                                <i class="fas fa-snowflake amenity-icon"></i> Air conditioning
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="tv">
+                                            <input type="checkbox" name="amenities[]" value="tv" class="form-check-input" id="tv">
+                                            <label class="form-check-label amenity-label" for="tv">
+                                                <i class="fas fa-tv amenity-icon"></i> TV
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="workspace">
+                                            <input type="checkbox" name="amenities[]" value="workspace" class="form-check-input" id="workspace">
+                                            <label class="form-check-label amenity-label" for="workspace">
+                                                <i class="fas fa-laptop amenity-icon"></i> Dedicated workspace
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="pool">
+                                            <input type="checkbox" name="amenities[]" value="pool" class="form-check-input" id="pool">
+                                            <label class="form-check-label amenity-label" for="pool">
+                                                <i class="fas fa-swimming-pool amenity-icon"></i> Pool
+                                            </label>
+                                        </div>
+
+                                        <!-- Row 3 -->
+                                        <div class="amenity-checkbox" data-amenity="pets">
+                                            <input type="checkbox" name="amenities[]" value="pets" class="form-check-input" id="pets">
+                                            <label class="form-check-label amenity-label" for="pets">
+                                                <i class="fas fa-paw amenity-icon"></i> Pets allowed
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="elevator">
+                                            <input type="checkbox" name="amenities[]" value="elevator" class="form-check-input" id="elevator">
+                                            <label class="form-check-label amenity-label" for="elevator">
+                                                <i class="fas fa-elevator amenity-icon"></i> Elevator
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="dryer">
+                                            <input type="checkbox" name="amenities[]" value="dryer" class="form-check-input" id="dryer">
+                                            <label class="form-check-label amenity-label" for="dryer">
+                                                <i class="fas fa-wind amenity-icon"></i> Dryer
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="amenity-checkbox" data-amenity="heating">
+                                            <input type="checkbox" name="amenities[]" value="heating" class="form-check-input" id="heating">
+                                            <label class="form-check-label amenity-label" for="heating">
+                                                <i class="fas fa-thermometer-half amenity-icon"></i> Heating
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- Photo Upload Field -->
@@ -1681,6 +1955,7 @@ foreach ($photo_history as $history) {
                                     <th>Name</th>
                                     <th>Type</th>
                                     <th>Price (PHP)</th>
+                                    <th>Features</th>
                                     <th>Photos (Max: <?= $max_photos_per_unit ?>)</th>
                                     <th>Actions</th>
                                 </tr>
@@ -1691,6 +1966,15 @@ foreach ($photo_history as $history) {
                                     $current_count = count($current_photos);
                                     $can_add_more = $current_count < $max_photos_per_unit;
                                     $photos_remaining = $max_photos_per_unit - $current_count;
+                                    
+                                    // Parse features
+                                    $features = [];
+                                    if (!empty($space['Features'])) {
+                                        $features = json_decode($space['Features'], true);
+                                    }
+                                    $bedrooms = $features['bedrooms'] ?? 1;
+                                    $bathrooms = $features['bathrooms'] ?? 1;
+                                    $amenities = $features['amenities'] ?? [];
                                 ?>
                                     <tr>
                                         <td>
@@ -1701,6 +1985,21 @@ foreach ($photo_history as $history) {
                                         </td>
                                         <td><?= htmlspecialchars($space['SpaceTypeName']) ?></td>
                                         <td>₱<?= number_format($space['Price'], 2) ?></td>
+                                        <td>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <span class="badge bg-primary">
+                                                    <i class="fas fa-bed me-1"></i><?= $bedrooms ?> bed
+                                                </span>
+                                                <span class="badge bg-info">
+                                                    <i class="fas fa-bath me-1"></i><?= $bathrooms ?> bath
+                                                </span>
+                                                <?php if (!empty($amenities)): ?>
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-star me-1"></i><?= count($amenities) ?> amenities
+                                                    </span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td>
                                             <div class="photo-management">
                                                 <!-- Photo Counter -->
@@ -1855,6 +2154,15 @@ foreach ($photo_history as $history) {
                             $current_count = count($current_photos);
                             $can_add_more = $current_count < $max_photos_per_unit;
                             $photos_remaining = $max_photos_per_unit - $current_count;
+                            
+                            // Parse features
+                            $features = [];
+                            if (!empty($space['Features'])) {
+                                $features = json_decode($space['Features'], true);
+                            }
+                            $bedrooms = $features['bedrooms'] ?? 1;
+                            $bathrooms = $features['bathrooms'] ?? 1;
+                            $amenities = $features['amenities'] ?? [];
                         ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
@@ -1874,6 +2182,23 @@ foreach ($photo_history as $history) {
                                 <div class="mobile-card-detail">
                                     <span class="label">Price:</span>
                                     <span class="value">₱<?= number_format($space['Price'], 2) ?></span>
+                                </div>
+
+                                <div class="mobile-card-detail">
+                                    <span class="label">Features:</span>
+                                    <span class="value">
+                                        <span class="badge bg-primary me-1">
+                                            <i class="fas fa-bed me-1"></i><?= $bedrooms ?> bed
+                                        </span>
+                                        <span class="badge bg-info me-1">
+                                            <i class="fas fa-bath me-1"></i><?= $bathrooms ?> bath
+                                        </span>
+                                        <?php if (!empty($amenities)): ?>
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-star me-1"></i><?= count($amenities) ?> amenities
+                                            </span>
+                                        <?php endif; ?>
+                                    </span>
                                 </div>
 
                                 <div class="space-actions mt-2">
@@ -2715,6 +3040,21 @@ foreach ($photo_history as $history) {
                 display.textContent = '';
             }
         }
+
+        // Amenities checkbox styling
+        document.querySelectorAll('.amenity-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('click', function(e) {
+                if (e.target.type !== 'checkbox') {
+                    const checkboxInput = this.querySelector('input[type="checkbox"]');
+                    checkboxInput.checked = !checkboxInput.checked;
+                }
+                this.classList.toggle('selected', this.querySelector('input[type="checkbox"]').checked);
+            });
+            
+            // Initialize selected state
+            const checkboxInput = checkbox.querySelector('input[type="checkbox"]');
+            checkbox.classList.toggle('selected', checkboxInput.checked);
+        });
 
         // Edit Space Type Modal
         const editTypeModal = document.getElementById('editTypeModal');
