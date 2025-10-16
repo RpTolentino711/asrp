@@ -1382,21 +1382,6 @@ public function addSpaceUtilities($space_id, $utilities_data) {
 
 
 
-
-  public function getRow($sql, $params = []) {
-        try {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Database error: " . $e->getMessage());
-            return false;
-        }
-    }
-    
-    /**
-     * Get multiple rows
-     */
     public function getRows($sql, $params = []) {
         try {
             $stmt = $this->pdo->prepare($sql);
