@@ -2497,16 +2497,27 @@ public function getAllUnitsWithRenterStatus() {
 
 public function getAdminMonthChartData($startDate, $endDate) {
     try {
+        // Validate date inputs
+        if (empty($startDate) || empty($endDate)) {
+            throw new Exception("Start date and end date are required");
+        }
+
         // Generate date range
         $dateRange = [];
         $currentDate = new DateTime($startDate);
         $endDateObj = new DateTime($endDate);
         
+        // Ensure start date is before end date
+        if ($currentDate > $endDateObj) {
+            throw new Exception("Start date cannot be after end date");
+        }
+
         while ($currentDate <= $endDateObj) {
             $dateRange[] = $currentDate->format('Y-m-d');
             $currentDate->modify('+1 day');
         }
 
+        // Initialize chart data structure
         $chartData = [
             'labels' => [],
             'new_rentals' => [],
@@ -2514,30 +2525,56 @@ public function getAdminMonthChartData($startDate, $endDate) {
             'new_messages' => []
         ];
 
-        // Get data for each day
-        foreach ($dateRange as $day) {
-            $dayStart = $day . ' 00:00:00';
-            $dayEnd = $day . ' 23:59:59';
-            
-            // Rentals for the day
-            $sqlRentals = "SELECT COUNT(*) as count FROM rentalrequest 
-                          WHERE Requested_At BETWEEN ? AND ?";
-            $rentals = $this->getRow($sqlRentals, [$dayStart, $dayEnd]);
-            
-            // Maintenance for the day  
-            $sqlMaintenance = "SELECT COUNT(*) as count FROM maintenancerequest 
-                              WHERE RequestDate BETWEEN ? AND ?";
-            $maintenance = $this->getRow($sqlMaintenance, [$dayStart, $dayEnd]);
-            
-            // Messages for the day
-            $sqlMessages = "SELECT COUNT(*) as count FROM free_message 
-                           WHERE is_deleted = 0 AND Sent_At BETWEEN ? AND ?";
-            $messages = $this->getRow($sqlMessages, [$dayStart, $dayEnd]);
+        // Use a single query for better performance
+        $sql = "SELECT 
+                DATE(rr.Requested_At) as date,
+                COUNT(DISTINCT rr.Request_ID) as rental_count,
+                COUNT(DISTINCT mr.Request_ID) as maintenance_count,
+                COUNT(DISTINCT fm.Message_ID) as message_count
+            FROM 
+                (SELECT ? as date UNION ALL SELECT ?) as dates
+            LEFT JOIN rentalrequest rr ON DATE(rr.Requested_At) = dates.date
+            LEFT JOIN maintenancerequest mr ON DATE(mr.RequestDate) = dates.date
+            LEFT JOIN free_message fm ON DATE(fm.Sent_At) = dates.date AND fm.is_deleted = 0
+            WHERE dates.date BETWEEN ? AND ?
+            GROUP BY dates.date
+            ORDER BY dates.date
+        ";
 
+        // Prepare parameters for the query
+        $params = [];
+        foreach ($dateRange as $date) {
+            $params[] = $date;
+            $params[] = $date; // Duplicate for the UNION
+        }
+        $params[] = $startDate;
+        $params[] = $endDate;
+
+        $results = $this->getRows($sql, $params);
+
+        // Create a map for quick lookup
+        $dataMap = [];
+        foreach ($results as $row) {
+            $dataMap[$row['date']] = [
+                'rentals' => (int)$row['rental_count'],
+                'maintenance' => (int)$row['maintenance_count'],
+                'messages' => (int)$row['message_count']
+            ];
+        }
+
+        // Populate chart data
+        foreach ($dateRange as $day) {
             $chartData['labels'][] = date('M j', strtotime($day));
-            $chartData['new_rentals'][] = $rentals['count'] ?? 0;
-            $chartData['new_maintenance'][] = $maintenance['count'] ?? 0;
-            $chartData['new_messages'][] = $messages['count'] ?? 0;
+            
+            if (isset($dataMap[$day])) {
+                $chartData['new_rentals'][] = $dataMap[$day]['rentals'];
+                $chartData['new_maintenance'][] = $dataMap[$day]['maintenance'];
+                $chartData['new_messages'][] = $dataMap[$day]['messages'];
+            } else {
+                $chartData['new_rentals'][] = 0;
+                $chartData['new_maintenance'][] = 0;
+                $chartData['new_messages'][] = 0;
+            }
         }
 
         return $chartData;
@@ -2545,23 +2582,30 @@ public function getAdminMonthChartData($startDate, $endDate) {
     } catch (Exception $e) {
         error_log("Error in getAdminMonthChartData: " . $e->getMessage());
         
-        // Fallback: return empty data
-        $days = [];
-        $currentDate = new DateTime($startDate);
-        $endDateObj = new DateTime($endDate);
-        
-        while ($currentDate <= $endDateObj) {
-            $days[] = $currentDate->format('Y-m-d');
-            $currentDate->modify('+1 day');
-        }
-
-        return [
-            'labels' => array_map(function($d){ return date('M j', strtotime($d)); }, $days),
-            'new_rentals' => array_fill(0, count($days), 0),
-            'new_maintenance' => array_fill(0, count($days), 0),
-            'new_messages' => array_fill(0, count($days), 0)
-        ];
+        // Fallback: return empty data with proper structure
+        return $this->getFallbackChartData($startDate, $endDate);
     }
+}
+
+// Helper function for fallback data
+private function getFallbackChartData($startDate, $endDate) {
+    $dateRange = [];
+    $currentDate = new DateTime($startDate);
+    $endDateObj = new DateTime($endDate);
+    
+    while ($currentDate <= $endDateObj) {
+        $dateRange[] = $currentDate->format('Y-m-d');
+        $currentDate->modify('+1 day');
+    }
+
+    return [
+        'labels' => array_map(function($d) { 
+            return date('M j', strtotime($d)); 
+        }, $dateRange),
+        'new_rentals' => array_fill(0, count($dateRange), 0),
+        'new_maintenance' => array_fill(0, count($dateRange), 0),
+        'new_messages' => array_fill(0, count($dateRange), 0)
+    ];
 }
 
 
