@@ -1,6 +1,8 @@
 <?php
 session_start();
 require '../database/database.php';
+
+// Set Philippine timezone
 date_default_timezone_set('Asia/Manila');
 
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
@@ -78,7 +80,7 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     // ==================== SHEET 1: EXECUTIVE SUMMARY ====================
     echo "<h1 style='text-align: center; color: #2c3e50;'>ASRT MANAGEMENT</h1>";
     echo "<h2 style='text-align: center; color: #34495e;'>MONTHLY PERFORMANCE DASHBOARD - " . strtoupper($monthName) . "</h2>";
-    echo "<p style='text-align: center;'>Generated on: " . date('F j, Y g:i A') . "</p>";
+    echo "<p style='text-align: center;'>Generated on: " . date('F j, Y g:i A') . " (Philippine Time)</p>";
     echo "<hr>";
     
     // FINANCIAL SUMMARY - UPDATED
@@ -196,19 +198,36 @@ function exportToExcel($monthName, $monthlyStats, $rentalRequestsData, $maintena
     echo "</table>";
     echo "<br>";
     
-    // REVENUE BREAKDOWN - UPDATED
+    // REVENUE BREAKDOWN - FIXED CALCULATION
     echo "<h4>Revenue Breakdown</h4>";
     echo "<table>";
     echo "<tr class='metric-header'><td>Category</td><td class='right'>Amount</td><td class='right'>Percentage</td></tr>";
-    
+
     $spaceRevenue = $financialSummary['space_revenue'] ?? 0;
     $apartmentRevenue = $financialSummary['apartment_revenue'] ?? 0;
     $potentialRevenue = $financialSummary['potential_revenue'] ?? 0;
-    
-    echo "<tr><td>Space Rentals</td><td class='right positive'>₱" . number_format($spaceRevenue, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($spaceRevenue/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
-    echo "<tr><td>Apartment Rentals</td><td class='right positive'>₱" . number_format($apartmentRevenue, 2) . "</td><td class='right'>" . ($totalRevenue > 0 ? number_format(($apartmentRevenue/$totalRevenue)*100, 1) : 0) . "%</td></tr>";
+
+    // Calculate total including potential revenue for percentage calculation
+    $totalIncludingPotential = $totalRevenue + $potentialRevenue;
+
+    // Only show percentages if we have actual revenue
+    if ($totalRevenue > 0) {
+        $spacePercentage = ($spaceRevenue / $totalRevenue) * 100;
+        $apartmentPercentage = ($apartmentRevenue / $totalRevenue) * 100;
+    } else {
+        $spacePercentage = 0;
+        $apartmentPercentage = 0;
+    }
+
+    echo "<tr><td>Space Rentals (Collected)</td><td class='right positive'>₱" . number_format($spaceRevenue, 2) . "</td><td class='right'>" . number_format($spacePercentage, 1) . "%</td></tr>";
+    echo "<tr><td>Apartment Rentals (Collected)</td><td class='right positive'>₱" . number_format($apartmentRevenue, 2) . "</td><td class='right'>" . number_format($apartmentPercentage, 1) . "%</td></tr>";
     echo "<tr><td>Potential Revenue (Unpaid)</td><td class='right warning'>₱" . number_format($potentialRevenue, 2) . "</td><td class='right'>N/A</td></tr>";
     echo "<tr class='metric-header'><td><strong>Total Collected Revenue</strong></td><td class='right positive'><strong>₱" . number_format($totalRevenue, 2) . "</strong></td><td class='right'><strong>100%</strong></td></tr>";
+
+    // Add total potential line
+    if ($potentialRevenue > 0) {
+        echo "<tr class='metric-header'><td><strong>Total Potential Revenue</strong></td><td class='right warning'><strong>₱" . number_format($totalIncludingPotential, 2) . "</strong></td><td class='right'><strong>N/A</strong></td></tr>";
+    }
     echo "</table>";
     echo "<br><br>";
     
@@ -287,7 +306,7 @@ function exportToPDF($monthName, $monthlyStats, $rentalRequestsData, $maintenanc
         <div class='header'>
             <h1>ASRT Management</h1>
             <h2>Monthly Report - " . $monthName . "</h2>
-            <p>Generated on: " . date('F j, Y g:i A') . "</p>
+            <p>Generated on: " . date('F j, Y g:i A') . " (Philippine Time)</p>
         </div>
         
         <h3>Executive Summary</h3>
