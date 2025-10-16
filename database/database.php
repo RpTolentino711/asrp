@@ -1361,14 +1361,17 @@ public function getAllSpacesWithDetails() {
     
     
     
- // In your Database class
 public function getSpaceUtilities($space_id) {
     $sql = "SELECT * FROM space_utilities WHERE Space_ID = ?";
-    $stmt = $this->pdo->prepare($sql); // Changed from $this->connection
-    $stmt->execute([$space_id]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+        $stmt->execute([$space_id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("getSpaceUtilities Error: " . $e->getMessage());
+        return null;
+    }
 }
-
 
 public function updateSpaceUtilities($space_id, $utilities_data) {
     // Check if utilities record exists
@@ -1382,19 +1385,24 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
                 Parking = ?, Internet = ?, Updated_At = CURRENT_TIMESTAMP 
                 WHERE Space_ID = ?";
         
-        $stmt = $this->connection->prepare($sql);
-        return $stmt->execute([
-            $utilities_data['bedrooms'],
-            $utilities_data['toilets'],
-            $utilities_data['has_water'],
-            $utilities_data['has_electricity'],
-            $utilities_data['square_meters'],
-            $utilities_data['furnished'],
-            $utilities_data['air_conditioning'],
-            $utilities_data['parking'],
-            $utilities_data['internet'],
-            $space_id
-        ]);
+        try {
+            $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+            return $stmt->execute([
+                $utilities_data['bedrooms'],
+                $utilities_data['toilets'],
+                $utilities_data['has_water'],
+                $utilities_data['has_electricity'],
+                $utilities_data['square_meters'],
+                $utilities_data['furnished'],
+                $utilities_data['air_conditioning'],
+                $utilities_data['parking'],
+                $utilities_data['internet'],
+                $space_id
+            ]);
+        } catch (PDOException $e) {
+            error_log("updateSpaceUtilities Error: " . $e->getMessage());
+            return false;
+        }
     } else {
         // Insert new record
         $sql = "INSERT INTO space_utilities 
@@ -1402,7 +1410,36 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
                  Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
-        $stmt = $this->connection->prepare($sql);
+        try {
+            $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
+            return $stmt->execute([
+                $space_id,
+                $utilities_data['bedrooms'],
+                $utilities_data['toilets'],
+                $utilities_data['has_water'],
+                $utilities_data['has_electricity'],
+                $utilities_data['square_meters'],
+                $utilities_data['furnished'],
+                $utilities_data['air_conditioning'],
+                $utilities_data['parking'],
+                $utilities_data['internet']
+            ]);
+        } catch (PDOException $e) {
+            error_log("addSpaceUtilities Error: " . $e->getMessage());
+            return false;
+        }
+    }
+}
+
+
+public function addSpaceUtilities($space_id, $utilities_data) {
+    $sql = "INSERT INTO space_utilities 
+            (Space_ID, Bedrooms, Toilets, Has_Water, Has_Electricity, 
+             Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    try {
+        $stmt = $this->pdo->prepare($sql); // Changed to $this->pdo
         return $stmt->execute([
             $space_id,
             $utilities_data['bedrooms'],
@@ -1415,28 +1452,10 @@ public function updateSpaceUtilities($space_id, $utilities_data) {
             $utilities_data['parking'],
             $utilities_data['internet']
         ]);
+    } catch (PDOException $e) {
+        error_log("addSpaceUtilities Error: " . $e->getMessage());
+        return false;
     }
-}
-
-public function addSpaceUtilities($space_id, $utilities_data) {
-    $sql = "INSERT INTO space_utilities 
-            (Space_ID, Bedrooms, Toilets, Has_Water, Has_Electricity, 
-             Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    
-    $stmt = $this->connection->prepare($sql);
-    return $stmt->execute([
-        $space_id,
-        $utilities_data['bedrooms'],
-        $utilities_data['toilets'],
-        $utilities_data['has_water'],
-        $utilities_data['has_electricity'],
-        $utilities_data['square_meters'],
-        $utilities_data['furnished'],
-        $utilities_data['air_conditioning'],
-        $utilities_data['parking'],
-        $utilities_data['internet']
-    ]);
 }
 
 public function getAllSpacesWithUtilities() {
@@ -1449,9 +1468,14 @@ public function getAllSpacesWithUtilities() {
             LEFT JOIN space_utilities su ON s.Space_ID = su.Space_ID
             ORDER BY s.Space_ID DESC";
     
-    $stmt = $this->connection->prepare($sql);
-    $stmt->execute();
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    try {
+        $stmt = $this->pdo->prepare($sql); // Use $this->pdo instead of $this->connection
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("getAllSpacesWithUtilities Error: " . $e->getMessage());
+        return [];
+    }
 }
 
 
