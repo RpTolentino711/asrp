@@ -873,9 +873,6 @@ if (isset($_SESSION['login_error'])) {
               $photos_with_descriptions = array_slice($photos_with_descriptions, 0, 6);
               $photo_count = count($photos_with_descriptions);
               $first_photo_url = !empty($photos_with_descriptions) ? $photos_with_descriptions[0]['url'] : null;
-
-              // Get utilities data for this space
-              $utilities = $db->getSpaceUtilities($space['Space_ID']);
               ?>
               <div class="col-lg-4 col-md-6 animate-on-scroll">
                 <div class="card unit-card">
@@ -884,23 +881,6 @@ if (isset($_SESSION['login_error'])) {
                       <img src="<?= $first_photo_url ?>" class="card-img-top" alt="<?= htmlspecialchars($space['Name']) ?>" style="cursor: pointer; height: 250px; object-fit: cover;" 
                            data-bs-toggle="modal" data-bs-target="#<?= $photo_modal_id ?>" 
                            data-bs-slide-to="0">
-                      
-                      <!-- NEW: Utilities Overlay on Photo -->
-                      <div class="utilities-overlay" style="position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.7); color: white; padding: 4px 8px; border-radius: 20px; font-size: 0.7rem; display: flex; align-items: center; gap: 4px; backdrop-filter: blur(4px);">
-                        <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
-                          <i class="fas fa-bed utility-icon"></i>
-                          <span class="utility-count"><?= $utilities['Bedrooms'] ?></span>
-                        <?php endif; ?>
-                        <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
-                          <i class="fas fa-bath utility-icon"></i>
-                          <span class="utility-count"><?= $utilities['Toilets'] ?></span>
-                        <?php endif; ?>
-                        <?php if (!empty($utilities['Square_Meters'])): ?>
-                          <i class="fas fa-ruler-combined utility-icon"></i>
-                          <span class="utility-count"><?= $utilities['Square_Meters'] ?>m²</span>
-                        <?php endif; ?>
-                      </div>
-
                       <?php if ($photo_count > 1): ?>
                         <span class="badge bg-primary position-absolute top-0 end-0 m-2" style="z-index:2;"> <?= $photo_count ?> photos </span>
                       <?php endif; ?>
@@ -915,36 +895,6 @@ if (isset($_SESSION['login_error'])) {
                     <h5 class="card-title fw-bold"><?= htmlspecialchars($space['Name']) ?></h5>
                     <p class="unit-price">₱<?= number_format($space['Price'], 0) ?> / month</p>
                     <p class="card-text text-muted">Premium commercial space in a strategic location Click to see details.</p>
-                    
-                    <!-- NEW: Utilities Badges -->
-                    <div class="utilities-badges mb-3" style="display: flex; flex-wrap: wrap; gap: 4px;">
-                      <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
-                        <span class="utility-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(99, 102, 241, 0.2); display: inline-flex; align-items: center; gap: 4px;">
-                          <i class="fas fa-bed"></i> <?= $utilities['Bedrooms'] ?> BR
-                        </span>
-                      <?php endif; ?>
-                      <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
-                        <span class="utility-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(99, 102, 241, 0.2); display: inline-flex; align-items: center; gap: 4px;">
-                          <i class="fas fa-bath"></i> <?= $utilities['Toilets'] ?> Bath
-                        </span>
-                      <?php endif; ?>
-                      <?php if (!empty($utilities['Square_Meters'])): ?>
-                        <span class="utility-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(99, 102, 241, 0.2); display: inline-flex; align-items: center; gap: 4px;">
-                          <i class="fas fa-ruler-combined"></i> <?= $utilities['Square_Meters'] ?>m²
-                        </span>
-                      <?php endif; ?>
-                      <?php if (!empty($utilities['Has_Water'])): ?>
-                        <span class="utility-badge" style="background: rgba(16, 185, 129, 0.1); color: #10b981; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(16, 185, 129, 0.2); display: inline-flex; align-items: center; gap: 4px;">
-                          <i class="fas fa-tint"></i> Water
-                        </span>
-                      <?php endif; ?>
-                      <?php if (!empty($utilities['Has_Electricity'])): ?>
-                        <span class="utility-badge" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; border: 1px solid rgba(245, 158, 11, 0.2); display: inline-flex; align-items: center; gap: 4px;">
-                          <i class="fas fa-bolt"></i> Electricity
-                        </span>
-                      <?php endif; ?>
-                    </div>
-
                     <div class="d-flex justify-content-between align-items-center mb-3">
                       <span class="unit-type"><?= htmlspecialchars($space['SpaceTypeName']) ?></span>
                       <small class="unit-location"><?= htmlspecialchars($space['City']) ?></small>
@@ -974,19 +924,6 @@ if (isset($_SESSION['login_error'])) {
                     <div class="modal-header border-0">
                       <h5 class="modal-title text-white" id="<?= $photo_modal_id ?>Label">
                         <?= htmlspecialchars($space['Name']) ?>
-                        
-                        <!-- NEW: Utilities in Modal Header -->
-                        <div class="utilities-header mt-1" style="font-size: 0.9rem; opacity: 0.9;">
-                          <?php if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0): ?>
-                            <span class="me-3"><i class="fas fa-bed me-1"></i><?= $utilities['Bedrooms'] ?> BR</span>
-                          <?php endif; ?>
-                          <?php if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0): ?>
-                            <span class="me-3"><i class="fas fa-bath me-1"></i><?= $utilities['Toilets'] ?> Bath</span>
-                          <?php endif; ?>
-                          <?php if (!empty($utilities['Square_Meters'])): ?>
-                            <span><i class="fas fa-ruler-combined me-1"></i><?= $utilities['Square_Meters'] ?>m²</span>
-                          <?php endif; ?>
-                        </div>
                       </h5>
                       <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
@@ -1083,68 +1020,6 @@ if (isset($_SESSION['login_error'])) {
                                   <div class="alert alert-info">
                                       <i class="bi bi-info-circle me-2"></i>
                                         To rent this unit and join our community, please submit your rental request. The admin will review your application and contact you to guide you through the next steps.
-                                  </div>
-                                  
-                                  <!-- NEW: Utilities Display in Rental Modal -->
-                                  <div class="mb-4">
-                                      <h6 class="fw-bold mb-3">Unit Features:</h6>
-                                      <div class="row g-3">';
-                  
-                  // Add utilities information
-                  if (!empty($utilities['Bedrooms']) && $utilities['Bedrooms'] > 0) {
-                      $modals .= '
-                                          <div class="col-md-4">
-                                              <div class="d-flex align-items-center">
-                                                  <i class="fas fa-bed text-primary me-2"></i>
-                                                  <div>
-                                                      <div class="fw-semibold">' . $utilities['Bedrooms'] . ' Bedroom' . ($utilities['Bedrooms'] > 1 ? 's' : '') . '</div>
-                                                  </div>
-                                              </div>
-                                          </div>';
-                  }
-                  
-                  if (!empty($utilities['Toilets']) && $utilities['Toilets'] > 0) {
-                      $modals .= '
-                                          <div class="col-md-4">
-                                              <div class="d-flex align-items-center">
-                                                  <i class="fas fa-bath text-primary me-2"></i>
-                                                  <div>
-                                                      <div class="fw-semibold">' . $utilities['Toilets'] . ' Toilet' . ($utilities['Toilets'] > 1 ? 's' : '') . '</div>
-                                                  </div>
-                                              </div>
-                                          </div>';
-                  }
-                  
-                  if (!empty($utilities['Square_Meters'])) {
-                      $modals .= '
-                                          <div class="col-md-4">
-                                              <div class="d-flex align-items-center">
-                                                  <i class="fas fa-ruler-combined text-primary me-2"></i>
-                                                  <div>
-                                                      <div class="fw-semibold">' . $utilities['Square_Meters'] . ' m²</div>
-                                                  </div>
-                                              </div>
-                                          </div>';
-                  }
-                  
-                  // Additional utilities
-                  $additional_utils = [];
-                  if (!empty($utilities['Has_Water'])) $additional_utils[] = '<span class="badge bg-success"><i class="fas fa-tint me-1"></i>Water</span>';
-                  if (!empty($utilities['Has_Electricity'])) $additional_utils[] = '<span class="badge bg-warning"><i class="fas fa-bolt me-1"></i>Electricity</span>';
-                  if (!empty($utilities['Furnished'])) $additional_utils[] = '<span class="badge bg-info"><i class="fas fa-couch me-1"></i>Furnished</span>';
-                  if (!empty($utilities['Air_Conditioning'])) $additional_utils[] = '<span class="badge bg-primary"><i class="fas fa-snowflake me-1"></i>Air Conditioning</span>';
-                  if (!empty($utilities['Parking'])) $additional_utils[] = '<span class="badge bg-secondary"><i class="fas fa-car me-1"></i>Parking</span>';
-                  if (!empty($utilities['Internet'])) $additional_utils[] = '<span class="badge bg-purple"><i class="fas fa-wifi me-1"></i>Internet</span>';
-                  
-                  if (!empty($additional_utils)) {
-                      $modals .= '
-                                          <div class="col-12">
-                                              <div class="d-flex flex-wrap gap-2 mt-2">' . implode('', $additional_utils) . '</div>
-                                          </div>';
-                  }
-                  
-                  $modals .= '
-                                      </div>
                                   </div>
                                   
                                   <!-- Unit Photos Preview in Rental Modal with Enhanced Descriptions -->
