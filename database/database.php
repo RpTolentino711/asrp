@@ -1802,11 +1802,6 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
 
 
 
-public function getRow($sql, $params = []) {
-    $stmt = $this->connection->prepare($sql);
-    $stmt->execute($params);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
 
 
 public function getAdminDashboardCounts($startDate = null, $endDate = null) {
