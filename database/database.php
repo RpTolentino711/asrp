@@ -1369,6 +1369,7 @@ public function getSpaceUtilities($space_id) {
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
+
 public function updateSpaceUtilities($space_id, $utilities_data) {
     // Check if utilities record exists
     $existing = $this->getSpaceUtilities($space_id);
@@ -1452,6 +1453,7 @@ public function getAllSpacesWithUtilities() {
     $stmt->execute();
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
+
 
 
 
