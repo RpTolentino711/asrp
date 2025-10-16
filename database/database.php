@@ -1359,126 +1359,22 @@ public function getAllSpacesWithDetails() {
     }
 }
     
-                         
-public function addSpaceUtilities($space_id, $utilities_data) {
-    $sql = "INSERT INTO space_utilities 
-            (Space_ID, Bedrooms, Toilets, Has_Water, Has_Electricity, 
-             Square_Meters, Furnished, Air_Conditioning, Parking, Internet) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    
-    // Use $this->pdo
-    $stmt = $this->pdo->prepare($sql);
-    return $stmt->execute([
-        $space_id,
-        $utilities_data['bedrooms'],
-        $utilities_data['toilets'],
-        $utilities_data['has_water'],
-        $utilities_data['has_electricity'],
-        $utilities_data['square_meters'],
-        $utilities_data['furnished'],
-        $utilities_data['air_conditioning'],
-        $utilities_data['parking'],
-        $utilities_data['internet']
-    ]);
-}
 
-
-
-    public function getRows($sql, $params = []) {
-        try {
-            $stmt = $this->pdo->prepare($sql);
-            $stmt->execute($params);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Database error: " . $e->getMessage());
-            return [];
-        }
-    }
-
-/**
- * Update space utilities in the database
- */
-public function updateSpaceUtilities($space_id, $utilities_data) {
-    // Check if utilities record exists
-    $existing = $this->getSpaceUtilities($space_id);
-    
-    if ($existing) {
-        // Update existing record
-        $sql = "UPDATE space_utilities SET 
-                Bedrooms = ?, Toilets = ?, Has_Water = ?, Has_Electricity = ?, 
-                Square_Meters = ?, Furnished = ?, Air_Conditioning = ?, 
-                Parking = ?, Internet = ?, Updated_At = CURRENT_TIMESTAMP 
-                WHERE Space_ID = ?";
-        
-        // Use $this->pdo
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([
-            $utilities_data['bedrooms'],
-            $utilities_data['toilets'],
-            $utilities_data['has_water'],
-            $utilities_data['has_electricity'],
-            $utilities_data['square_meters'],
-            $utilities_data['furnished'],
-            $utilities_data['air_conditioning'],
-            $utilities_data['parking'],
-            $utilities_data['internet'],
-            $space_id
-        ]);
-    } else {
-        // Insert new record using the addSpaceUtilities method
-        return $this->addSpaceUtilities($space_id, $utilities_data);
-    }
-}
-
-/**
- * Get space utilities by space ID
- */
-public function getSpaceUtilities($space_id) {
-    $sql = "SELECT * FROM space_utilities WHERE Space_ID = ?";
-    // Use $this->pdo
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute([$space_id]);
-    return $stmt->fetch(PDO::FETCH_ASSOC);
-}
-/**
- * Get all spaces with their utilities data
- */
-
-public function __construct() {
-    $dsn = "mysql:host={$this->host};dbname={$this->dbname};charset=utf8mb4";
-    $options = [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ];
+// In your Database class - ADD THIS NEW FUNCTION
+public function updateSpaceFeatures($space_id, $features) {
     try {
-        $this->pdo = new PDO($dsn, $this->user, $this->pass, $options);
-        $this->pdo->exec("SET time_zone = '+08:00'");
-        
-        // Add this line to set the connection property
-        $this->connection = $this->pdo;
-        
+        $sql = "UPDATE space SET Features = :features WHERE Space_ID = :space_id";
+        $params = [
+            ':features' => json_encode($features),
+            ':space_id' => $space_id
+        ];
+        return $this->executeStatement($sql, $params);
     } catch (PDOException $e) {
-        die("Database connection failed: " . $e->getMessage());
+        error_log("Error updating space features: " . $e->getMessage());
+        return false;
     }
 }
 
-
-public function getAllSpacesWithUtilities() {
-    $sql = "SELECT s.*, st.SpaceTypeName,
-                   su.Bedrooms, su.Toilets, su.Has_Water, su.Has_Electricity,
-                   su.Square_Meters, su.Furnished, su.Air_Conditioning, 
-                   su.Parking, su.Internet
-            FROM space s
-            LEFT JOIN spacetype st ON s.SpaceType_ID = st.SpaceType_ID
-            LEFT JOIN space_utilities su ON s.Space_ID = su.Space_ID
-            ORDER BY s.Space_ID DESC";
-    
-    // Use $this->pdo instead of $this->connection
-    $stmt = $this->pdo->prepare($sql);
-    $stmt->execute();
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
-}
 
 
   public function getAllActiveRenters() {
