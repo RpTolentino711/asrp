@@ -9,6 +9,29 @@ error_reporting(E_ALL);
 
 $db = new Database();
 
+// --- NOTIFICATION SYSTEM VARIABLES ---
+$unseen_rentals_sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
+$unseen_rentals_result = $db->getRow($unseen_rentals_sql);
+$unseen_rentals = $unseen_rentals_result['count'] ?? 0;
+
+$new_maintenance_sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0";
+$new_maintenance_result = $db->getRow($new_maintenance_sql);
+$new_maintenance_requests = $new_maintenance_result['count'] ?? 0;
+
+$unread_messages_sql = "SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0";
+$unread_messages_result = $db->getRow($unread_messages_sql);
+$unread_client_messages = $unread_messages_result['count'] ?? 0;
+
+// Get counts for sidebar badges
+$rental_count = $db->getRow("SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new'")['count'];
+$maintenance_count = $db->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'];
+$chat_count = $db->getRow("SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0")['count'];
+
+// MARK ALL MAINTENANCE REQUESTS AS SEEN WHEN ADMIN VIEWS THE PAGE
+$db->executeStatement(
+    "UPDATE maintenancerequest SET admin_seen = 1 WHERE Status = 'Submitted' AND admin_seen = 0"
+);
+
 // --- Admin auth check ---
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header('Location: login.php');
@@ -512,6 +535,7 @@ foreach ($photo_history as $history) {
             --sidebar-width: 280px;
             --border-radius: 12px;
             --transition: all 0.3s ease;
+            --mobile-header-height: 65px;
         }
         
         * {
@@ -526,39 +550,47 @@ foreach ($photo_history as $history) {
             color: #374151;
             min-height: 100vh;
             position: relative;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Mobile Menu Overlay */
         .mobile-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6);
             z-index: 999;
             display: none;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
         }
 
         .mobile-overlay.active {
             display: block;
+            animation: fadeInOverlay 0.3s ease-out;
         }
 
-        /* Mobile Header */
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
         .mobile-header {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            height: 60px;
+            height: var(--mobile-header-height);
             background: white;
             border-bottom: 1px solid #e5e7eb;
             z-index: 1001;
             padding: 0 1rem;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .mobile-menu-btn {
@@ -566,22 +598,34 @@ foreach ($photo_history as $history) {
             border: none;
             font-size: 1.5rem;
             color: var(--dark);
-            padding: 0.5rem;
+            padding: 0.75rem;
             border-radius: 8px;
             transition: var(--transition);
+            min-width: 48px;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
 
-        .mobile-menu-btn:hover {
+        .mobile-menu-btn:active {
             background: rgba(0,0,0,0.1);
         }
 
         .mobile-brand {
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.2rem;
             color: var(--dark);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .mobile-brand i {
+            color: var(--primary);
         }
         
-        /* Sidebar Styling */
         .sidebar {
             position: fixed;
             width: var(--sidebar-width);
@@ -589,10 +633,11 @@ foreach ($photo_history as $history) {
             background: linear-gradient(180deg, var(--dark), var(--darker));
             color: white;
             padding: 1.5rem 1rem;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
             z-index: 1000;
             transition: var(--transition);
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
         .sidebar-header {
@@ -624,18 +669,20 @@ foreach ($photo_history as $history) {
         .nav-link {
             display: flex;
             align-items: center;
-            padding: 0.75rem 1rem;
+            padding: 0.85rem 1rem;
             color: rgba(255, 255, 255, 0.85);
             border-radius: var(--border-radius);
             text-decoration: none;
             transition: var(--transition);
             font-weight: 500;
             font-size: 0.95rem;
+            min-height: 48px;
         }
         
         .nav-link:hover, .nav-link.active {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
             color: white;
+            transform: translateX(5px);
         }
         
         .nav-link i {
@@ -643,7 +690,7 @@ foreach ($photo_history as $history) {
             margin-right: 0.75rem;
             font-size: 1.1rem;
         }
-        
+
         .badge-notification {
             position: absolute;
             right: 1rem;
@@ -655,17 +702,16 @@ foreach ($photo_history as $history) {
             font-weight: 600;
         }
         
-        /* Main Content */
         .main-content {
             margin-left: var(--sidebar-width);
             padding: 2rem;
             transition: var(--transition);
+            min-height: 100vh;
         }
         
-        /* Header */
         .dashboard-header {
             display: flex;
-            justify-content: between;
+            justify-content: space-between;
             align-items: center;
             margin-bottom: 2rem;
             padding-bottom: 1rem;
@@ -687,6 +733,8 @@ foreach ($photo_history as $history) {
 
         .page-title p {
             font-size: 0.9rem;
+            color: #6b7280;
+            margin: 0;
         }
         
         .title-icon {
@@ -701,13 +749,13 @@ foreach ($photo_history as $history) {
             font-size: 1.25rem;
         }
         
-        /* Dashboard Card */
         .dashboard-card {
             background: white;
             border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             margin-bottom: 2rem;
             overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.05);
         }
         
         .card-header {
@@ -745,13 +793,14 @@ foreach ($photo_history as $history) {
         .table-container {
             overflow-x: auto;
             border-radius: var(--border-radius);
+            -webkit-overflow-scrolling: touch;
         }
         
         .custom-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            min-width: 600px;
+            min-width: 900px;
         }
         
         .custom-table th {
@@ -762,6 +811,7 @@ foreach ($photo_history as $history) {
             color: #374151;
             border-bottom: 1px solid #e5e7eb;
             font-size: 0.9rem;
+            white-space: nowrap;
         }
         
         .custom-table td {
@@ -933,9 +983,9 @@ foreach ($photo_history as $history) {
         .mobile-card {
             background: white;
             border-radius: var(--border-radius);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 1rem;
-            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 1.25rem;
+            padding: 1.25rem;
             border-left: 4px solid var(--primary);
         }
 
@@ -943,7 +993,12 @@ foreach ($photo_history as $history) {
             font-weight: 600;
             font-size: 1.1rem;
             color: var(--dark);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         .mobile-card-detail {
@@ -951,15 +1006,19 @@ foreach ($photo_history as $history) {
             justify-content: space-between;
             margin-bottom: 0.5rem;
             font-size: 0.9rem;
+            align-items: flex-start;
         }
 
         .mobile-card-detail .label {
             font-weight: 500;
             color: #6b7280;
+            min-width: 80px;
         }
 
         .mobile-card-detail .value {
             color: var(--dark);
+            text-align: right;
+            flex: 1;
         }
 
         .mobile-photo-grid {
@@ -1102,12 +1161,54 @@ foreach ($photo_history as $history) {
             font-size: 0.8rem;
             margin-top: 0.25rem;
         }
+
+        /* Notification Styles */
+        .notification-badge {
+            animation: pulse 2s infinite;
+        }
         
-        /* Mobile Responsive */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .bell-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            75% { transform: rotate(15deg); }
+        }
+
+        .tools-shake {
+            animation: toolsShake 0.5s ease-in-out;
+        }
+
+        @keyframes toolsShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-10deg) scale(1.1); }
+            50% { transform: rotate(10deg) scale(1.1); }
+            75% { transform: rotate(-5deg) scale(1.05); }
+        }
+
+        .message-shake {
+            animation: messageShake 0.5s ease-in-out;
+        }
+
+        @keyframes messageShake {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(-8deg) scale(1.1); }
+            50% { transform: rotate(8deg) scale(1.1); }
+            75% { transform: rotate(-4deg) scale(1.05); }
+        }
+        
+        /* CRITICAL: Mobile Responsive Breakpoints */
         @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
-                width: 280px;
             }
             
             .sidebar.active {
@@ -1120,47 +1221,31 @@ foreach ($photo_history as $history) {
             
             .main-content {
                 margin-left: 0;
-                margin-top: 60px;
-                padding: 1rem;
+                margin-top: var(--mobile-header-height);
+                padding: 1.25rem;
+            }
+
+            /* CRITICAL FIX: Toggle table/mobile display */
+            .table-desktop {
+                display: none !important;
+            }
+
+            .table-mobile {
+                display: block !important;
             }
 
             .dashboard-header {
                 flex-direction: column;
                 align-items: flex-start;
                 gap: 1rem;
-                margin-bottom: 1.5rem;
             }
 
             .page-title h1 {
-                font-size: 1.5rem;
-            }
-
-            .title-icon {
-                width: 40px;
-                height: 40px;
-                font-size: 1rem;
+                font-size: 1.6rem;
             }
 
             .card-body {
-                padding: 1rem;
-            }
-
-            .card-header {
-                padding: 1rem;
-                font-size: 1rem;
-            }
-
-            .custom-table {
-                display: none;
-            }
-
-            .table-mobile {
-                display: block;
-            }
-
-            .btn-action {
-                font-size: 0.75rem;
-                padding: 0.4rem 0.8rem;
+                padding: 1.25rem;
             }
 
             .photo-grid {
@@ -1187,7 +1272,7 @@ foreach ($photo_history as $history) {
         
         @media (max-width: 768px) {
             .main-content {
-                padding: 0.75rem;
+                padding: 1rem;
             }
 
             .dashboard-card {
@@ -1241,26 +1326,37 @@ foreach ($photo_history as $history) {
         .animate-fade-in {
             animation: fadeIn 0.5s ease-in-out;
         }
+
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
         
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
 
         /* Touch-friendly improvements */
         @media (hover: none) and (pointer: coarse) {
-            .btn-action {
-                min-height: 44px;
-                min-width: 44px;
-            }
-
-            .nav-link {
-                min-height: 44px;
-            }
-
-            .mobile-menu-btn {
-                min-height: 44px;
-                min-width: 44px;
+            .nav-link,
+            .mobile-menu-btn,
+            .btn-action,
+            .file-input-label {
+                min-height: 48px;
+                min-width: 48px;
             }
         }
 
@@ -1375,10 +1471,11 @@ foreach ($photo_history as $history) {
 
     <!-- Mobile Header -->
     <div class="mobile-header">
-        <button class="mobile-menu-btn" id="mobileMenuBtn">
+        <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
             <i class="fas fa-bars"></i>
         </button>
         <div class="mobile-brand">
+            <i class="fas fa-crown"></i>
             ASRT Admin
         </div>
         <div></div>
@@ -1412,20 +1509,29 @@ foreach ($photo_history as $history) {
                 <a href="view_rental_requests.php" class="nav-link">
                     <i class="fas fa-clipboard-check"></i>
                     <span>Rental Requests</span>
+                    <?php if ($rental_count > 0): ?>
+                        <span class="badge badge-notification bg-danger notification-badge" id="sidebarRentalBadge"><?= $rental_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
-           <div class="nav-item">
-    <a href="manage_maintenance.php" class="nav-link">
-        <i class="fas fa-tools"></i>
-        <span>Maintenance</span>
-    </a>
-</div>
+            <div class="nav-item">
+                <a href="manage_maintenance.php" class="nav-link">
+                    <i class="fas fa-tools"></i>
+                    <span>Maintenance</span>
+                    <?php if ($maintenance_count > 0): ?>
+                        <span class="badge badge-notification bg-warning" id="sidebarMaintenanceBadge"><?= $maintenance_count ?></span>
+                    <?php endif; ?>
+                </a>
+            </div>
             
             <div class="nav-item">
                 <a href="generate_invoice.php" class="nav-link">
                     <i class="fas fa-file-invoice-dollar"></i>
                     <span>Invoices</span>
+                    <?php if ($chat_count > 0): ?>
+                        <span class="badge badge-notification bg-info" id="sidebarInvoicesBadge"><?= $chat_count ?></span>
+                    <?php endif; ?>
                 </a>
             </div>
             
@@ -2234,35 +2340,349 @@ foreach ($photo_history as $history) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- COMPLETE NOTIFICATION SYSTEM ---
+        let rentalNotificationCooldown = false;
+        let maintenanceNotificationCooldown = false;
+        let clientMessageNotificationCooldown = false;
+
+        let lastUnseenRentals = <?= $unseen_rentals ?? 0 ?>;
+        let lastUnseenMaintenance = <?= $new_maintenance_requests ?? 0 ?>;
+        let lastUnreadClientMessages = <?= $unread_client_messages ?? 0 ?>;
+        let isFirstLoad = true;
+        let isTabActive = true;
+
+        // Debug logging
+        console.log('Initial counts - Rentals: <?= $unseen_rentals ?? 0 ?>, Maintenance: <?= $new_maintenance_requests ?? 0 ?>, Messages: <?= $unread_client_messages ?? 0 ?>');
+
+        // Tab visibility handling
+        document.addEventListener('visibilitychange', function() {
+            isTabActive = !document.hidden;
+            console.log('Tab visibility changed:', isTabActive ? 'active' : 'hidden');
+            if (isTabActive) {
+                fetchDashboardCounts();
+            }
+        });
+
+        // 1. Show rental notification
+        function showNewRentalNotification(count) {
+            if (rentalNotificationCooldown) {
+                console.log('Rental notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing rental notification for', count, 'new requests');
+            rentalNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-success alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 20px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #10b981;
+                animation: slideInRight 0.3s ease-out;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-bell text-success fs-4 me-3 bell-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🏠 New Rental Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new pending request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="view_rental_requests.php" class="btn btn-sm btn-success">
+                                <i class="fas fa-eye me-1"></i>View Requests
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                rentalNotificationCooldown = false;
+                console.log('Rental notification cooldown reset');
+            }, 10000);
+        }
+
+        // 2. Show maintenance notification
+        function showNewMaintenanceNotification(count) {
+            if (maintenanceNotificationCooldown) {
+                console.log('Maintenance notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing maintenance notification for', count, 'new requests');
+            maintenanceNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-warning alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 100px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #f59e0b;
+                animation: slideInRight 0.3s ease-out;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-tools text-warning fs-4 me-3 tools-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">🔧 New Maintenance Request!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new maintenance request${count > 1 ? 's' : ''} to review.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="manage_maintenance.php" class="btn btn-sm btn-warning text-white">
+                                <i class="fas fa-tools me-1"></i>View Requests
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                maintenanceNotificationCooldown = false;
+                console.log('Maintenance notification cooldown reset');
+            }, 10000);
+        }
+
+        // 3. Show client message notification
+        function showNewClientMessageNotification(count) {
+            if (clientMessageNotificationCooldown) {
+                console.log('Client message notification cooldown active');
+                return;
+            }
+            
+            console.log('Showing client message notification for', count, 'new messages');
+            clientMessageNotificationCooldown = true;
+            
+            const notification = document.createElement('div');
+            notification.className = 'alert alert-info alert-dismissible fade show';
+            notification.style.cssText = `
+                position: fixed; 
+                top: 180px; 
+                right: 20px; 
+                z-index: 9999; 
+                min-width: 320px; 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                border-left: 4px solid #06b6d4;
+                animation: slideInRight 0.3s ease-out;
+            `;
+            notification.innerHTML = `
+                <div class="d-flex align-items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-comments text-info fs-4 me-3 message-shake"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">💬 New Client Message!</h6>
+                        <p class="mb-2">You have <strong>${count}</strong> new message${count > 1 ? 's' : ''} from client${count > 1 ? 's' : ''}.</p>
+                        <div class="d-flex gap-2 mt-2">
+                            <a href="generate_invoice.php" class="btn btn-sm btn-info text-white">
+                                <i class="fas fa-inbox me-1"></i>View Messages
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="alert">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Auto remove after 8 seconds
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Reset cooldown after 10 seconds
+            setTimeout(() => {
+                clientMessageNotificationCooldown = false;
+                console.log('Client message notification cooldown reset');
+            }, 10000);
+        }
+
+        function updateBadgeAnimation(badgeElement, newCount, oldCount) {
+            if (newCount > oldCount && !isFirstLoad) {
+                badgeElement.classList.add('notification-badge');
+                setTimeout(() => {
+                    badgeElement.classList.remove('notification-badge');
+                }, 3000);
+            }
+        }
+
+        // Function to update sidebar badges
+        function updateSidebarBadge(currentCount, badgeId, linkSelector) {
+            const sidebarBadge = document.getElementById(badgeId);
+            if (sidebarBadge) {
+                const oldCount = parseInt(sidebarBadge.textContent);
+                sidebarBadge.textContent = currentCount;
+                updateBadgeAnimation(sidebarBadge, currentCount, oldCount);
+            } else {
+                // Create badge if it doesn't exist
+                const link = document.querySelector(`a[href="${linkSelector}"]`);
+                if (link && currentCount > 0) {
+                    const newBadge = document.createElement('span');
+                    newBadge.id = badgeId;
+                    newBadge.className = 'badge badge-notification bg-danger notification-badge';
+                    newBadge.textContent = currentCount;
+                    link.appendChild(newBadge);
+                }
+            }
+        }
+
+        // Fetch dashboard counts
+        function fetchDashboardCounts() {
+            if (!isTabActive) {
+                console.log('Tab not active, skipping count fetch');
+                return;
+            }
+            
+            console.log('Fetching dashboard counts...');
+            fetch('../AJAX/ajax_admin_dashboard_counts.php')
+                .then(res => {
+                    if (!res.ok) throw new Error('Network response was not ok');
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Counts received:', data);
+                    
+                    if (data && !data.error) {
+                        const currentUnseenRentals = data.unseen_rentals ?? 0;
+                        const currentUnseenMaintenance = data.new_maintenance_requests ?? 0;
+                        const currentUnreadClientMessages = data.unread_client_messages ?? 0;
+
+                        // Check for new rental requests
+                        if (!isFirstLoad && currentUnseenRentals > lastUnseenRentals) {
+                            const newRequests = currentUnseenRentals - lastUnseenRentals;
+                            console.log(`New rental requests detected: ${newRequests} (was ${lastUnseenRentals}, now ${currentUnseenRentals})`);
+                            showNewRentalNotification(newRequests);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnseenRentals, 'sidebarRentalBadge', 'view_rental_requests.php');
+                        }
+                        
+                        // Check for new maintenance requests
+                        if (!isFirstLoad && currentUnseenMaintenance > lastUnseenMaintenance) {
+                            const newRequests = currentUnseenMaintenance - lastUnseenMaintenance;
+                            console.log(`New maintenance requests detected: ${newRequests} (was ${lastUnseenMaintenance}, now ${currentUnseenMaintenance})`);
+                            showNewMaintenanceNotification(newRequests);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnseenMaintenance, 'sidebarMaintenanceBadge', 'manage_maintenance.php');
+                        }
+                        
+                        // Check for new client messages
+                        if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
+                            const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
+                            console.log(`New client messages detected: ${newMessages} (was ${lastUnreadClientMessages}, now ${currentUnreadClientMessages})`);
+                            showNewClientMessageNotification(newMessages);
+                            
+                            // Update sidebar badge
+                            updateSidebarBadge(currentUnreadClientMessages, 'sidebarInvoicesBadge', 'generate_invoice.php');
+                        }
+                        
+                        lastUnseenRentals = currentUnseenRentals;
+                        lastUnseenMaintenance = currentUnseenMaintenance;
+                        lastUnreadClientMessages = currentUnreadClientMessages;
+                        isFirstLoad = false;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching dashboard counts:', err);
+                });
+        }
+
         // Mobile menu functionality
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const sidebar = document.getElementById('sidebar');
         const mobileOverlay = document.getElementById('mobileOverlay');
-
+        
         function toggleMobileMenu() {
             sidebar.classList.toggle('active');
             mobileOverlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
         }
 
-        mobileMenuBtn.addEventListener('click', toggleMobileMenu);
-        mobileOverlay.addEventListener('click', toggleMobileMenu);
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', toggleMobileMenu);
+        }
+        
+        if (mobileOverlay) {
+            mobileOverlay.addEventListener('click', toggleMobileMenu);
+        }
 
-        // Close mobile menu when clicking on nav links
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', () => {
-                if (window.innerWidth <= 992) {
-                    sidebar.classList.remove('active');
-                    mobileOverlay.classList.remove('active');
+                if (window.innerWidth <= 992 && sidebar.classList.contains('active')) {
+                    toggleMobileMenu();
                 }
             });
         });
 
-        // Handle window resize
+        let resizeTimer;
         window.addEventListener('resize', () => {
-            if (window.innerWidth > 992) {
-                sidebar.classList.remove('active');
-                mobileOverlay.classList.remove('active');
-            }
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                if (window.innerWidth > 992 && sidebar.classList.contains('active')) {
+                    sidebar.classList.remove('active');
+                    mobileOverlay.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }, 250);
         });
 
         // Price formatting
@@ -2512,6 +2932,48 @@ foreach ($photo_history as $history) {
                 }
             }, 5000);
         });
+
+        // Start polling for notifications
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Space & Unit Management page fully loaded with COMPLETE notification system');
+            console.log('Test notifications with: testNotification("rental") or testNotification("maintenance") or testNotification("client_message")');
+            
+            fetchDashboardCounts();
+            
+            // Poll every 5 seconds for faster response
+            setInterval(() => {
+                if (isTabActive) {
+                    fetchDashboardCounts();
+                }
+            }, 5000);
+        });
+
+        // Debug: Manual trigger for testing
+        window.testNotification = function(type) {
+            if (type === 'rental') {
+                showNewRentalNotification(1);
+            } else if (type === 'maintenance') {
+                showNewMaintenanceNotification(1);
+            } else if (type === 'client_message') {
+                showNewClientMessageNotification(1);
+            }
+        };
+
+        // Add slideInRight animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from {
+                    opacity: 0;
+                    transform: translateX(100%);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
