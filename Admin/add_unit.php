@@ -46,6 +46,111 @@ $success_unit = '';
 $error_unit = '';
 $success_type = '';
 $error_type = '';
+$success_amenity = '';
+$error_amenity = '';
+
+// --- Handle Amenity Category Addition ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'add_amenity_category') {
+    $category_name = trim($_POST['category_name'] ?? '');
+    $category_icon = trim($_POST['category_icon'] ?? 'fas fa-star');
+    $category_order = intval($_POST['category_order'] ?? 0);
+
+    if (empty($category_name)) {
+        $error_amenity = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                      <i class="fas fa-exclamation-circle me-2"></i>
+                      Please enter a category name.
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>';
+    } else {
+        if ($db->addNewAmenityCategory($category_name, $category_icon, $category_order)) {
+            $success_amenity = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Amenity category added successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_amenity = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Failed to add amenity category.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        }
+    }
+}
+
+// --- Handle Amenity Addition ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'add_amenity') {
+    $amenity_category = intval($_POST['amenity_category'] ?? 0);
+    $amenity_name = trim($_POST['amenity_name'] ?? '');
+    $amenity_icon = trim($_POST['amenity_icon'] ?? 'fas fa-check');
+    $amenity_description = trim($_POST['amenity_description'] ?? '');
+    $amenity_order = intval($_POST['amenity_order'] ?? 0);
+
+    if (empty($amenity_name) || empty($amenity_category)) {
+        $error_amenity = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                      <i class="fas fa-exclamation-circle me-2"></i>
+                      Please fill in all required fields.
+                      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>';
+    } else {
+        if ($db->addNewAmenity($amenity_category, $amenity_name, $amenity_icon, $amenity_description, $amenity_order)) {
+            $success_amenity = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Amenity added successfully!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>';
+        } else {
+            $error_amenity = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                          <i class="fas fa-exclamation-circle me-2"></i>
+                          Failed to add amenity.
+                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                          </div>';
+        }
+    }
+}
+
+// --- Handle Space Amenities Management ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type'])) {
+    if ($_POST['form_type'] === 'add_space_amenity') {
+        $space_id = intval($_POST['space_id'] ?? 0);
+        $amenity_id = intval($_POST['amenity_id'] ?? 0);
+        
+        if ($space_id && $amenity_id) {
+            if ($db->addAmenityToSpace($space_id, $amenity_id)) {
+                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Amenity added to space successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            } else {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Amenity is already added to this space.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+    } elseif ($_POST['form_type'] === 'remove_space_amenity') {
+        $space_id = intval($_POST['space_id'] ?? 0);
+        $amenity_id = intval($_POST['amenity_id'] ?? 0);
+        
+        if ($space_id && $amenity_id) {
+            if ($db->removeAmenityFromSpace($space_id, $amenity_id)) {
+                $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                Amenity removed from space successfully!
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>';
+            } else {
+                $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
+                              <i class="fas fa-exclamation-circle me-2"></i>
+                              Failed to remove amenity from space.
+                              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                              </div>';
+            }
+        }
+    }
+}
 
 // --- Handle photo description update ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_description') {
@@ -484,6 +589,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 // --- Fetch Data for Display ---
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithDetails();
+
+// Fetch amenities data
+$amenities_categories = $db->getAllAmenitiesCategories();
+$all_amenities = $db->getAllAmenities();
+
+// Get space amenities for each space
+$space_amenities_data = [];
+foreach ($spaces as $space) {
+    $space_amenities_data[$space['Space_ID']] = $db->getSpaceAmenitiesGrouped($space['Space_ID']);
+}
 
 // Get current active photos for each space
 $space_photos = [];
@@ -1162,6 +1277,167 @@ foreach ($photo_history as $history) {
             margin-top: 0.25rem;
         }
 
+        /* Amenities Styles */
+        .amenities-section {
+            background: #f8f9fa;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .amenity-category {
+            margin-bottom: 2rem;
+        }
+
+        .amenity-category-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .amenity-category-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .amenity-category-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--dark);
+            margin: 0;
+        }
+
+        .amenities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .amenity-item {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .amenity-item:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .amenity-item.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .amenity-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .amenity-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+
+        .amenity-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+            color: var(--dark);
+            margin: 0;
+        }
+
+        .amenity-description {
+            font-size: 0.8rem;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+
+        .amenity-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn-add-amenity {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--secondary);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: var(--transition);
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn-add-amenity:hover {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-remove-amenity {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            text-decoration: none;
+            transition: var(--transition);
+            width: 100%;
+            text-align: center;
+        }
+
+        .btn-remove-amenity:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .current-amenities {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .current-amenity-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .current-amenity-item:last-child {
+            margin-bottom: 0;
+        }
+
         /* Notification Styles */
         .notification-badge {
             animation: pulse 2s infinite;
@@ -1267,6 +1543,10 @@ foreach ($photo_history as $history) {
             
             .description-timeline {
                 font-size: 0.8rem;
+            }
+
+            .amenities-grid {
+                grid-template-columns: 1fr;
             }
         }
         
@@ -1575,7 +1855,7 @@ foreach ($photo_history as $history) {
                 </div>
                 <div>
                     <h1>Space & Unit Management</h1>
-                    <p class="text-muted mb-0">Add and manage spaces, units, and space types</p>
+                    <p class="text-muted mb-0">Add and manage spaces, units, amenities, and space types</p>
                 </div>
             </div>
         </div>
@@ -1584,6 +1864,8 @@ foreach ($photo_history as $history) {
         <?= $error_unit ?>
         <?= $success_type ?>
         <?= $error_type ?>
+        <?= $success_amenity ?>
+        <?= $error_amenity ?>
         
         <div class="row">
             <!-- Add New Space/Unit -->
@@ -1662,8 +1944,89 @@ foreach ($photo_history as $history) {
                 </div>
             </div>
         </div>
+
+        <!-- Amenities Management Section -->
+        <div class="row">
+            <!-- Add New Amenity Category -->
+            <div class="col-lg-6">
+                <div class="dashboard-card animate-fade-in">
+                    <div class="card-header">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Add New Amenity Category</span>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" class="row g-3" autocomplete="off">
+                            <input type="hidden" name="form_type" value="add_amenity_category" />
+                            <div class="col-12">
+                                <label for="category_name" class="form-label fw-semibold">Category Name <span class="text-danger">*</span></label>
+                                <input id="category_name" type="text" class="form-control" name="category_name" placeholder="e.g. Kitchen, Outdoor, Entertainment" required />
+                            </div>
+                            <div class="col-12">
+                                <label for="category_icon" class="form-label fw-semibold">Icon Class <span class="text-danger">*</span></label>
+                                <input id="category_icon" type="text" class="form-control" name="category_icon" placeholder="fas fa-utensils" value="fas fa-star" required />
+                                <small class="text-muted">Use FontAwesome icon classes (e.g., fas fa-utensils, fas fa-wifi)</small>
+                            </div>
+                            <div class="col-12">
+                                <label for="category_order" class="form-label fw-semibold">Display Order</label>
+                                <input id="category_order" type="number" class="form-control" name="category_order" value="0" min="0" />
+                            </div>
+                            <div class="col-12 text-center mt-4">
+                                <button type="submit" class="btn btn-primary px-5">
+                                    <i class="fas fa-plus-circle me-1"></i> Add Category
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add New Amenity -->
+            <div class="col-lg-6">
+                <div class="dashboard-card animate-fade-in">
+                    <div class="card-header">
+                        <i class="fas fa-plus-square"></i>
+                        <span>Add New Amenity</span>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" class="row g-3" autocomplete="off">
+                            <input type="hidden" name="form_type" value="add_amenity" />
+                            <div class="col-12">
+                                <label for="amenity_category" class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+                                <select id="amenity_category" name="amenity_category" class="form-select" required>
+                                    <option value="" selected disabled>Select Category</option>
+                                    <?php foreach ($amenities_categories as $category): ?>
+                                        <option value="<?= $category['Category_ID'] ?>"><?= htmlspecialchars($category['Category_Name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label for="amenity_name" class="form-label fw-semibold">Amenity Name <span class="text-danger">*</span></label>
+                                <input id="amenity_name" type="text" class="form-control" name="amenity_name" placeholder="e.g. Swimming Pool, Air Conditioning" required />
+                            </div>
+                            <div class="col-12">
+                                <label for="amenity_icon" class="form-label fw-semibold">Icon Class</label>
+                                <input id="amenity_icon" type="text" class="form-control" name="amenity_icon" placeholder="fas fa-swimming-pool" value="fas fa-check" />
+                            </div>
+                            <div class="col-12">
+                                <label for="amenity_description" class="form-label fw-semibold">Description</label>
+                                <textarea id="amenity_description" class="form-control" name="amenity_description" rows="3" placeholder="Brief description of this amenity"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label for="amenity_order" class="form-label fw-semibold">Display Order</label>
+                                <input id="amenity_order" type="number" class="form-control" name="amenity_order" value="0" min="0" />
+                            </div>
+                            <div class="col-12 text-center mt-4">
+                                <button type="submit" class="btn btn-primary px-5">
+                                    <i class="fas fa-plus-circle me-1"></i> Add Amenity
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
         
-        <!-- Existing Spaces/Units -->
+        <!-- Existing Spaces/Units with Amenities -->
         <div class="dashboard-card animate-fade-in">
             <div class="card-header">
                 <i class="fas fa-list"></i>
@@ -1682,6 +2045,7 @@ foreach ($photo_history as $history) {
                                     <th>Type</th>
                                     <th>Price (PHP)</th>
                                     <th>Photos (Max: <?= $max_photos_per_unit ?>)</th>
+                                    <th>Amenities</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -1691,6 +2055,7 @@ foreach ($photo_history as $history) {
                                     $current_count = count($current_photos);
                                     $can_add_more = $current_count < $max_photos_per_unit;
                                     $photos_remaining = $max_photos_per_unit - $current_count;
+                                    $space_amenities = $space_amenities_data[$space['Space_ID']] ?? [];
                                 ?>
                                     <tr>
                                         <td>
@@ -1832,6 +2197,100 @@ foreach ($photo_history as $history) {
                                             </div>
                                         </td>
                                         <td>
+                                            <!-- Amenities Management -->
+                                            <div class="amenities-section">
+                                                <!-- Current Amenities -->
+                                                <?php if (!empty($space_amenities)): ?>
+                                                    <div class="current-amenities mb-3">
+                                                        <h6 class="fw-semibold mb-2">Current Amenities:</h6>
+                                                        <?php foreach ($space_amenities as $category_id => $category_data): ?>
+                                                            <div class="mb-2">
+                                                                <small class="text-muted fw-semibold"><?= htmlspecialchars($category_data['category_name']) ?>:</small>
+                                                                <?php foreach ($category_data['amenities'] as $amenity): ?>
+                                                                    <div class="current-amenity-item">
+                                                                        <div class="amenity-icon">
+                                                                            <i class="<?= htmlspecialchars($amenity['Icon']) ?>"></i>
+                                                                        </div>
+                                                                        <span class="amenity-name"><?= htmlspecialchars($amenity['Amenity_Name']) ?></span>
+                                                                        <form method="post" class="ms-auto">
+                                                                            <input type="hidden" name="form_type" value="remove_space_amenity">
+                                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                                            <input type="hidden" name="amenity_id" value="<?= $amenity['Amenity_ID'] ?>">
+                                                                            <button type="submit" class="btn-remove-amenity" title="Remove amenity">
+                                                                                <i class="fas fa-times"></i>
+                                                                            </button>
+                                                                        </form>
+                                                                    </div>
+                                                                <?php endforeach; ?>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="text-center text-muted py-2">
+                                                        <p>No amenities added yet</p>
+                                                    </div>
+                                                <?php endif; ?>
+
+                                                <!-- Add Amenities -->
+                                                <div class="add-amenities">
+                                                    <h6 class="fw-semibold mb-3">Add Amenities:</h6>
+                                                    <?php foreach ($amenities_categories as $category): 
+                                                        $category_amenities = $db->getAmenitiesByCategory($category['Category_ID']);
+                                                    ?>
+                                                        <?php if (!empty($category_amenities)): ?>
+                                                            <div class="amenity-category">
+                                                                <div class="amenity-category-header">
+                                                                    <div class="amenity-category-icon">
+                                                                        <i class="<?= htmlspecialchars($category['Icon']) ?>"></i>
+                                                                    </div>
+                                                                    <h5 class="amenity-category-title"><?= htmlspecialchars($category['Category_Name']) ?></h5>
+                                                                </div>
+                                                                <div class="amenities-grid">
+                                                                    <?php foreach ($category_amenities as $amenity): 
+                                                                        $is_added = false;
+                                                                        if (isset($space_amenities[$category['Category_ID']])) {
+                                                                            foreach ($space_amenities[$category['Category_ID']]['amenities'] as $added_amenity) {
+                                                                                if ($added_amenity['Amenity_ID'] == $amenity['Amenity_ID']) {
+                                                                                    $is_added = true;
+                                                                                    break;
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    ?>
+                                                                        <div class="amenity-item <?= $is_added ? 'selected' : '' ?>">
+                                                                            <div class="amenity-header">
+                                                                                <div class="amenity-icon">
+                                                                                    <i class="<?= htmlspecialchars($amenity['Icon']) ?>"></i>
+                                                                                </div>
+                                                                                <h6 class="amenity-name"><?= htmlspecialchars($amenity['Amenity_Name']) ?></h6>
+                                                                            </div>
+                                                                            <?php if (!empty($amenity['Description'])): ?>
+                                                                                <p class="amenity-description"><?= htmlspecialchars($amenity['Description']) ?></p>
+                                                                            <?php endif; ?>
+                                                                            <div class="amenity-actions">
+                                                                                <?php if (!$is_added): ?>
+                                                                                    <form method="post">
+                                                                                        <input type="hidden" name="form_type" value="add_space_amenity">
+                                                                                        <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                                                        <input type="hidden" name="amenity_id" value="<?= $amenity['Amenity_ID'] ?>">
+                                                                                        <button type="submit" class="btn-add-amenity">
+                                                                                            <i class="fas fa-plus me-1"></i> Add
+                                                                                        </button>
+                                                                                    </form>
+                                                                                <?php else: ?>
+                                                                                    <span class="text-success small"><i class="fas fa-check me-1"></i>Added</span>
+                                                                                <?php endif; ?>
+                                                                            </div>
+                                                                        </div>
+                                                                    <?php endforeach; ?>
+                                                                </div>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
                                             <div class="space-actions">
                                                 <button type="button" class="btn-edit-space" data-bs-toggle="modal" data-bs-target="#editSpaceModal" 
                                                         data-space-id="<?= $space['Space_ID'] ?>" 
@@ -1855,6 +2314,7 @@ foreach ($photo_history as $history) {
                             $current_count = count($current_photos);
                             $can_add_more = $current_count < $max_photos_per_unit;
                             $photos_remaining = $max_photos_per_unit - $current_count;
+                            $space_amenities = $space_amenities_data[$space['Space_ID']] ?? [];
                         ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
@@ -1874,6 +2334,38 @@ foreach ($photo_history as $history) {
                                 <div class="mobile-card-detail">
                                     <span class="label">Price:</span>
                                     <span class="value">₱<?= number_format($space['Price'], 2) ?></span>
+                                </div>
+
+                                <!-- Amenities Section for Mobile -->
+                                <div class="amenities-section mt-3">
+                                    <h6 class="fw-semibold mb-2">Amenities:</h6>
+                                    <?php if (!empty($space_amenities)): ?>
+                                        <?php foreach ($space_amenities as $category_id => $category_data): ?>
+                                            <div class="mb-2">
+                                                <small class="text-muted fw-semibold"><?= htmlspecialchars($category_data['category_name']) ?>:</small>
+                                                <?php foreach ($category_data['amenities'] as $amenity): ?>
+                                                    <div class="current-amenity-item">
+                                                        <div class="amenity-icon">
+                                                            <i class="<?= htmlspecialchars($amenity['Icon']) ?>"></i>
+                                                        </div>
+                                                        <span class="amenity-name"><?= htmlspecialchars($amenity['Amenity_Name']) ?></span>
+                                                        <form method="post" class="ms-auto">
+                                                            <input type="hidden" name="form_type" value="remove_space_amenity">
+                                                            <input type="hidden" name="space_id" value="<?= $space['Space_ID'] ?>">
+                                                            <input type="hidden" name="amenity_id" value="<?= $amenity['Amenity_ID'] ?>">
+                                                            <button type="submit" class="btn-remove-amenity" title="Remove amenity">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <div class="text-center text-muted py-2">
+                                            <p>No amenities added</p>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
 
                                 <div class="space-actions mt-2">
@@ -2935,7 +3427,7 @@ foreach ($photo_history as $history) {
 
         // Start polling for notifications
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Space & Unit Management page fully loaded with COMPLETE notification system');
+            console.log('Space & Unit Management page fully loaded with COMPLETE notification system and AMENITIES management');
             console.log('Test notifications with: testNotification("rental") or testNotification("maintenance") or testNotification("client_message")');
             
             fetchDashboardCounts();
@@ -2974,6 +3466,19 @@ foreach ($photo_history as $history) {
             }
         `;
         document.head.appendChild(style);
+
+        // Amenity item hover effects
+        document.querySelectorAll('.amenity-item').forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-2px)';
+                this.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+            });
+            
+            item.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = 'none';
+            });
+        });
     </script>
 </body>
 </html>
