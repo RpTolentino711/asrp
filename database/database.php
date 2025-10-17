@@ -463,7 +463,92 @@ function addClientPhotoToHistory($db, $space_id, $photo_path, $action, $descript
     }
 }
 
+public function addPhotoToHistory($space_id, $filename, $action, $previous_filename = null, $admin_id = null, $description = null, $utility_icons = []) {
+    $sql = "INSERT INTO photo_history 
+            (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description,
+             has_bedroom, has_toilet, has_kitchen, has_living, has_balcony, has_parking, has_ac, has_furniture) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    
+    $status = ($action === 'deleted') ? 'inactive' : 'active';
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([
+            $space_id, 
+            $filename, 
+            $action, 
+            $previous_filename, 
+            $admin_id, 
+            $status, 
+            $description,
+            $utility_icons['has_bedroom'] ?? 0,
+            $utility_icons['has_toilet'] ?? 0,
+            $utility_icons['has_kitchen'] ?? 0,
+            $utility_icons['has_living'] ?? 0,
+            $utility_icons['has_balcony'] ?? 0,
+            $utility_icons['has_parking'] ?? 0,
+            $utility_icons['has_ac'] ?? 0,
+            $utility_icons['has_furniture'] ?? 0
+        ]);
+    } catch (PDOException $e) {
+        error_log("addPhotoToHistory Error: " . $e->getMessage());
+        return false;
+    }
+}
 
+public function getCurrentSpacePhotosWithUtilities($space_id) {
+    $sql = "SELECT ph.*, 
+                   COALESCE(ph.has_bedroom, 0) as has_bedroom,
+                   COALESCE(ph.has_toilet, 0) as has_toilet,
+                   COALESCE(ph.has_kitchen, 0) as has_kitchen,
+                   COALESCE(ph.has_living, 0) as has_living,
+                   COALESCE(ph.has_balcony, 0) as has_balcony,
+                   COALESCE(ph.has_parking, 0) as has_parking,
+                   COALESCE(ph.has_ac, 0) as has_ac,
+                   COALESCE(ph.has_furniture, 0) as has_furniture
+            FROM photo_history ph 
+            WHERE ph.Space_ID = ? AND ph.Status = 'active' 
+            ORDER BY ph.History_ID DESC";
+    
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([$space_id]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log("getCurrentSpacePhotosWithUtilities Error: " . $e->getMessage());
+        return [];
+    }
+}
+
+public function updatePhotoUtilities($history_id, $utility_icons) {
+    $sql = "UPDATE photo_history SET 
+            has_bedroom = ?, 
+            has_toilet = ?, 
+            has_kitchen = ?, 
+            has_living = ?, 
+            has_balcony = ?, 
+            has_parking = ?, 
+            has_ac = ?, 
+            has_furniture = ? 
+            WHERE History_ID = ?";
+    
+    try {
+        $stmt = $this->pdo->prepare($sql);
+        return $stmt->execute([
+            $utility_icons['has_bedroom'],
+            $utility_icons['has_toilet'],
+            $utility_icons['has_kitchen'],
+            $utility_icons['has_living'],
+            $utility_icons['has_balcony'],
+            $utility_icons['has_parking'],
+            $utility_icons['has_ac'],
+            $utility_icons['has_furniture'],
+            $history_id
+        ]);
+    } catch (PDOException $e) {
+        error_log("updatePhotoUtilities Error: " . $e->getMessage());
+        return false;
+    }
+}
 
 public function getInvoiceChatMessagesForClient($invoice_id) {
     $sql = "SELECT ic.*, 
@@ -3059,19 +3144,7 @@ public function getActiveClientPhotosForUnits($unit_ids, $client_id) {
     }
 }
 
-public function addPhotoToHistory($space_id, $filename, $action, $previous_filename = null, $admin_id = null, $description = null) {
-    $sql = "INSERT INTO photo_history (Space_ID, Photo_Path, Action, Previous_Photo_Path, Action_By, Status, description) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)";
-    
-    $status = ($action === 'deleted') ? 'inactive' : 'active';
-    try {
-        $stmt = $this->pdo->prepare($sql);
-        return $stmt->execute([$space_id, $filename, $action, $previous_filename, $admin_id, $status, $description]);
-    } catch (PDOException $e) {
-        error_log("addPhotoToHistory Error: " . $e->getMessage());
-        return false;
-    }
-}
+
 
 
 
