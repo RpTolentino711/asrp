@@ -494,17 +494,7 @@ public function addPhotoToHistory($space_id, $filename, $action, $previous_filen
         return false;
     }
 }
-public function getCurrentSpacePhotos($space_id) {
-    $sql = "SELECT * FROM photo_history WHERE Space_ID = ? AND Status = 'active' ORDER BY History_ID DESC";
-    try {
-        $stmt = $this->pdo->prepare($sql);
-        $stmt->execute([$space_id]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log("getCurrentSpacePhotos Error: " . $e->getMessage());
-        return [];
-    }
-}
+
 
 public function getCurrentSpacePhotosWithUtilities($space_id) {
     $sql = "SELECT ph.*, 
