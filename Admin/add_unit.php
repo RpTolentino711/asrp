@@ -1235,6 +1235,88 @@ foreach ($photo_history as $history) {
             75% { transform: rotate(-4deg) scale(1.05); }
         }
         
+        /* NEW: Enhanced Photo Status Icons */
+        .photo-status-overlay {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 10;
+        }
+
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .status-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .status-new {
+            background: linear-gradient(135deg, #10b981, #059669);
+            animation: pulse-glow 2s infinite;
+        }
+
+        .status-updated {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .status-featured {
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+        }
+
+        .status-utilities {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        }
+
+        /* Photo with utilities wrapper */
+        .photo-with-utilities {
+            position: relative;
+        }
+
+        .utilities-overlay {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .utility-icon {
+            font-size: 0.6rem;
+            opacity: 0.9;
+        }
+
+        .utility-count {
+            font-weight: 600;
+            margin: 0 2px;
+        }
+        
         /* CRITICAL: Mobile Responsive Breakpoints */
         @media (max-width: 992px) {
             .sidebar {
@@ -1297,6 +1379,19 @@ foreach ($photo_history as $history) {
             
             .description-timeline {
                 font-size: 0.8rem;
+            }
+
+            /* Mobile adjustments for status icons */
+            .status-icon {
+                width: 20px;
+                height: 20px;
+                font-size: 0.6rem;
+            }
+
+            .photo-status-overlay {
+                top: 6px;
+                right: 6px;
+                gap: 3px;
             }
         }
         
@@ -1494,37 +1589,6 @@ foreach ($photo_history as $history) {
             border: 1px solid #e5e7eb;
         }
 
-        /* NEW: Utilities Icons Overlay on Photos */
-        .photo-with-utilities {
-            position: relative;
-        }
-
-        .utilities-overlay {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-        }
-
-        .utility-icon {
-            font-size: 0.6rem;
-            opacity: 0.9;
-        }
-
-        .utility-count {
-            font-weight: 600;
-            margin: 0 2px;
-        }
-
         /* NEW: Utilities Section Styling */
         .utilities-section {
             background: #f8f9fa;
@@ -1608,6 +1672,34 @@ foreach ($photo_history as $history) {
             display: inline-flex;
             align-items: center;
             gap: 2px;
+        }
+
+        /* NEW: Recently Added Photo Highlight */
+        .recent-photo {
+            position: relative;
+            border: 2px solid #10b981;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .recent-photo::after {
+            content: 'NEW';
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #10b981;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            z-index: 5;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-5px); }
+            60% { transform: translateY(-3px); }
         }
     </style>
 </head>
@@ -1922,6 +2014,9 @@ foreach ($photo_history as $history) {
                                     $current_count = count($current_photos);
                                     $can_add_more = $current_count < $max_photos_per_unit;
                                     $photos_remaining = $max_photos_per_unit - $current_count;
+                                    
+                                    // Determine if photo is recently added (within last 7 days)
+                                    $recent_threshold = date('Y-m-d H:i:s', strtotime('-7 days'));
                                 ?>
                                     <tr>
                                         <td>
@@ -1976,12 +2071,33 @@ foreach ($photo_history as $history) {
                                                 <!-- Existing Photos Grid -->
                                                 <?php if (!empty($current_photos)): ?>
                                                     <div class="photo-grid">
-                                                        <?php foreach ($current_photos as $photo): ?>
-                                                            <div class="photo-item">
+                                                        <?php foreach ($current_photos as $photo): 
+                                                            $is_recent = strtotime($photo['Action_Date'] ?? '') > strtotime($recent_threshold);
+                                                        ?>
+                                                            <div class="photo-item <?= $is_recent ? 'recent-photo' : '' ?>">
                                                                 <div class="photo-with-utilities">
                                                                     <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" class="photo-preview" alt="Space Photo">
                                                                     
-                                                                    <!-- NEW: Utilities Overlay -->
+                                                                    <!-- NEW: Enhanced Status Icons -->
+                                                                    <div class="photo-status-overlay">
+                                                                        <?php if ($is_recent): ?>
+                                                                            <div class="status-icon status-new" title="Recently Added">
+                                                                                <i class="fas fa-star"></i>
+                                                                            </div>
+                                                                        <?php endif; ?>
+                                                                        <?php if ($space['Bedrooms'] > 0 || $space['Toilets'] > 0): ?>
+                                                                            <div class="status-icon status-utilities" title="Has Utilities">
+                                                                                <i class="fas fa-home"></i>
+                                                                            </div>
+                                                                        <?php endif; ?>
+                                                                        <?php if ($space['Furnished']): ?>
+                                                                            <div class="status-icon status-featured" title="Furnished">
+                                                                                <i class="fas fa-couch"></i>
+                                                                            </div>
+                                                                        <?php endif; ?>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Utilities Overlay -->
                                                                     <div class="utilities-overlay">
                                                                         <?php if ($space['Bedrooms'] > 0): ?>
                                                                             <i class="fas fa-bed utility-icon"></i>
@@ -2143,6 +2259,7 @@ foreach ($photo_history as $history) {
                             $current_count = count($current_photos);
                             $can_add_more = $current_count < $max_photos_per_unit;
                             $photos_remaining = $max_photos_per_unit - $current_count;
+                            $recent_threshold = date('Y-m-d H:i:s', strtotime('-7 days'));
                         ?>
                             <div class="mobile-card">
                                 <div class="mobile-card-header">
@@ -2239,12 +2356,28 @@ foreach ($photo_history as $history) {
                                 </div>
 
                                 <div class="mobile-photo-grid">
-                                    <?php foreach ($current_photos as $photo): ?>
-                                        <div class="mobile-photo-item">
+                                    <?php foreach ($current_photos as $photo): 
+                                        $is_recent = strtotime($photo['Action_Date'] ?? '') > strtotime($recent_threshold);
+                                    ?>
+                                        <div class="mobile-photo-item <?= $is_recent ? 'recent-photo' : '' ?>">
                                             <div class="photo-with-utilities">
                                                 <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" alt="Space Photo">
                                                 
-                                                <!-- NEW: Utilities Overlay for Mobile -->
+                                                <!-- NEW: Enhanced Status Icons for Mobile -->
+                                                <div class="photo-status-overlay">
+                                                    <?php if ($is_recent): ?>
+                                                        <div class="status-icon status-new" title="Recently Added">
+                                                            <i class="fas fa-star"></i>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                    <?php if ($space['Bedrooms'] > 0 || $space['Toilets'] > 0): ?>
+                                                        <div class="status-icon status-utilities" title="Has Utilities">
+                                                            <i class="fas fa-home"></i>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                                
+                                                <!-- Utilities Overlay for Mobile -->
                                                 <div class="utilities-overlay">
                                                     <?php if ($space['Bedrooms'] > 0): ?>
                                                         <i class="fas fa-bed utility-icon"></i>
@@ -3042,7 +3175,19 @@ foreach ($photo_history as $history) {
 
         // Start polling for notifications
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Space & Unit Management page fully loaded with utilities integration');
+            console.log('Space & Unit Management page fully loaded with enhanced icon system');
+            
+            // Add tooltips to status icons
+            const statusIcons = document.querySelectorAll('.status-icon');
+            statusIcons.forEach(icon => {
+                icon.addEventListener('mouseenter', function() {
+                    const title = this.getAttribute('title');
+                    if (title) {
+                        // You can add a custom tooltip implementation here if needed
+                        console.log('Status:', title);
+                    }
+                });
+            });
         });
     </script>
 </body>
