@@ -47,39 +47,6 @@ $error_unit = '';
 $success_type = '';
 $error_type = '';
 
-// --- Handle photo utility icons update ---
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_photo_utilities') {
-    $history_id = intval($_POST['history_id'] ?? 0);
-    
-    // Collect utility icons for this specific photo
-    $utility_icons = [
-        'has_bedroom' => isset($_POST['has_bedroom']) ? 1 : 0,
-        'has_toilet' => isset($_POST['has_toilet']) ? 1 : 0,
-        'has_kitchen' => isset($_POST['has_kitchen']) ? 1 : 0,
-        'has_living' => isset($_POST['has_living']) ? 1 : 0,
-        'has_balcony' => isset($_POST['has_balcony']) ? 1 : 0,
-        'has_parking' => isset($_POST['has_parking']) ? 1 : 0,
-        'has_ac' => isset($_POST['has_ac']) ? 1 : 0,
-        'has_furniture' => isset($_POST['has_furniture']) ? 1 : 0
-    ];
-    
-    if ($history_id >= 1) {
-        if ($db->updatePhotoUtilities($history_id, $utility_icons)) {
-            $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
-                            <i class="fas fa-check-circle me-2"></i>
-                            Photo utility icons updated successfully!
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>';
-        } else {
-            $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
-                          <i class="fas fa-exclamation-circle me-2"></i>
-                          Failed to update photo utility icons.
-                          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                          </div>';
-        }
-    }
-}
-
 // --- Handle photo description update ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST['form_type'] === 'update_description') {
     $history_id = intval($_POST['history_id'] ?? 0);
@@ -135,18 +102,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $space_id = intval($_POST['space_id'] ?? 0);
     $photo_description = trim($_POST['photo_description'] ?? '');
     
-    // Collect utility icons for new photo
-    $utility_icons = [
-        'has_bedroom' => isset($_POST['has_bedroom']) ? 1 : 0,
-        'has_toilet' => isset($_POST['has_toilet']) ? 1 : 0,
-        'has_kitchen' => isset($_POST['has_kitchen']) ? 1 : 0,
-        'has_living' => isset($_POST['has_living']) ? 1 : 0,
-        'has_balcony' => isset($_POST['has_balcony']) ? 1 : 0,
-        'has_parking' => isset($_POST['has_parking']) ? 1 : 0,
-        'has_ac' => isset($_POST['has_ac']) ? 1 : 0,
-        'has_furniture' => isset($_POST['has_furniture']) ? 1 : 0
-    ];
-    
     if (strlen($photo_description) > 1000) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
                       <i class="fas fa-exclamation-circle me-2"></i>
@@ -185,10 +140,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
                 $filepath = $upload_dir . $filename;
                 
                 if (move_uploaded_file($file['tmp_name'], $filepath)) {
-                    if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id, $photo_description, $utility_icons)) {
+                    if ($db->addPhotoToHistory($space_id, $filename, 'uploaded', null, $ua_id, $photo_description)) {
                         $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                         <i class="fas fa-check-circle me-2"></i>
-                                        Photo uploaded successfully with utility icons!
+                                        Photo uploaded successfully! (Added to history)
                                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                         </div>';
                     } else {
@@ -215,18 +170,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
     $space_id = intval($_POST['space_id'] ?? 0);
     $old_photo_path = trim($_POST['old_photo_path'] ?? '');
     $photo_description = trim($_POST['photo_description'] ?? '');
-    
-    // Collect utility icons for updated photo
-    $utility_icons = [
-        'has_bedroom' => isset($_POST['has_bedroom']) ? 1 : 0,
-        'has_toilet' => isset($_POST['has_toilet']) ? 1 : 0,
-        'has_kitchen' => isset($_POST['has_kitchen']) ? 1 : 0,
-        'has_living' => isset($_POST['has_living']) ? 1 : 0,
-        'has_balcony' => isset($_POST['has_balcony']) ? 1 : 0,
-        'has_parking' => isset($_POST['has_parking']) ? 1 : 0,
-        'has_ac' => isset($_POST['has_ac']) ? 1 : 0,
-        'has_furniture' => isset($_POST['has_furniture']) ? 1 : 0
-    ];
     
     if (strlen($photo_description) > 1000) {
         $error_unit = '<div class="alert alert-danger alert-dismissible fade show animate-fade-in" role="alert">
@@ -259,10 +202,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             if (move_uploaded_file($file['tmp_name'], $filepath)) {
                 $db->deactivatePhoto($space_id, $old_photo_path);
                 
-                if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id, $photo_description, $utility_icons)) {
+                if ($db->addPhotoToHistory($space_id, $new_filename, 'updated', $old_photo_path, $ua_id, $photo_description)) {
                     $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
                                     <i class="fas fa-check-circle me-2"></i>
-                                    Photo updated successfully with utility icons!
+                                    Photo updated successfully! (Old photo marked inactive, new photo added)
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                     </div>';
                 } else {
@@ -372,18 +315,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
             if ($new_space) {
                 if ($db->addSpaceUtilities($new_space['Space_ID'], $utilities_data)) {
                     if ($uploaded_photo_filename) {
-                        // Add main photo with default utility icons
-                        $default_utilities = [
-                            'has_bedroom' => 1,
-                            'has_toilet' => 1,
-                            'has_kitchen' => 1,
-                            'has_living' => 1,
-                            'has_balcony' => 0,
-                            'has_parking' => 0,
-                            'has_ac' => 0,
-                            'has_furniture' => 0
-                        ];
-                        $db->addPhotoToHistory($new_space['Space_ID'], $uploaded_photo_filename, 'uploaded', null, $ua_id, 'Main unit photo', $default_utilities);
+                        $db->addPhotoToHistory($new_space['Space_ID'], $uploaded_photo_filename, 'uploaded', null, $ua_id);
                     }
                     
                     $success_unit = '<div class="alert alert-success alert-dismissible fade show animate-fade-in" role="alert">
@@ -583,10 +515,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['form_type']) && $_POST
 $spacetypes = $db->getAllSpaceTypes();
 $spaces = $db->getAllSpacesWithUtilities();
 
-// Get current active photos for each space with their utility icons
+// Get current active photos for each space
 $space_photos = [];
 foreach ($spaces as $space) {
-    $space_photos[$space['Space_ID']] = $db->getCurrentSpacePhotosWithUtilities($space['Space_ID']);
+    $space_photos[$space['Space_ID']] = $db->getCurrentSpacePhotos($space['Space_ID']);
 }
 
 $photo_history = $db->getPhotoHistory();
@@ -1562,76 +1494,35 @@ foreach ($photo_history as $history) {
             border: 1px solid #e5e7eb;
         }
 
-        /* NEW: Enhanced Utilities Icons Overlay on Photos */
+        /* NEW: Utilities Icons Overlay on Photos */
         .photo-with-utilities {
             position: relative;
-            overflow: hidden;
         }
 
         .utilities-overlay {
             position: absolute;
             top: 8px;
             left: 8px;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 6px 10px;
+            padding: 4px 8px;
             border-radius: 20px;
             font-size: 0.7rem;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
-            flex-wrap: wrap;
-            max-width: calc(100% - 16px);
-            z-index: 10;
         }
 
         .utility-icon {
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             opacity: 0.9;
-            min-width: 12px;
         }
 
         .utility-count {
             font-weight: 600;
-            margin: 0 1px;
-            font-size: 0.6rem;
-        }
-
-        /* NEW: Photo Utilities Section */
-        .photo-utilities-section {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 1rem;
-            margin: 0.75rem 0;
-            border: 1px solid #e5e7eb;
-        }
-
-        .photo-utilities-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-        }
-
-        .photo-utility-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-        }
-
-        .photo-utility-checkbox {
-            width: 16px;
-            height: 16px;
-        }
-
-        .utility-label {
-            display: flex;
-            align-items: center;
-            gap: 0.25rem;
-            font-size: 0.75rem;
+            margin: 0 2px;
         }
 
         /* NEW: Utilities Section Styling */
@@ -1717,26 +1608,6 @@ foreach ($photo_history as $history) {
             display: inline-flex;
             align-items: center;
             gap: 2px;
-        }
-
-        /* NEW: Edit Utilities Button */
-        .btn-edit-utilities {
-            background: rgba(245, 158, 11, 0.1);
-            color: #f59e0b;
-            border: 1px solid rgba(245, 158, 11, 0.2);
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            text-decoration: none;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-        }
-
-        .btn-edit-utilities:hover {
-            background: #f59e0b;
-            color: white;
         }
     </style>
 </head>
@@ -2110,51 +1981,24 @@ foreach ($photo_history as $history) {
                                                                 <div class="photo-with-utilities">
                                                                     <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" class="photo-preview" alt="Space Photo">
                                                                     
-                                                                    <!-- NEW: Individual Photo Utilities Overlay -->
+                                                                    <!-- NEW: Utilities Overlay -->
                                                                     <div class="utilities-overlay">
-                                                                        <?php if ($photo['has_bedroom']): ?>
-                                                                            <i class="fas fa-bed utility-icon" title="Bedroom"></i>
+                                                                        <?php if ($space['Bedrooms'] > 0): ?>
+                                                                            <i class="fas fa-bed utility-icon"></i>
+                                                                            <span class="utility-count"><?= $space['Bedrooms'] ?></span>
                                                                         <?php endif; ?>
-                                                                        <?php if ($photo['has_toilet']): ?>
-                                                                            <i class="fas fa-bath utility-icon" title="Toilet"></i>
+                                                                        <?php if ($space['Toilets'] > 0): ?>
+                                                                            <i class="fas fa-bath utility-icon"></i>
+                                                                            <span class="utility-count"><?= $space['Toilets'] ?></span>
                                                                         <?php endif; ?>
-                                                                        <?php if ($photo['has_kitchen']): ?>
-                                                                            <i class="fas fa-utensils utility-icon" title="Kitchen"></i>
-                                                                        <?php endif; ?>
-                                                                        <?php if ($photo['has_living']): ?>
-                                                                            <i class="fas fa-couch utility-icon" title="Living Room"></i>
-                                                                        <?php endif; ?>
-                                                                        <?php if ($photo['has_balcony']): ?>
-                                                                            <i class="fas fa-door-open utility-icon" title="Balcony"></i>
-                                                                        <?php endif; ?>
-                                                                        <?php if ($photo['has_parking']): ?>
-                                                                            <i class="fas fa-car utility-icon" title="Parking"></i>
-                                                                        <?php endif; ?>
-                                                                        <?php if ($photo['has_ac']): ?>
-                                                                            <i class="fas fa-snowflake utility-icon" title="Air Conditioning"></i>
-                                                                        <?php endif; ?>
-                                                                        <?php if ($photo['has_furniture']): ?>
-                                                                            <i class="fas fa-chair utility-icon" title="Furniture"></i>
+                                                                        <?php if ($space['Square_Meters']): ?>
+                                                                            <i class="fas fa-ruler-combined utility-icon"></i>
+                                                                            <span class="utility-count"><?= $space['Square_Meters'] ?>m²</span>
                                                                         <?php endif; ?>
                                                                     </div>
                                                                 </div>
                                                                 
                                                                 <div class="photo-actions">
-                                                                    <!-- Edit Utilities Button -->
-                                                                    <button type="button" class="btn-action btn-edit-utilities" 
-                                                                            data-bs-toggle="modal" data-bs-target="#editUtilitiesModal"
-                                                                            data-history-id="<?= $photo['History_ID'] ?>"
-                                                                            data-has-bedroom="<?= $photo['has_bedroom'] ?>"
-                                                                            data-has-toilet="<?= $photo['has_toilet'] ?>"
-                                                                            data-has-kitchen="<?= $photo['has_kitchen'] ?>"
-                                                                            data-has-living="<?= $photo['has_living'] ?>"
-                                                                            data-has-balcony="<?= $photo['has_balcony'] ?>"
-                                                                            data-has-parking="<?= $photo['has_parking'] ?>"
-                                                                            data-has-ac="<?= $photo['has_ac'] ?>"
-                                                                            data-has-furniture="<?= $photo['has_furniture'] ?>">
-                                                                        <i class="fas fa-tags me-1"></i> Edit Icons
-                                                                    </button>
-
                                                                     <!-- Update Photo Form with Description -->
                                                                     <form method="post" enctype="multipart/form-data">
                                                                         <div class="file-input-container">
@@ -2175,61 +2019,6 @@ foreach ($photo_history as $history) {
                                                                                       placeholder="Describe this photo (max 1000 characters)" 
                                                                                       maxlength="1000"><?= htmlspecialchars($photo['description'] ?? '') ?></textarea>
                                                                             <div class="char-counter small text-muted"><?= strlen($photo['description'] ?? '') ?>/1000</div>
-                                                                        </div>
-
-                                                                        <!-- NEW: Photo Utilities Section -->
-                                                                        <div class="photo-utilities-section">
-                                                                            <label class="form-label small fw-semibold mb-2">What does this photo show?</label>
-                                                                            <div class="photo-utilities-grid">
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_bedroom" value="1" <?= $photo['has_bedroom'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-bed text-primary"></i> Bedroom
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_toilet" value="1" <?= $photo['has_toilet'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-bath text-info"></i> Toilet
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_kitchen" value="1" <?= $photo['has_kitchen'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-utensils text-warning"></i> Kitchen
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_living" value="1" <?= $photo['has_living'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-couch text-success"></i> Living
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_balcony" value="1" <?= $photo['has_balcony'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-door-open text-secondary"></i> Balcony
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_parking" value="1" <?= $photo['has_parking'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-car text-dark"></i> Parking
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_ac" value="1" <?= $photo['has_ac'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-snowflake text-info"></i> AC
-                                                                                    </label>
-                                                                                </div>
-                                                                                <div class="photo-utility-item">
-                                                                                    <input type="checkbox" class="photo-utility-checkbox" name="has_furniture" value="1" <?= $photo['has_furniture'] ? 'checked' : '' ?>>
-                                                                                    <label class="utility-label">
-                                                                                        <i class="fas fa-chair text-brown"></i> Furniture
-                                                                                    </label>
-                                                                                </div>
-                                                                            </div>
                                                                         </div>
                                                                         
                                                                         <button type="submit" class="btn btn-primary btn-sm mt-2 w-100">Update Photo</button>
@@ -2305,61 +2094,6 @@ foreach ($photo_history as $history) {
                                                                           placeholder="Describe this photo (max 1000 characters)" 
                                                                           maxlength="1000"></textarea>
                                                                 <div class="char-counter small text-muted">0/1000</div>
-                                                            </div>
-
-                                                            <!-- NEW: Photo Utilities Section for New Photo -->
-                                                            <div class="photo-utilities-section">
-                                                                <label class="form-label small fw-semibold mb-2">What does this photo show?</label>
-                                                                <div class="photo-utilities-grid">
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_bedroom" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-bed text-primary"></i> Bedroom
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_toilet" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-bath text-info"></i> Toilet
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_kitchen" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-utensils text-warning"></i> Kitchen
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_living" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-couch text-success"></i> Living
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_balcony" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-door-open text-secondary"></i> Balcony
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_parking" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-car text-dark"></i> Parking
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_ac" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-snowflake text-info"></i> AC
-                                                                        </label>
-                                                                    </div>
-                                                                    <div class="photo-utility-item">
-                                                                        <input type="checkbox" class="photo-utility-checkbox" name="has_furniture" value="1">
-                                                                        <label class="utility-label">
-                                                                            <i class="fas fa-chair text-brown"></i> Furniture
-                                                                        </label>
-                                                                    </div>
-                                                                </div>
                                                             </div>
                                                             
                                                             <button type="submit" class="btn btn-success btn-sm mt-2">
@@ -2510,38 +2244,19 @@ foreach ($photo_history as $history) {
                                             <div class="photo-with-utilities">
                                                 <img src="../uploads/unit_photos/<?= htmlspecialchars($photo['Photo_Path']) ?>" alt="Space Photo">
                                                 
-                                                <!-- NEW: Individual Photo Utilities Overlay for Mobile -->
+                                                <!-- NEW: Utilities Overlay for Mobile -->
                                                 <div class="utilities-overlay">
-                                                    <?php if ($photo['has_bedroom']): ?>
-                                                        <i class="fas fa-bed utility-icon" title="Bedroom"></i>
+                                                    <?php if ($space['Bedrooms'] > 0): ?>
+                                                        <i class="fas fa-bed utility-icon"></i>
+                                                        <span class="utility-count"><?= $space['Bedrooms'] ?></span>
                                                     <?php endif; ?>
-                                                    <?php if ($photo['has_toilet']): ?>
-                                                        <i class="fas fa-bath utility-icon" title="Toilet"></i>
-                                                    <?php endif; ?>
-                                                    <?php if ($photo['has_kitchen']): ?>
-                                                        <i class="fas fa-utensils utility-icon" title="Kitchen"></i>
-                                                    <?php endif; ?>
-                                                    <?php if ($photo['has_living']): ?>
-                                                        <i class="fas fa-couch utility-icon" title="Living Room"></i>
+                                                    <?php if ($space['Toilets'] > 0): ?>
+                                                        <i class="fas fa-bath utility-icon"></i>
+                                                        <span class="utility-count"><?= $space['Toilets'] ?></span>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
                                             <div class="mobile-photo-actions">
-                                                <!-- Edit Utilities Button -->
-                                                <button type="button" class="btn-action btn-edit-utilities" 
-                                                        data-bs-toggle="modal" data-bs-target="#editUtilitiesModal"
-                                                        data-history-id="<?= $photo['History_ID'] ?>"
-                                                        data-has-bedroom="<?= $photo['has_bedroom'] ?>"
-                                                        data-has-toilet="<?= $photo['has_toilet'] ?>"
-                                                        data-has-kitchen="<?= $photo['has_kitchen'] ?>"
-                                                        data-has-living="<?= $photo['has_living'] ?>"
-                                                        data-has-balcony="<?= $photo['has_balcony'] ?>"
-                                                        data-has-parking="<?= $photo['has_parking'] ?>"
-                                                        data-has-ac="<?= $photo['has_ac'] ?>"
-                                                        data-has-furniture="<?= $photo['has_furniture'] ?>">
-                                                    <i class="fas fa-tags"></i> Edit Icons
-                                                </button>
-
                                                 <!-- Update Photo Form with Description -->
                                                 <form method="post" enctype="multipart/form-data">
                                                     <div class="file-input-container w-100">
@@ -2562,37 +2277,6 @@ foreach ($photo_history as $history) {
                                                                   placeholder="Describe this photo (max 1000 chars)" 
                                                                   maxlength="1000"><?= htmlspecialchars($photo['description'] ?? '') ?></textarea>
                                                         <div class="char-counter small text-muted"><?= strlen($photo['description'] ?? '') ?>/1000</div>
-                                                    </div>
-
-                                                    <!-- NEW: Photo Utilities Section for Mobile -->
-                                                    <div class="photo-utilities-section">
-                                                        <label class="form-label small fw-semibold mb-2">Photo shows:</label>
-                                                        <div class="photo-utilities-grid">
-                                                            <div class="photo-utility-item">
-                                                                <input type="checkbox" class="photo-utility-checkbox" name="has_bedroom" value="1" <?= $photo['has_bedroom'] ? 'checked' : '' ?>>
-                                                                <label class="utility-label">
-                                                                    <i class="fas fa-bed text-primary"></i>
-                                                                </label>
-                                                            </div>
-                                                            <div class="photo-utility-item">
-                                                                <input type="checkbox" class="photo-utility-checkbox" name="has_toilet" value="1" <?= $photo['has_toilet'] ? 'checked' : '' ?>>
-                                                                <label class="utility-label">
-                                                                    <i class="fas fa-bath text-info"></i>
-                                                                </label>
-                                                            </div>
-                                                            <div class="photo-utility-item">
-                                                                <input type="checkbox" class="photo-utility-checkbox" name="has_kitchen" value="1" <?= $photo['has_kitchen'] ? 'checked' : '' ?>>
-                                                                <label class="utility-label">
-                                                                    <i class="fas fa-utensils text-warning"></i>
-                                                                </label>
-                                                            </div>
-                                                            <div class="photo-utility-item">
-                                                                <input type="checkbox" class="photo-utility-checkbox" name="has_living" value="1" <?= $photo['has_living'] ? 'checked' : '' ?>>
-                                                                <label class="utility-label">
-                                                                    <i class="fas fa-couch text-success"></i>
-                                                                </label>
-                                                            </div>
-                                                        </div>
                                                     </div>
                                                     
                                                     <button type="submit" class="btn btn-primary btn-sm w-100 mt-1" style="font-size: 0.7rem;">Update Photo</button>
@@ -2663,37 +2347,6 @@ foreach ($photo_history as $history) {
                                                               placeholder="Describe this photo (max 1000 chars)" 
                                                               maxlength="1000"></textarea>
                                                     <div class="char-counter small text-muted">0/1000</div>
-                                                </div>
-
-                                                <!-- NEW: Photo Utilities Section for New Photo (Mobile) -->
-                                                <div class="photo-utilities-section">
-                                                    <label class="form-label small fw-semibold mb-2">Photo shows:</label>
-                                                    <div class="photo-utilities-grid">
-                                                        <div class="photo-utility-item">
-                                                            <input type="checkbox" class="photo-utility-checkbox" name="has_bedroom" value="1">
-                                                            <label class="utility-label">
-                                                                <i class="fas fa-bed text-primary"></i>
-                                                            </label>
-                                                        </div>
-                                                        <div class="photo-utility-item">
-                                                            <input type="checkbox" class="photo-utility-checkbox" name="has_toilet" value="1">
-                                                            <label class="utility-label">
-                                                                <i class="fas fa-bath text-info"></i>
-                                                            </label>
-                                                        </div>
-                                                        <div class="photo-utility-item">
-                                                            <input type="checkbox" class="photo-utility-checkbox" name="has_kitchen" value="1">
-                                                            <label class="utility-label">
-                                                                <i class="fas fa-utensils text-warning"></i>
-                                                            </label>
-                                                        </div>
-                                                        <div class="photo-utility-item">
-                                                            <input type="checkbox" class="photo-utility-checkbox" name="has_living" value="1">
-                                                            <label class="utility-label">
-                                                                <i class="fas fa-couch text-success"></i>
-                                                            </label>
-                                                        </div>
-                                                    </div>
                                                 </div>
                                                 
                                                 <button type="submit" class="btn btn-success btn-sm w-100 mt-1" style="font-size: 0.7rem;">
@@ -2872,36 +2525,6 @@ foreach ($photo_history as $history) {
                                         <?php if (!empty($history['description'])): ?>
                                             <div class="description-timeline bg-light p-2 rounded mt-2 small">
                                                 <strong>Description:</strong> <?= htmlspecialchars($history['description']) ?>
-                                            </div>
-                                        <?php endif; ?>
-
-                                        <!-- Show utility icons in timeline -->
-                                        <?php if ($history['has_bedroom'] || $history['has_toilet'] || $history['has_kitchen'] || $history['has_living'] || $history['has_balcony'] || $history['has_parking'] || $history['has_ac'] || $history['has_furniture']): ?>
-                                            <div class="utilities-overlay mt-2" style="position: relative; top: 0; left: 0; display: inline-flex;">
-                                                <?php if ($history['has_bedroom']): ?>
-                                                    <i class="fas fa-bed utility-icon" title="Bedroom"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_toilet']): ?>
-                                                    <i class="fas fa-bath utility-icon" title="Toilet"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_kitchen']): ?>
-                                                    <i class="fas fa-utensils utility-icon" title="Kitchen"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_living']): ?>
-                                                    <i class="fas fa-couch utility-icon" title="Living Room"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_balcony']): ?>
-                                                    <i class="fas fa-door-open utility-icon" title="Balcony"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_parking']): ?>
-                                                    <i class="fas fa-car utility-icon" title="Parking"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_ac']): ?>
-                                                    <i class="fas fa-snowflake utility-icon" title="Air Conditioning"></i>
-                                                <?php endif; ?>
-                                                <?php if ($history['has_furniture']): ?>
-                                                    <i class="fas fa-chair utility-icon" title="Furniture"></i>
-                                                <?php endif; ?>
                                             </div>
                                         <?php endif; ?>
                                         
@@ -3146,82 +2769,6 @@ foreach ($photo_history as $history) {
         </div>
     </div>
 
-    <!-- Edit Utilities Modal -->
-    <div class="modal fade" id="editUtilitiesModal" tabindex="-1" aria-labelledby="editUtilitiesModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editUtilitiesModalLabel">Edit Photo Utility Icons</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="post">
-                    <div class="modal-body">
-                        <input type="hidden" name="form_type" value="update_photo_utilities">
-                        <input type="hidden" name="history_id" id="edit_utilities_history_id">
-                        
-                        <div class="photo-utilities-section">
-                            <label class="form-label fw-semibold mb-3">What does this photo show?</label>
-                            <div class="photo-utilities-grid">
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_bedroom" value="1" id="edit_has_bedroom">
-                                    <label class="utility-label" for="edit_has_bedroom">
-                                        <i class="fas fa-bed text-primary"></i> Bedroom
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_toilet" value="1" id="edit_has_toilet">
-                                    <label class="utility-label" for="edit_has_toilet">
-                                        <i class="fas fa-bath text-info"></i> Toilet
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_kitchen" value="1" id="edit_has_kitchen">
-                                    <label class="utility-label" for="edit_has_kitchen">
-                                        <i class="fas fa-utensils text-warning"></i> Kitchen
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_living" value="1" id="edit_has_living">
-                                    <label class="utility-label" for="edit_has_living">
-                                        <i class="fas fa-couch text-success"></i> Living Room
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_balcony" value="1" id="edit_has_balcony">
-                                    <label class="utility-label" for="edit_has_balcony">
-                                        <i class="fas fa-door-open text-secondary"></i> Balcony
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_parking" value="1" id="edit_has_parking">
-                                    <label class="utility-label" for="edit_has_parking">
-                                        <i class="fas fa-car text-dark"></i> Parking
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_ac" value="1" id="edit_has_ac">
-                                    <label class="utility-label" for="edit_has_ac">
-                                        <i class="fas fa-snowflake text-info"></i> Air Conditioning
-                                    </label>
-                                </div>
-                                <div class="photo-utility-item">
-                                    <input type="checkbox" class="photo-utility-checkbox" name="has_furniture" value="1" id="edit_has_furniture">
-                                    <label class="utility-label" for="edit_has_furniture">
-                                        <i class="fas fa-chair text-brown"></i> Furniture
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Utility Icons</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <!-- Image Preview Modal -->
     <div class="modal fade" id="imageModal" tabindex="-1" aria-labelledby="imageModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -3382,34 +2929,6 @@ foreach ($photo_history as $history) {
             });
         }
 
-        // Edit Utilities Modal
-        const editUtilitiesModal = document.getElementById('editUtilitiesModal');
-        if (editUtilitiesModal) {
-            editUtilitiesModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-                const historyId = button.getAttribute('data-history-id');
-                const hasBedroom = button.getAttribute('data-has-bedroom') === '1';
-                const hasToilet = button.getAttribute('data-has-toilet') === '1';
-                const hasKitchen = button.getAttribute('data-has-kitchen') === '1';
-                const hasLiving = button.getAttribute('data-has-living') === '1';
-                const hasBalcony = button.getAttribute('data-has-balcony') === '1';
-                const hasParking = button.getAttribute('data-has-parking') === '1';
-                const hasAc = button.getAttribute('data-has-ac') === '1';
-                const hasFurniture = button.getAttribute('data-has-furniture') === '1';
-                
-                const modal = this;
-                modal.querySelector('#edit_utilities_history_id').value = historyId;
-                modal.querySelector('#edit_has_bedroom').checked = hasBedroom;
-                modal.querySelector('#edit_has_toilet').checked = hasToilet;
-                modal.querySelector('#edit_has_kitchen').checked = hasKitchen;
-                modal.querySelector('#edit_has_living').checked = hasLiving;
-                modal.querySelector('#edit_has_balcony').checked = hasBalcony;
-                modal.querySelector('#edit_has_parking').checked = hasParking;
-                modal.querySelector('#edit_has_ac').checked = hasAc;
-                modal.querySelector('#edit_has_furniture').checked = hasFurniture;
-            });
-        }
-
         // Image Preview Modal
         const imageModal = document.getElementById('imageModal');
         if (imageModal) {
@@ -3523,7 +3042,7 @@ foreach ($photo_history as $history) {
 
         // Start polling for notifications
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Space & Unit Management page fully loaded with individual photo utility icons');
+            console.log('Space & Unit Management page fully loaded with utilities integration');
         });
     </script>
 </body>
