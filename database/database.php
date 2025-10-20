@@ -1809,12 +1809,11 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
         (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND MONTH(EndDate) = MONTH(CURDATE()) AND YEAR(EndDate) = YEAR(CURDATE())) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND MONTH(EndDate) = MONTH(CURDATE()) AND YEAR(EndDate) = YEAR(CURDATE())) as overdue_invoices,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
     
     return $this->getRow($sql);
 }
-
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
