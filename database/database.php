@@ -1805,15 +1805,19 @@ public function getAdminDashboardCounts($startDate = null, $endDate = null) {
         $endDate = date('Y-m-t');
     }
     
+    // Add time component to include the entire end date
+    $endDateWithTime = $endDate . ' 23:59:59';
+    
     $sql = "SELECT 
         (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND MONTH(EndDate) = MONTH(CURDATE()) AND YEAR(EndDate) = YEAR(CURDATE())) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()) as overdue_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'new') as unpaid_invoices,
+        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND Flow_Status = 'new') as overdue_invoices,
         (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
     
     return $this->getRow($sql);
 }
+
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
