@@ -22,21 +22,14 @@ $startDate = "$selectedYear-" . str_pad($selectedMonth, 2, "0", STR_PAD_LEFT) . 
 $endDate = date("Y-m-t", strtotime($startDate));
 $monthName = date('F Y', strtotime($startDate));
 
-// Get statistics
+// Get statistics - FIXED: Use the corrected counts
 $counts = $db->getAdminDashboardCounts();
 
-// DEBUG: Check what invoices are being counted as unpaid
+// DEBUG: Check what invoices are being counted
 $debug_unpaid = $db->executeQuery("SELECT Invoice_ID, Client_ID, InvoiceDate, EndDate, Status, Flow_Status FROM invoice WHERE Status = 'unpaid'");
 echo "<!-- DEBUG: Found " . count($debug_unpaid) . " unpaid invoices -->";
 foreach($debug_unpaid as $inv) {
     echo "<!-- Invoice #{$inv['Invoice_ID']}: {$inv['EndDate']} - Status: {$inv['Status']} - Flow: {$inv['Flow_Status']} -->";
-}
-
-// DEBUG: Check what should be counted (only October unpaid)
-$debug_october_unpaid = $db->executeQuery("SELECT Invoice_ID, Client_ID, EndDate FROM invoice WHERE Status = 'unpaid' AND MONTH(EndDate) = 10 AND YEAR(EndDate) = 2025");
-echo "<!-- DEBUG: Should show " . count($debug_october_unpaid) . " October unpaid invoices -->";
-foreach($debug_october_unpaid as $inv) {
-    echo "<!-- October Unpaid: Invoice #{$inv['Invoice_ID']} - Due: {$inv['EndDate']} -->";
 }
 
 // Monthly stats for the selected period
@@ -47,7 +40,7 @@ $chartData = $db->getAdminMonthChartData($startDate, $endDate);
 $rentalRequestsData = $db->getTotalRentalRequests($startDate, $endDate);
 $maintenanceRequestsData = $db->getTotalMaintenanceRequests($startDate, $endDate);
 
-// Extract values
+// Extract values - FIXED: Use corrected counts
 $pending = $counts['pending_rentals'] ?? 0;
 $pending_maintenance = $counts['pending_maintenance'] ?? 0;
 $unpaid_invoices = $counts['unpaid_invoices'] ?? 0;
@@ -56,7 +49,7 @@ $total_earnings = $monthlyStats['total_earnings'] ?? 0;
 $paid_invoices_count = $monthlyStats['paid_invoices_count'] ?? 0;
 $new_messages_count = $monthlyStats['new_messages_count'] ?? 0;
 
-// For AJAX real-time updates - FIXED: Get from database directly
+// For AJAX real-time updates
 $unseen_rentals_sql = "SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND admin_seen = 0 AND Flow_Status = 'new'";
 $unseen_rentals_result = $db->getRow($unseen_rentals_sql);
 $unseen_rentals = $unseen_rentals_result['count'] ?? 0;
@@ -65,10 +58,17 @@ $new_maintenance_sql = "SELECT COUNT(*) as count FROM maintenancerequest WHERE S
 $new_maintenance_result = $db->getRow($new_maintenance_sql);
 $new_maintenance_requests = $new_maintenance_result['count'] ?? 0;
 
-// NEW: Get initial unread client messages count
+// Get initial unread client messages count
 $unread_messages_sql = "SELECT COUNT(*) as count FROM invoice_chat WHERE Sender_Type = 'client' AND is_read_admin = 0";
 $unread_messages_result = $db->getRow($unread_messages_sql);
 $unread_client_messages = $unread_messages_result['count'] ?? 0;
+
+// NEW: Get free message statistics including days count
+$messageStats = $db->getFreeMessageDaysCount();
+$total_message_days = $messageStats['total_days_span'] ?? 0;
+$total_messages = $messageStats['total_messages'] ?? 0;
+$first_message_date = $messageStats['first_message_date'] ?? 'N/A';
+$last_message_date = $messageStats['last_message_date'] ?? 'N/A';
 
 // Soft delete logic
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['soft_delete_msg_id'])) {
@@ -369,6 +369,7 @@ function timeAgo($datetime) {
         .stat-card.invoices { border-left-color: var(--info); }
         .stat-card.overdue { border-left-color: var(--danger); }
         .stat-card.earnings { border-left-color: var(--secondary); }
+        .stat-card.messages { border-left-color: #8b5cf6; }
         
         .stat-icon {
             width: 50px;
@@ -391,6 +392,7 @@ function timeAgo($datetime) {
         .stat-card.invoices .stat-icon { background: rgba(6, 182, 212, 0.1); color: var(--info); }
         .stat-card.overdue .stat-icon { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
         .stat-card.earnings .stat-icon { background: rgba(16, 185, 129, 0.1); color: var(--secondary); }
+        .stat-card.messages .stat-icon { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
         
         .stat-value {
             font-size: 2rem;
@@ -664,6 +666,47 @@ function timeAgo($datetime) {
             border-color: var(--primary);
         }
 
+        /* Message Stats Card */
+        .message-stats-card {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .message-stats-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .message-stats-header i {
+            font-size: 1.5rem;
+        }
+
+        .message-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .message-stat {
+            text-align: center;
+        }
+
+        .message-stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .message-stat-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+        }
+
         /* Mobile Card Layout */
         .mobile-card {
             background: white;
@@ -888,6 +931,10 @@ function timeAgo($datetime) {
             .summary-card {
                 padding: 0.75rem;
             }
+
+            .message-stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
         
         @media (max-width: 768px) {
@@ -929,6 +976,10 @@ function timeAgo($datetime) {
             }
 
             .monthly-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .message-stats-grid {
                 grid-template-columns: 1fr;
             }
         }
@@ -1205,6 +1256,32 @@ function timeAgo($datetime) {
             </div>
         </div>
         
+        <!-- Message Statistics Card -->
+        <div class="message-stats-card animate-fade-in">
+            <div class="message-stats-header">
+                <i class="fas fa-comments"></i>
+                <h5 class="mb-0">Free Message Statistics</h5>
+            </div>
+            <div class="message-stats-grid">
+                <div class="message-stat">
+                    <div class="message-stat-value"><?= $total_message_days ?></div>
+                    <div class="message-stat-label">Total Days</div>
+                </div>
+                <div class="message-stat">
+                    <div class="message-stat-value"><?= $total_messages ?></div>
+                    <div class="message-stat-label">Total Messages</div>
+                </div>
+                <div class="message-stat">
+                    <div class="message-stat-value"><?= $first_message_date != 'N/A' ? date('M d, Y', strtotime($first_message_date)) : 'N/A' ?></div>
+                    <div class="message-stat-label">First Message</div>
+                </div>
+                <div class="message-stat">
+                    <div class="message-stat-value"><?= $last_message_date != 'N/A' ? date('M d, Y', strtotime($last_message_date)) : 'N/A' ?></div>
+                    <div class="message-stat-label">Last Message</div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Monthly Earnings Summary -->
         <div class="monthly-summary animate-fade-in">
             <div class="monthly-summary-content">
@@ -1438,11 +1515,11 @@ function timeAgo($datetime) {
     // --- FIXED NOTIFICATION SYSTEM ---
     let rentalNotificationCooldown = false;
     let maintenanceNotificationCooldown = false;
-    let clientMessageNotificationCooldown = false; // NEW: For client messages
+    let clientMessageNotificationCooldown = false;
 
     let lastUnseenRentals = <?= $unseen_rentals ?>;
     let lastNewMaintenance = <?= $new_maintenance_requests ?>;
-    let lastUnreadClientMessages = <?= $unread_client_messages ?>; // NEW: Track client messages
+    let lastUnreadClientMessages = <?= $unread_client_messages ?>;
     let isFirstLoad = true;
     let isTabActive = true;
 
@@ -1587,7 +1664,7 @@ function timeAgo($datetime) {
         }, 10000);
     }
 
-    // NEW: Show client message notification
+    // Show client message notification
     function showNewClientMessageNotification(count) {
         if (clientMessageNotificationCooldown) {
             console.log('Client message notification cooldown active');
@@ -1659,7 +1736,7 @@ function timeAgo($datetime) {
         }
     }
 
-    // NEW: Function to update invoices sidebar badge
+    // Function to update invoices sidebar badge
     function updateInvoicesSidebarBadge(currentCount) {
         const sidebarBadge = document.getElementById('sidebarInvoicesBadge');
         if (sidebarBadge) {
@@ -1698,7 +1775,7 @@ function timeAgo($datetime) {
                 if (data && !data.error) {
                     const currentUnseenRentals = data.unseen_rentals ?? 0;
                     const currentNewMaintenance = data.new_maintenance_requests ?? 0;
-                    const currentUnreadClientMessages = data.unread_client_messages ?? 0; // NEW
+                    const currentUnreadClientMessages = data.unread_client_messages ?? 0;
                     const currentPending = data.pending_rentals ?? 0;
                     const currentMaintenance = data.pending_maintenance ?? 0;
                     const currentUnpaid = data.unpaid_invoices ?? 0;
@@ -1724,7 +1801,7 @@ function timeAgo($datetime) {
                         showNewMaintenanceNotification(newMaintenance);
                     }
                     
-                    // NEW: Check for new client messages
+                    // Check for new client messages
                     if (!isFirstLoad && currentUnreadClientMessages > lastUnreadClientMessages) {
                         const newMessages = currentUnreadClientMessages - lastUnreadClientMessages;
                         console.log(`New client messages detected: ${newMessages} (was ${lastUnreadClientMessages}, now ${currentUnreadClientMessages})`);
@@ -1736,7 +1813,7 @@ function timeAgo($datetime) {
                     
                     lastUnseenRentals = currentUnseenRentals;
                     lastNewMaintenance = currentNewMaintenance;
-                    lastUnreadClientMessages = currentUnreadClientMessages; // NEW
+                    lastUnreadClientMessages = currentUnreadClientMessages;
                     isFirstLoad = false;
                 }
             })
@@ -1783,7 +1860,7 @@ function timeAgo($datetime) {
         }
     }
 
-    // FIXED: Maintenance requests function
+    // Maintenance requests function
     function fetchLatestMaintenance() {
         if (!isTabActive) return;
         
@@ -2066,7 +2143,7 @@ function timeAgo($datetime) {
             showNewRequestNotification(1);
         } else if (type === 'maintenance') {
             showNewMaintenanceNotification(1);
-        } else if (type === 'client_message') { // NEW
+        } else if (type === 'client_message') {
             showNewClientMessageNotification(1);
         }
     };
