@@ -25,6 +25,20 @@ $monthName = date('F Y', strtotime($startDate));
 // Get statistics
 $counts = $db->getAdminDashboardCounts();
 
+// DEBUG: Check what invoices are being counted as unpaid
+$debug_unpaid = $db->executeQuery("SELECT Invoice_ID, Client_ID, InvoiceDate, EndDate, Status, Flow_Status FROM invoice WHERE Status = 'unpaid'");
+echo "<!-- DEBUG: Found " . count($debug_unpaid) . " unpaid invoices -->";
+foreach($debug_unpaid as $inv) {
+    echo "<!-- Invoice #{$inv['Invoice_ID']}: {$inv['EndDate']} - Status: {$inv['Status']} - Flow: {$inv['Flow_Status']} -->";
+}
+
+// DEBUG: Check what should be counted (only October unpaid)
+$debug_october_unpaid = $db->executeQuery("SELECT Invoice_ID, Client_ID, EndDate FROM invoice WHERE Status = 'unpaid' AND MONTH(EndDate) = 10 AND YEAR(EndDate) = 2025");
+echo "<!-- DEBUG: Should show " . count($debug_october_unpaid) . " October unpaid invoices -->";
+foreach($debug_october_unpaid as $inv) {
+    echo "<!-- October Unpaid: Invoice #{$inv['Invoice_ID']} - Due: {$inv['EndDate']} -->";
+}
+
 // Monthly stats for the selected period
 $monthlyStats = $db->getMonthlyEarningsStats($startDate, $endDate);
 $chartData = $db->getAdminMonthChartData($startDate, $endDate);
