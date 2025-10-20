@@ -1809,11 +1809,12 @@ public function getAdminDashboardCounts() {
     // Pending maintenance
     $counts['pending_maintenance'] = $this->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'] ?? 0;
     
-    // FIXED: Unpaid invoices (only invoices that are unpaid, not overdue)
-    $counts['unpaid_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status != 'overdue'")['count'] ?? 0;
+    // FIXED: Unpaid invoices (ALL unpaid invoices, not just monthly)
+    $counts['unpaid_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'")['count'] ?? 0;
     
-    // FIXED: Overdue invoices (only invoices that are both unpaid AND overdue)
-    $counts['overdue_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'overdue'")['count'] ?? 0;
+    // FIXED: Overdue invoices (ALL unpaid invoices where EndDate has passed)
+    $currentDate = date('Y-m-d');
+    $counts['overdue_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < ?", [$currentDate])['count'] ?? 0;
     
     return $counts;
 }
