@@ -1798,22 +1798,26 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
 
 
 
-public function getAdminDashboardCounts($startDate = null, $endDate = null) {
-    // If no dates provided, use current month
-    if (!$startDate || !$endDate) {
-        $startDate = date('Y-m-01');
-        $endDate = date('Y-m-t');
-    }
+// In your Database class, update the getAdminDashboardCounts method:
+
+public function getAdminDashboardCounts() {
+    $counts = [];
     
-    $sql = "SELECT 
-        (SELECT COUNT(*) FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new') as pending_rentals,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status IN ('Submitted', 'In Progress')) as pending_maintenance,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND MONTH(EndDate) = MONTH(CURDATE()) AND YEAR(EndDate) = YEAR(CURDATE())) as unpaid_invoices,
-        (SELECT COUNT(*) FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE() AND MONTH(EndDate) = MONTH(CURDATE()) AND YEAR(EndDate) = YEAR(CURDATE())) as overdue_invoices,
-        (SELECT COUNT(*) FROM maintenancerequest WHERE Status = 'Submitted' AND admin_seen = 0) as new_maintenance_requests";
+    // Pending rentals
+    $counts['pending_rentals'] = $this->getRow("SELECT COUNT(*) as count FROM rentalrequest WHERE Status = 'Pending' AND Flow_Status = 'new'")['count'] ?? 0;
     
-    return $this->getRow($sql);
+    // Pending maintenance
+    $counts['pending_maintenance'] = $this->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'] ?? 0;
+    
+    // FIXED: Unpaid invoices (only invoices that are unpaid, not overdue)
+    $counts['unpaid_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status != 'overdue'")['count'] ?? 0;
+    
+    // FIXED: Overdue invoices (only invoices that are both unpaid AND overdue)
+    $counts['overdue_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND Flow_Status = 'overdue'")['count'] ?? 0;
+    
+    return $counts;
 }
+
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
@@ -2098,6 +2102,18 @@ public function insertFreeMessage($name, $email, $phone, $message) {
     $sql = "INSERT INTO free_message (Client_Name, Client_Email, Client_Phone, Message_Text)
             VALUES (?, ?, ?, ?)";
     return $this->executeStatement($sql, [$name, $email, $phone, $message]);
+}
+
+public function getFreeMessageDaysCount() {
+    $sql = "SELECT 
+                DATEDIFF(CURDATE(), MIN(Sent_At)) as days_since_first_message,
+                DATEDIFF(MAX(Sent_At), MIN(Sent_At)) + 1 as total_days_span,
+                COUNT(*) as total_messages,
+                MIN(Sent_At) as first_message_date,
+                MAX(Sent_At) as last_message_date
+            FROM free_message 
+            WHERE is_deleted = 0";
+    return $this->runQuery($sql);
 }
 
 public function getSingleInvoiceForDisplay($invoice_id) {
