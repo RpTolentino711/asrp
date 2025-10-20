@@ -9,8 +9,12 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 $db = new Database();
 
-// Get current counts without date filtering for real-time updates
+// Get current counts with MONTHLY filtering for invoices
 try {
+    $currentMonth = date('m');
+    $currentYear = date('Y');
+    $currentDate = date('Y-m-d');
+    
     $counts = [
         'pending_rentals' => 0,
         'pending_maintenance' => 0,
@@ -18,7 +22,7 @@ try {
         'overdue_invoices' => 0,
         'new_maintenance_requests' => 0,
         'unseen_rentals' => 0,
-        'unread_client_messages' => 0 // Add this for client message notifications
+        'unread_client_messages' => 0
     ];
     
     // Pending rental requests (ALL pending, not just unseen)
@@ -41,14 +45,21 @@ try {
     $result = $db->getRow($sql);
     $counts['new_maintenance_requests'] = $result['count'] ?? 0;
     
-    // Unpaid invoices (ALL unpaid, not just new flow_status)
-    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'";
-    $result = $db->getRow($sql);
+    // FIXED: Unpaid invoices for CURRENT MONTH only
+    $sql = "SELECT COUNT(*) as count FROM invoice 
+            WHERE Status = 'unpaid' 
+            AND MONTH(EndDate) = ? 
+            AND YEAR(EndDate) = ?";
+    $result = $db->getRow($sql, [$currentMonth, $currentYear]);
     $counts['unpaid_invoices'] = $result['count'] ?? 0;
     
-    // Overdue invoices (ALL overdue, not just new flow_status)
-    $sql = "SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < CURDATE()";
-    $result = $db->getRow($sql);
+    // FIXED: Overdue invoices for CURRENT MONTH only
+    $sql = "SELECT COUNT(*) as count FROM invoice 
+            WHERE Status = 'unpaid' 
+            AND EndDate < ? 
+            AND MONTH(EndDate) = ? 
+            AND YEAR(EndDate) = ?";
+    $result = $db->getRow($sql, [$currentDate, $currentMonth, $currentYear]);
     $counts['overdue_invoices'] = $result['count'] ?? 0;
     
     // NEW: Get count of unread client messages in invoice chat

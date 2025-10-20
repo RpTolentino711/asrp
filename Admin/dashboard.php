@@ -1687,7 +1687,7 @@ function timeAgo($datetime) {
         }
         
         console.log('Fetching dashboard counts...');
-        fetch('../AJAX/ajax_admin_dashboard_counts.php')
+fetch(`../AJAX/ajax_admin_dashboard_counts.php?month=${selectedMonth}&year=${selectedYear}`)
             .then(res => {
                 if (!res.ok) throw new Error('Network response was not ok');
                 return res.json();

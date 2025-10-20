@@ -1798,9 +1798,11 @@ public function getMonthlyEarningsStats($startDate, $endDate) {
 
 
 
-// In your Database class, update the getAdminDashboardCounts method:
-
 public function getAdminDashboardCounts() {
+    $currentMonth = date('m');
+    $currentYear = date('Y');
+    $currentDate = date('Y-m-d');
+    
     $counts = [];
     
     // Pending rentals
@@ -1809,16 +1811,14 @@ public function getAdminDashboardCounts() {
     // Pending maintenance
     $counts['pending_maintenance'] = $this->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'] ?? 0;
     
-    // FIXED: Unpaid invoices (ALL unpaid invoices, not just monthly)
-    $counts['unpaid_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'")['count'] ?? 0;
+    // FIXED: Unpaid invoices for CURRENT MONTH only
+    $counts['unpaid_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND MONTH(EndDate) = ? AND YEAR(EndDate) = ?", [$currentMonth, $currentYear])['count'] ?? 0;
     
-    // FIXED: Overdue invoices (ALL unpaid invoices where EndDate has passed)
-    $currentDate = date('Y-m-d');
-    $counts['overdue_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < ?", [$currentDate])['count'] ?? 0;
+    // FIXED: Overdue invoices for CURRENT MONTH only
+    $counts['overdue_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < ? AND MONTH(EndDate) = ? AND YEAR(EndDate) = ?", [$currentDate, $currentMonth, $currentYear])['count'] ?? 0;
     
     return $counts;
 }
-
 
 // New function specifically for maintenance statistics
 public function getMaintenanceStats($startDate, $endDate) {
