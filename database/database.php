@@ -1809,10 +1809,10 @@ public function getAdminDashboardCounts() {
     // Pending maintenance
     $counts['pending_maintenance'] = $this->getRow("SELECT COUNT(*) as count FROM maintenancerequest WHERE Status = 'Submitted'")['count'] ?? 0;
     
-    // FIXED: Unpaid invoices (ALL unpaid invoices regardless of date)
+    // FIXED: Unpaid invoices (ALL unpaid invoices, not just monthly)
     $counts['unpaid_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid'")['count'] ?? 0;
     
-    // FIXED: Overdue invoices (unpaid invoices where EndDate has passed)
+    // FIXED: Overdue invoices (ALL unpaid invoices where EndDate has passed)
     $currentDate = date('Y-m-d');
     $counts['overdue_invoices'] = $this->getRow("SELECT COUNT(*) as count FROM invoice WHERE Status = 'unpaid' AND EndDate < ?", [$currentDate])['count'] ?? 0;
     
@@ -2103,18 +2103,6 @@ public function insertFreeMessage($name, $email, $phone, $message) {
     $sql = "INSERT INTO free_message (Client_Name, Client_Email, Client_Phone, Message_Text)
             VALUES (?, ?, ?, ?)";
     return $this->executeStatement($sql, [$name, $email, $phone, $message]);
-}
-
-public function getFreeMessageDaysCount() {
-    $sql = "SELECT 
-                DATEDIFF(CURDATE(), MIN(Sent_At)) as days_since_first_message,
-                DATEDIFF(MAX(Sent_At), MIN(Sent_At)) + 1 as total_days_span,
-                COUNT(*) as total_messages,
-                MIN(Sent_At) as first_message_date,
-                MAX(Sent_At) as last_message_date
-            FROM free_message 
-            WHERE is_deleted = 0";
-    return $this->runQuery($sql);
 }
 
 public function getSingleInvoiceForDisplay($invoice_id) {
