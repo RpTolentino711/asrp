@@ -1330,7 +1330,7 @@ if (isset($_SESSION['login_error'])) {
                               <div class="modal-footer">
                                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                   <a href="rent_request.php?space_id=' . urlencode($space['Space_ID']) . '" class="btn btn-success">
-                                      <i class="bi bi-receipt me-2"></i>Request Invoice
+                                      <i class="bi bi-receipt me-2"></i>Request Rent
                                   </a>
                               </div>
                           </div>
