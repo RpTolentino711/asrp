@@ -817,7 +817,6 @@ $service_icon = isset($service_icons[strtoupper($jobtype_name)]) ? $service_icon
     <?php require('footer.php'); ?>
 
     <!-- Bootstrap JavaScript -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Mobile navbar handling
