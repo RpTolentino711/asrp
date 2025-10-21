@@ -12,13 +12,11 @@ if (!$logged_in) {
 }
 
 // Handle form submission with POST-redirect-GET pattern to prevent duplicate submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['confirm_price'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['start_date'], $_POST['confirm_price'])) {
     $space_id = intval($_POST['space_id']);
+    $start_date = $_POST['start_date'];
     
-    // ALWAYS USE TODAY'S DATE AS START DATE
-    $start_date = date('Y-m-d');
-    
-    // Calculate end date as 1 month from start date (today)
+    // Calculate end date as 1 month from start date
     $end_date = date('Y-m-d', strtotime($start_date . ' +1 month'));
 
     if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
@@ -48,6 +46,9 @@ $pending_space_ids = [];
 foreach ($pending_requests as $request) {
     $pending_space_ids[] = $request['Space_ID'];
 }
+
+// Get today's date for the date input min attribute
+$today_date = date('Y-m-d');
 ?>
 <!doctype html>
 <html lang="en">
@@ -860,23 +861,25 @@ foreach ($pending_requests as $request) {
                                         <input type="hidden" name="space_id" value="<?= htmlspecialchars($space['Space_ID']) ?>">
                                         <input type="hidden" name="confirm_price" value="1">
                                         
-                                        <!-- Display today's date as fixed start date -->
+                                        <!-- User can choose start date from today onwards -->
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-calendar-plus"></i>
                                                 Start Date
                                             </label>
-                                            <input type="text" class="form-control" value="<?= date('F j, Y') ?>" disabled readonly>
-                                            <input type="hidden" name="start_date" value="<?= date('Y-m-d') ?>">
-                                            <small class="text-muted mt-1 d-block">Rental will start from today's date</small>
+                                            <input type="date" name="start_date" class="form-control start-date-input" 
+                                                   min="<?= $today_date ?>" 
+                                                   value="<?= $today_date ?>"
+                                                   <?= $has_pending_request ? 'disabled' : '' ?> required>
+                                            <small class="text-muted mt-1 d-block">You can choose any date starting from today</small>
                                         </div>
                                         
-                                        <!-- Show calculated end date -->
+                                        <!-- Show calculated end date based on selected start date -->
                                         <div class="due-date-display">
                                             <strong>Rental Period: 1 Month</strong>
-                                            <p class="mb-0 mt-2 text-muted">Your rental period will be from <?= date('F j, Y') ?> to <?= date('F j, Y', strtotime('+1 month')) ?></p>
+                                            <p class="mb-0 mt-2 text-muted">Your rental period will be automatically calculated based on your selected start date</p>
                                             <div class="calculated-end-date mt-2" style="font-weight: 600; color: var(--primary);">
-                                                End Date: <?= date('F j, Y', strtotime('+1 month')) ?>
+                                                End Date: <?= date('F j, Y', strtotime($today_date . ' +1 month')) ?>
                                             </div>
                                         </div>
                                         
@@ -886,7 +889,7 @@ foreach ($pending_requests as $request) {
                                                 <?php if ($has_pending_request): ?>
                                                     You have already submitted a request for this unit. Please wait for admin approval.
                                                 <?php else: ?>
-                                                    The rental will start from today's date and continue for 1 month. Our team will review your application and contact you within 24 hours.
+                                                    Choose your preferred start date (today or any future date). The rental period is fixed at 1 month. Our team will review your application and contact you within 24 hours.
                                                 <?php endif; ?>
                                             </p>
                                         </div>
@@ -954,7 +957,7 @@ foreach ($pending_requests as $request) {
                         </div>
                         <p class="mb-0">
                             Are you sure you want to submit this rental request? 
-                            The rental will start from today and continue for 1 month.
+                            The price is fixed and rental period is 1 month.
                         </p>
                         <div class="alert alert-warning mt-3">
                             <small><i class="bi bi-exclamation-triangle me-2"></i>
@@ -1016,13 +1019,39 @@ foreach ($pending_requests as $request) {
 
         // Show confirmation modal
         function showConfirmModal(form, price, unitName) {
+            const startDateInput = form.querySelector('input[name="start_date"]');
+            if (!startDateInput.value) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Please Select Start Date',
+                    text: 'Please select a start date before submitting your request.',
+                    confirmButtonColor: 'var(--primary)'
+                });
+                return false;
+            }
+
+            // Validate that the selected date is not in the past
+            const selectedDate = new Date(startDateInput.value);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time part for accurate comparison
+            
+            if (selectedDate < today) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Invalid Start Date',
+                    text: 'Please select a start date that is today or in the future.',
+                    confirmButtonColor: 'var(--primary)'
+                });
+                return false;
+            }
+
             pendingForm = form;
             document.getElementById('modalPriceText').textContent = "₱" + Number(price).toLocaleString() + " per month";
             document.getElementById('modalUnitName').textContent = unitName;
             
-            // Calculate and display date range (always today to today + 1 month)
-            const startDate = new Date();
-            const endDate = new Date();
+            // Calculate and display date range based on selected start date
+            const startDate = new Date(startDateInput.value);
+            const endDate = new Date(startDate);
             endDate.setMonth(endDate.getMonth() + 1);
             
             const dateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
@@ -1076,11 +1105,47 @@ foreach ($pending_requests as $request) {
                 }
             });
 
-            // Form validation
+            // Start date change handler to show/calculate end date
+            document.querySelectorAll('.start-date-input').forEach(input => {
+                input.addEventListener('change', function() {
+                    const form = this.closest('form');
+                    const dueDateDisplay = form.querySelector('.due-date-display');
+                    const calculatedEndDate = form.querySelector('.calculated-end-date');
+                    
+                    if (this.value && dueDateDisplay && calculatedEndDate) {
+                        const startDate = new Date(this.value);
+                        const endDate = new Date(startDate);
+                        endDate.setMonth(endDate.getMonth() + 1);
+                        
+                        calculatedEndDate.textContent = `End Date: ${formatDate(endDate)}`;
+                        dueDateDisplay.style.display = 'block';
+                    } else if (dueDateDisplay) {
+                        dueDateDisplay.style.display = 'none';
+                    }
+                });
+            });
+
+            // Form validation - prevent past dates
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', function(e) {
-                    // No date validation needed since start date is fixed to today
-                    console.log('Submitting rental request with start date: today');
+                    const startDate = this.querySelector('input[name="start_date"]');
+                    
+                    if (startDate && startDate.value) {
+                        const selectedDate = new Date(startDate.value);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        if (selectedDate < today) {
+                            e.preventDefault();
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Invalid Start Date',
+                                text: 'Please select a start date that is today or in the future.',
+                                confirmButtonColor: 'var(--primary)'
+                            });
+                            return false;
+                        }
+                    }
                 });
             });
 
@@ -1118,6 +1183,18 @@ foreach ($pending_requests as $request) {
                     });
                 }, 1000);
             <?php endif; ?>
+
+            // Date input improvements - set minimum to today
+            document.querySelectorAll('input[type="date"]').forEach(input => {
+                // Set minimum date to today to prevent past dates
+                const today = new Date().toISOString().split('T')[0];
+                input.setAttribute('min', today);
+                
+                // Set default value to today if not already set
+                if (!input.value) {
+                    input.value = today;
+                }
+            });
 
             // Enhanced card interactions for available units only
             document.querySelectorAll('.rental-card:not(.pending-request)').forEach(card => {
