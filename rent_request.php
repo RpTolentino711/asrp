@@ -12,11 +12,13 @@ if (!$logged_in) {
 }
 
 // Handle form submission with POST-redirect-GET pattern to prevent duplicate submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['start_date'], $_POST['confirm_price'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $logged_in && isset($_POST['space_id'], $_POST['confirm_price'])) {
     $space_id = intval($_POST['space_id']);
-    $start_date = $_POST['start_date'];
     
-    // Calculate end date as 1 month from start date
+    // ALWAYS USE TODAY'S DATE AS START DATE
+    $start_date = date('Y-m-d');
+    
+    // Calculate end date as 1 month from start date (today)
     $end_date = date('Y-m-d', strtotime($start_date . ' +1 month'));
 
     if ($db->createRentalRequest($client_id, $space_id, $start_date, $end_date)) {
@@ -858,18 +860,24 @@ foreach ($pending_requests as $request) {
                                         <input type="hidden" name="space_id" value="<?= htmlspecialchars($space['Space_ID']) ?>">
                                         <input type="hidden" name="confirm_price" value="1">
                                         
+                                        <!-- Display today's date as fixed start date -->
                                         <div class="mb-3">
                                             <label class="form-label">
                                                 <i class="bi bi-calendar-plus"></i>
                                                 Start Date
                                             </label>
-                                            <input type="date" name="start_date" class="form-control start-date-input" <?= $has_pending_request ? 'disabled' : '' ?> required>
+                                            <input type="text" class="form-control" value="<?= date('F j, Y') ?>" disabled readonly>
+                                            <input type="hidden" name="start_date" value="<?= date('Y-m-d') ?>">
+                                            <small class="text-muted mt-1 d-block">Rental will start from today's date</small>
                                         </div>
                                         
-                                        <div class="due-date-display" style="display: none;">
+                                        <!-- Show calculated end date -->
+                                        <div class="due-date-display">
                                             <strong>Rental Period: 1 Month</strong>
-                                            <p class="mb-0 mt-2 text-muted">Due date will be automatically set to 1 month from your selected start date</p>
-                                            <div class="calculated-end-date mt-2" style="font-weight: 600; color: var(--primary);"></div>
+                                            <p class="mb-0 mt-2 text-muted">Your rental period will be from <?= date('F j, Y') ?> to <?= date('F j, Y', strtotime('+1 month')) ?></p>
+                                            <div class="calculated-end-date mt-2" style="font-weight: 600; color: var(--primary);">
+                                                End Date: <?= date('F j, Y', strtotime('+1 month')) ?>
+                                            </div>
                                         </div>
                                         
                                         <div class="rental-notes">
@@ -878,7 +886,7 @@ foreach ($pending_requests as $request) {
                                                 <?php if ($has_pending_request): ?>
                                                     You have already submitted a request for this unit. Please wait for admin approval.
                                                 <?php else: ?>
-                                                    Choose your preferred start date (any date is allowed). The rental period is fixed at 1 month. Our team will review your application and contact you within 24 hours.
+                                                    The rental will start from today's date and continue for 1 month. Our team will review your application and contact you within 24 hours.
                                                 <?php endif; ?>
                                             </p>
                                         </div>
@@ -946,7 +954,7 @@ foreach ($pending_requests as $request) {
                         </div>
                         <p class="mb-0">
                             Are you sure you want to submit this rental request? 
-                            The price is fixed and rental period is 1 month.
+                            The rental will start from today and continue for 1 month.
                         </p>
                         <div class="alert alert-warning mt-3">
                             <small><i class="bi bi-exclamation-triangle me-2"></i>
@@ -1008,24 +1016,13 @@ foreach ($pending_requests as $request) {
 
         // Show confirmation modal
         function showConfirmModal(form, price, unitName) {
-            const startDateInput = form.querySelector('input[name="start_date"]');
-            if (!startDateInput.value) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Please Select Start Date',
-                    text: 'Please select a start date before submitting your request.',
-                    confirmButtonColor: 'var(--primary)'
-                });
-                return false;
-            }
-
             pendingForm = form;
             document.getElementById('modalPriceText').textContent = "₱" + Number(price).toLocaleString() + " per month";
             document.getElementById('modalUnitName').textContent = unitName;
             
-            // Calculate and display date range
-            const startDate = new Date(startDateInput.value);
-            const endDate = new Date(startDate);
+            // Calculate and display date range (always today to today + 1 month)
+            const startDate = new Date();
+            const endDate = new Date();
             endDate.setMonth(endDate.getMonth() + 1);
             
             const dateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
@@ -1079,35 +1076,11 @@ foreach ($pending_requests as $request) {
                 }
             });
 
-            // Start date change handler to show/calculate end date
-            document.querySelectorAll('.start-date-input').forEach(input => {
-                input.addEventListener('change', function() {
-                    const form = this.closest('form');
-                    const dueDateDisplay = form.querySelector('.due-date-display');
-                    const calculatedEndDate = form.querySelector('.calculated-end-date');
-                    
-                    if (this.value && dueDateDisplay && calculatedEndDate) {
-                        const startDate = new Date(this.value);
-                        const endDate = new Date(startDate);
-                        endDate.setMonth(endDate.getMonth() + 1);
-                        
-                        calculatedEndDate.textContent = `End Date: ${formatDate(endDate)}`;
-                        dueDateDisplay.style.display = 'block';
-                    } else if (dueDateDisplay) {
-                        dueDateDisplay.style.display = 'none';
-                    }
-                });
-            });
-
-            // Form validation - removed past date restriction
+            // Form validation
             document.querySelectorAll('form').forEach(form => {
                 form.addEventListener('submit', function(e) {
-                    const startDate = this.querySelector('input[name="start_date"]');
-                    
-                    if (startDate && startDate.value) {
-                        // No date restrictions - any date is allowed
-                        console.log('Start date selected:', startDate.value);
-                    }
+                    // No date validation needed since start date is fixed to today
+                    console.log('Submitting rental request with start date: today');
                 });
             });
 
@@ -1145,12 +1118,6 @@ foreach ($pending_requests as $request) {
                     });
                 }, 1000);
             <?php endif; ?>
-
-            // Date input improvements - no minimum date restriction
-            document.querySelectorAll('input[type="date"]').forEach(input => {
-                // Remove any minimum date restrictions - users can select any date
-                input.removeAttribute('min');
-            });
 
             // Enhanced card interactions for available units only
             document.querySelectorAll('.rental-card:not(.pending-request)').forEach(card => {
